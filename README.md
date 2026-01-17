@@ -1,2 +1,1 @@
-# town-commerce-platform
-local ecomerse app for Ghana
+# Town Commerce Platform
