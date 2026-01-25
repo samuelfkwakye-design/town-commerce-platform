@@ -43,7 +43,10 @@ export class OrdersService {
         townId: dto.townId,
         customerEmail: dto.customerEmail ?? null,
         customerPhone: dto.customerPhone ?? null,
+
+        // If not provided, Prisma default (COD) applies
         goodsPaymentMethod: dto.goodsPaymentMethod ?? undefined,
+
         status: OrderStatus.DRAFT,
         subtotal: this.dec('0.00'),
         total: this.dec('0.00'),
@@ -74,6 +77,7 @@ export class OrdersService {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Order not found: ${orderId}`);
 
+    // LOCKING RULE: no item edits after DRAFT
     if (order.status !== OrderStatus.DRAFT) {
       throw new BadRequestException('You can only add items to a DRAFT order');
     }
@@ -83,12 +87,25 @@ export class OrdersService {
       include: { product: true, town: true },
     });
 
-    if (!townProduct) throw new NotFoundException(`TownProduct not found: ${dto.townProductId}`);
+    if (!townProduct) {
+      throw new NotFoundException(`TownProduct not found: ${dto.townProductId}`);
+    }
 
     if (townProduct.townId !== order.townId) {
       throw new BadRequestException('TownProduct does not belong to this order’s town');
     }
+    // ---- Stock validation (pre-check) ----
+    // Only enforce when stock is tracked (not null/undefined).
+    // Also account for items already in THIS order (so repeated adds can't bypass stock limits).
+    const existingItems = await this.prisma.orderItem.findMany({
+      where: { orderId, townProductId: townProduct.id },
+      select: { quantity: true, weightGrams: true },
+    });
 
+    const alreadyQty = existingItems.reduce((sum, it) => sum + (it.quantity ?? 0), 0);
+    const alreadyGrams = existingItems.reduce((sum, it) => sum + (it.weightGrams ?? 0), 0);
+
+    // UNIT pricing
     if (townProduct.pricingModel === PricingModel.UNIT) {
       if (!dto.quantity || dto.quantity < 1) {
         throw new BadRequestException('UNIT items require quantity (>= 1)');
@@ -98,6 +115,17 @@ export class OrdersService {
       }
       if (!townProduct.pricePerUnit) {
         throw new BadRequestException('TownProduct is missing pricePerUnit');
+      }
+      // Enforce available stock if stockQty is tracked
+      if (townProduct.stockQty !== null && townProduct.stockQty !== undefined) {
+        const requested = dto.quantity;
+        const available = townProduct.stockQty;
+
+        if (alreadyQty + requested > available) {
+          throw new BadRequestException(
+            `Insufficient stock. Available: ${available}, in-order: ${alreadyQty}, requested: ${requested}`,
+          );
+        }
       }
 
       const unitPrice = townProduct.pricePerUnit;
@@ -118,6 +146,7 @@ export class OrdersService {
       return created;
     }
 
+    // WEIGHT pricing
     if (townProduct.pricingModel === PricingModel.WEIGHT) {
       if (!dto.weightGrams || dto.weightGrams < 1) {
         throw new BadRequestException('WEIGHT items require weightGrams (>= 1)');
@@ -127,6 +156,17 @@ export class OrdersService {
       }
       if (!townProduct.pricePerKg) {
         throw new BadRequestException('TownProduct is missing pricePerKg');
+      }
+      // Enforce available stock if stockWeightGrams is tracked
+      if (townProduct.stockWeightGrams !== null && townProduct.stockWeightGrams !== undefined) {
+        const requested = dto.weightGrams;
+        const available = townProduct.stockWeightGrams;
+
+        if (alreadyGrams + requested > available) {
+          throw new BadRequestException(
+            `Insufficient stock (grams). Available: ${available}, in-order: ${alreadyGrams}, requested: ${requested}`,
+          );
+        }
       }
 
       const unitPrice = townProduct.pricePerKg;
@@ -155,6 +195,10 @@ export class OrdersService {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Order not found: ${orderId}`);
 
+    // LOCKING RULES:
+    // - DRAFT: allow contact + fee updates
+    // - CONFIRMED: allow ONLY contact updates (email/phone)
+    // - others: no updates
     const isDraft = order.status === OrderStatus.DRAFT;
     const isConfirmed = order.status === OrderStatus.CONFIRMED;
 
@@ -173,6 +217,7 @@ export class OrdersService {
       );
     }
 
+    // If CONFIRMED, block fee changes
     if (isConfirmed && (hasDeliveryFee || hasServiceFee)) {
       throw new BadRequestException('Fees cannot be changed after order confirmation');
     }
@@ -182,6 +227,7 @@ export class OrdersService {
       data: {
         customerEmail: hasEmail ? dto.customerEmail ?? null : undefined,
         customerPhone: hasPhone ? dto.customerPhone ?? null : undefined,
+
         deliveryFee: isDraft && hasDeliveryFee ? this.dec(dto.deliveryFee!) : undefined,
         serviceFee: isDraft && hasServiceFee ? this.dec(dto.serviceFee!) : undefined,
       },
@@ -237,10 +283,13 @@ export class OrdersService {
   private async deductStockForFulfilment(tx: Prisma.TransactionClient, orderId: string) {
     const orderWithItems = await tx.order.findUnique({
       where: { id: orderId },
-      include: { items: { include: { townProduct: true } } },
+      include: {
+        items: { include: { townProduct: true } },
+      },
     });
 
     if (!orderWithItems) throw new NotFoundException(`Order not found: ${orderId}`);
+
     if (orderWithItems.items.length === 0) {
       throw new BadRequestException('Cannot fulfil an order with no items');
     }
@@ -252,10 +301,14 @@ export class OrdersService {
         const qty = item.quantity ?? 0;
         if (qty < 1) throw new BadRequestException('UNIT item missing quantity');
 
+        // stockQty null => not tracked
         if (tp.stockQty === null || tp.stockQty === undefined) continue;
 
         const updated = await tx.townProduct.updateMany({
-          where: { id: tp.id, stockQty: { not: null, gte: qty } },
+          where: {
+            id: tp.id,
+            stockQty: { not: null, gte: qty },
+          },
           data: { stockQty: { decrement: qty } },
         });
 
@@ -269,10 +322,14 @@ export class OrdersService {
         const grams = item.weightGrams ?? 0;
         if (grams < 1) throw new BadRequestException('WEIGHT item missing weightGrams');
 
+        // stockWeightGrams null => not tracked
         if (tp.stockWeightGrams === null || tp.stockWeightGrams === undefined) continue;
 
         const updated = await tx.townProduct.updateMany({
-          where: { id: tp.id, stockWeightGrams: { not: null, gte: grams } },
+          where: {
+            id: tp.id,
+            stockWeightGrams: { not: null, gte: grams },
+          },
           data: { stockWeightGrams: { decrement: grams } },
         });
 
@@ -284,10 +341,13 @@ export class OrdersService {
   }
 
   async completeOrder(orderId: string, code: string) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+
     if (!order) throw new NotFoundException(`Order not found: ${orderId}`);
 
-    // Idempotent: do not double-deduct
+    // ✅ Idempotent: do not double-deduct stock
     if (order.status === OrderStatus.FULFILLED || order.status === OrderStatus.SETTLED) {
       return order;
     }
@@ -305,10 +365,12 @@ export class OrdersService {
     }
 
     const incomingHash = this.hashCode(code);
+
     if (incomingHash !== order.deliveryCodeHash) {
       throw new BadRequestException('Invalid delivery code');
     }
 
+    // ✅ Atomic: deduct stock + fulfil in one transaction
     return this.prisma.$transaction(async (tx) => {
       await this.deductStockForFulfilment(tx, orderId);
 
@@ -323,6 +385,7 @@ export class OrdersService {
     });
   }
 
+  // Driver confirms cash was collected for goods (COD only) → SETTLED
   async markCodCollected(orderId: string, note?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -352,7 +415,12 @@ export class OrdersService {
 
     const [, settled] = await this.prisma.$transaction([
       this.prisma.payment.upsert({
-        where: { orderId_purpose: { orderId, purpose: PaymentPurpose.COD_GOODS } },
+        where: {
+          orderId_purpose: {
+            orderId,
+            purpose: PaymentPurpose.COD_GOODS,
+          },
+        },
         create: {
           orderId,
           purpose: PaymentPurpose.COD_GOODS,
@@ -370,6 +438,7 @@ export class OrdersService {
           hubtelResponse: note ? { note } : undefined,
         },
       }),
+
       this.prisma.order.update({
         where: { id: orderId },
         data: { status: OrderStatus.SETTLED },
@@ -380,6 +449,13 @@ export class OrdersService {
     return settled;
   }
 
+  /**
+   * Initiate MOMO payment for goods (after delivery)
+   * - Creates/updates Payment as INITIATED
+   * - Calls Hubtel Direct Receive (dev-safe if not configured)
+   * - Stores Hubtel response & TransactionId (if returned)
+   * - Webhook will later mark SUCCESS + SETTLED
+   */
   async payGoods(orderId: string, momoPhone?: string, note?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -417,6 +493,7 @@ export class OrdersService {
       throw new BadRequestException('Goods payment is already marked as paid');
     }
 
+    // Idempotent if INITIATED already
     if (existing?.status === PaymentStatus.INITIATED) {
       return {
         orderId: order.id,
@@ -432,10 +509,17 @@ export class OrdersService {
     }
 
     const clientReference =
-      existing?.clientReference ?? `goods_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+      existing?.clientReference ??
+      `goods_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
 
+    // Upsert payment INITIATED
     const payment = await this.prisma.payment.upsert({
-      where: { orderId_purpose: { orderId: order.id, purpose: PaymentPurpose.COD_GOODS } },
+      where: {
+        orderId_purpose: {
+          orderId: order.id,
+          purpose: PaymentPurpose.COD_GOODS,
+        },
+      },
       create: {
         orderId: order.id,
         purpose: PaymentPurpose.COD_GOODS,
@@ -445,20 +529,31 @@ export class OrdersService {
         currency: 'GHS',
         provider: 'HUBTEL',
         clientReference,
-        hubtelResponse: { stage: 'INITIATED_LOCAL', payToPhone, note: note ?? null },
+        hubtelResponse: {
+          stage: 'INITIATED_LOCAL',
+          payToPhone,
+          note: note ?? null,
+        },
       },
       update: {
         method: PaymentMethod.MOMO,
         status: PaymentStatus.INITIATED,
         provider: 'HUBTEL',
         clientReference,
-        hubtelResponse: { stage: 'INITIATED_LOCAL', payToPhone, note: note ?? null },
+        hubtelResponse: {
+          stage: 'INITIATED_LOCAL',
+          payToPhone,
+          note: note ?? null,
+        },
       },
     });
 
     const callbackUrl = (process.env.HUBTEL_CALLBACK_URL ?? '').trim();
+
+    // NOTE: payOnDeliveryTotal is a Prisma.Decimal. Make a clean "120.00" string.
     const amountStr = new Prisma.Decimal(order.payOnDeliveryTotal).toFixed(2);
 
+    // Call Hubtel (dev-safe)
     const hubtelRes = await this.hubtel.receiveMoney({
       destination: payToPhone,
       amount: amountStr,
@@ -474,6 +569,7 @@ export class OrdersService {
       (hubtelRes as any)?.json?.data?.transactionId ??
       null;
 
+    // Persist Hubtel response
     await this.prisma.payment.update({
       where: { id: payment.id },
       data: {
