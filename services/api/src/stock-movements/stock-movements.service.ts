@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma, StockMovementReason } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { ListStockMovementsQueryDto } from './dto/list-stock-movements.query.dto';
-import { Prisma } from '@prisma/client';
 
 type Cursor = { createdAt: Date; id: string };
 
@@ -42,14 +43,9 @@ export class StockMovementsService {
     };
 
     /**
-     * Cursor paging with orderBy (createdAt desc, id desc)
+     * Seek pagination for orderBy (createdAt desc, id desc)
      *
-     * Prisma cursor expects a UNIQUE cursor.
-     * If your StockMovement model has `id` as @id (unique), we can use cursor: { id }
-     * BUT to maintain correct ordering when multiple rows share same createdAt,
-     * we apply an extra `where` clause to implement “seek pagination”:
-     *
-     * For (createdAt desc, id desc), next page condition is:
+     * Next page condition:
      *   createdAt < cursor.createdAt
      *   OR (createdAt = cursor.createdAt AND id < cursor.id)
      */
@@ -69,7 +65,7 @@ export class StockMovementsService {
     const rows = await this.prisma.stockMovement.findMany({
       where: finalWhere,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: limit + 1, // fetch 1 extra to detect next page
+      take: limit + 1,
     });
 
     const hasNextPage = rows.length > limit;
@@ -78,11 +74,74 @@ export class StockMovementsService {
 
     return {
       items,
-      pageInfo: {
-        limit,
-        hasNextPage,
-        nextCursor,
-      },
+      pageInfo: { limit, hasNextPage, nextCursor },
     };
+  }
+
+  async adjust(dto: AdjustStockDto) {
+    const { townProductId, deltaQty, deltaWeightGrams, note } = dto;
+
+    const hasQty = typeof deltaQty === 'number';
+    const hasWg = typeof deltaWeightGrams === 'number';
+
+    if ((hasQty && hasWg) || (!hasQty && !hasWg)) {
+      throw new BadRequestException('Provide exactly one of deltaQty or deltaWeightGrams');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const tp = await tx.townProduct.findUnique({
+        where: { id: townProductId },
+        select: {
+          id: true,
+          pricingModel: true,
+          stockQty: true,
+          stockWeightGrams: true,
+        },
+      });
+
+      if (!tp) throw new BadRequestException('TownProduct not found');
+
+      if (tp.pricingModel === 'UNIT' && !hasQty) {
+        throw new BadRequestException('UNIT products require deltaQty');
+      }
+      if (tp.pricingModel === 'WEIGHT' && !hasWg) {
+        throw new BadRequestException('WEIGHT products require deltaWeightGrams');
+      }
+
+      const currentQty = tp.stockQty ?? 0;
+      const currentWg = tp.stockWeightGrams ?? 0;
+
+      const newQty = hasQty ? currentQty + (deltaQty as number) : currentQty;
+      const newWg = hasWg ? currentWg + (deltaWeightGrams as number) : currentWg;
+
+      if (newQty < 0) throw new BadRequestException('Resulting stockQty cannot be negative');
+      if (newWg < 0) throw new BadRequestException('Resulting stockWeightGrams cannot be negative');
+
+      const updated = await tx.townProduct.update({
+        where: { id: townProductId },
+        data: {
+          ...(hasQty ? { stockQty: newQty } : {}),
+          ...(hasWg ? { stockWeightGrams: newWg } : {}),
+        },
+        select: {
+          id: true,
+          pricingModel: true,
+          stockQty: true,
+          stockWeightGrams: true,
+        },
+      });
+
+      const movement = await tx.stockMovement.create({
+        data: {
+          townProductId,
+          deltaQty: hasQty ? (deltaQty as number) : null,
+          deltaWeightGrams: hasWg ? (deltaWeightGrams as number) : null,
+          reason: StockMovementReason.MANUAL_ADJUSTMENT,
+          note,
+        },
+      });
+
+      return { townProduct: updated, stockMovement: movement };
+    });
   }
 }
