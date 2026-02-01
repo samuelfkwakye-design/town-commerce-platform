@@ -9,6 +9,7 @@ import { ProductsModule } from './products/products.module';
 import { TownProductsModule } from './town-products/town-products.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
+import { StockMovementsModule } from './stock-movements/stock-movements.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { PaymentsModule } from './payments/payments.module';
     ProductsModule,
     TownProductsModule,
     OrdersModule,
+    StockMovementsModule,
     PaymentsModule, // 👈 REQUIRED for webhook to be live
   ],
   controllers: [AppController],
