@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { StockMovementReason } from '@prisma/client';
 
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -7,6 +16,7 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { CompleteOrderDto } from './dto/complete-order.dto';
 import { CodCollectedDto } from './dto/cod-collected.dto';
 import { PayGoodsDto } from './dto/pay-goods.dto';
+import { RefundItemsDto } from './dto/refund-items.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -22,6 +32,19 @@ export class OrdersController {
   @Get(':id')
   get(@Param('id') id: string) {
     return this.service.getOrder(id);
+  }
+
+  // GET /api/v1/orders/:id/stock-movements?reason=FULFILMENT&limit=50
+  @Get(':id/stock-movements')
+  stockMovements(
+    @Param('id') id: string,
+    @Query('reason') reason?: StockMovementReason,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getStockMovementsForOrder(id, {
+      reason,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   // POST /api/v1/orders/:id/items
@@ -58,5 +81,11 @@ export class OrdersController {
   @Post(':id/pay-goods')
   payGoods(@Param('id') id: string, @Body() dto: PayGoodsDto) {
     return this.service.payGoods(id, dto.momoPhone, dto.note);
+  }
+
+  // POST /api/v1/orders/:id/refund-items
+  @Post(':id/refund-items')
+  refundItems(@Param('id') id: string, @Body() dto: RefundItemsDto) {
+    return this.service.refundItems(id, dto.reason, dto.restock, dto.items);
   }
 }

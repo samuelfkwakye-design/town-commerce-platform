@@ -4,9 +4,10 @@ import {
   PaymentMethod,
   PaymentPurpose,
   PaymentStatus,
-  Prisma,
   PricingModel,
+  RefundStatus,
 } from '@prisma/client';
+
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { HubtelService } from '../hubtel/hubtel.service';
@@ -14,6 +15,8 @@ import { HubtelService } from '../hubtel/hubtel.service';
 import { AddOrderItemDto } from './dto/add-order-item.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
+import { RefundItemLineDto } from './dto/refund-items.dto';
+import { Prisma, StockMovementReason } from '@prisma/client';
 
 @Injectable()
 export class OrdersService {
@@ -21,9 +24,219 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly hubtel: HubtelService,
   ) {}
-
-  private dec(value: string | number): Prisma.Decimal {
+    private dec(value: string | number): Prisma.Decimal {
     return new Prisma.Decimal(String(value));
+  }
+
+  // Full refund (already implemented previously in this project; re-adding entry point)
+  async refundGoods(orderId: string, reason?: string, restock?: boolean) {
+    // TEMP: keep compilation green; we will reinsert the full implementation next.
+    return { ok: false, message: 'refundGoods temporarily not wired in this build' };
+  }
+
+      // Partial refund (base exists previously; re-adding entry point)
+      async refundItems(
+  orderId: string,
+  reason?: string,
+  restock?: boolean,
+  items?: RefundItemLineDto[],
+
+) {
+console.log('REFUND_ITEMS CALLED', {
+  orderId,
+  restock,
+  items,
+});
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        payments: true,
+      },
+    });
+    if (!order) throw new NotFoundException(`Order not found: ${orderId}`);
+
+  if (order.status !== OrderStatus.SETTLED && order.status !== OrderStatus.PARTIALLY_REFUNDED) {
+  throw new BadRequestException(
+    'Partial refund allowed only when order is SETTLED or PARTIALLY_REFUNDED',
+  );
+}
+
+
+    const goodsPayment = order.payments.find(
+      (p) => p.purpose === PaymentPurpose.COD_GOODS && p.status === PaymentStatus.SUCCESS,
+    );
+    if (!goodsPayment) {
+      throw new BadRequestException('Goods payment not found or not SUCCESS');
+    }
+
+    if (!items || items.length === 0) {
+      throw new BadRequestException('At least one refund item is required');
+    }
+
+        const refund = await this.prisma.refund.create({
+      data: {
+        paymentId: goodsPayment.id,
+        reason: reason ?? 'partial refund',
+        restock: !!restock,
+        amount: this.dec('0.00'),
+        status: RefundStatus.REQUESTED,
+      },
+    });
+
+
+        const orderWithItems = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: { include: { refundItems: true } },
+      },
+    });
+    if (!orderWithItems) throw new NotFoundException(`Order not found: ${orderId}`);
+
+    const itemById = new Map(orderWithItems.items.map((i) => [i.id, i]));
+
+    let totalRefund = new Prisma.Decimal(0);
+
+const restocked = new Map<
+  string,
+  { townProductId: string; stockQty?: number; stockWeightGrams?: number }
+>();
+
+
+await this.prisma.$transaction(async (tx) => {
+
+        for (const line of items) {
+        const oi = itemById.get(line.orderItemId);
+        if (!oi) {
+          throw new BadRequestException(`Order item ${line.orderItemId} does not belong to this order`);
+        }
+
+        const hasQty = typeof line.quantity === 'number';
+        const hasWg = typeof line.weightGrams === 'number';
+        if ((hasQty && hasWg) || (!hasQty && !hasWg)) {
+          throw new BadRequestException(
+            `Refund item ${line.orderItemId} must include exactly one of quantity or weightGrams`,
+          );
+        }
+
+        const refundedQty = (oi.refundItems ?? []).reduce((s, r) => s + (r.quantity ?? 0), 0);
+        const refundedWg = (oi.refundItems ?? []).reduce((s, r) => s + (r.weightGrams ?? 0), 0);
+
+        let amount: Prisma.Decimal;
+
+        if (hasQty) {
+          if (!oi.quantity) throw new BadRequestException(`Order item ${oi.id} is not a UNIT item`);
+          if (line.quantity! > oi.quantity - refundedQty) {
+            throw new BadRequestException(`Refund quantity exceeds remaining quantity for item ${oi.id}`);
+          }
+
+          amount = new Prisma.Decimal(oi.unitPrice).mul(line.quantity!);
+
+         await tx.refundItem.create({
+  data: {
+    refundId: refund.id,
+    orderItemId: oi.id,
+    quantity: line.quantity!,
+    amount,
+  },
+});
+
+if (restock && line.quantity! > 0) {
+  const tp = await tx.townProduct.update({
+    where: { id: oi.townProductId },
+    data: { stockQty: { increment: line.quantity! } },
+    select: { id: true, stockQty: true },
+  });
+
+  await this.recordStockMovement(tx, {
+    townProductId: oi.townProductId,
+    reason: StockMovementReason.REFUND,
+    orderId: order.id,
+    refundId: refund.id,
+    deltaQty: line.quantity!,
+  });
+
+  restocked.set(tp.id, {
+    townProductId: tp.id,
+    stockQty: tp.stockQty ?? undefined,
+  });
+}
+
+       } else {
+  if (!oi.weightGrams) throw new BadRequestException(`Order item ${oi.id} is not a WEIGHT item`);
+          if (line.weightGrams! > oi.weightGrams - refundedWg) {
+            throw new BadRequestException(`Refund grams exceed remaining grams for item ${oi.id}`);
+          }
+
+          const perGram = new Prisma.Decimal(oi.lineTotal).div(oi.weightGrams);
+          amount = perGram.mul(line.weightGrams!);
+
+          await tx.refundItem.create({
+  data: {
+    refundId: refund.id,
+    orderItemId: oi.id,
+    weightGrams: line.weightGrams!,
+    amount,
+  },
+});
+
+if (restock && line.weightGrams! > 0) {
+  const tp = await tx.townProduct.update({
+    where: { id: oi.townProductId },
+    data: { stockWeightGrams: { increment: line.weightGrams! } },
+    select: { id: true, stockWeightGrams: true },
+  });
+
+  await this.recordStockMovement(tx, {
+    townProductId: oi.townProductId,
+    reason: StockMovementReason.REFUND,
+    orderId: order.id,
+    refundId: refund.id,
+    deltaWeightGrams: line.weightGrams!,
+  });
+
+  restocked.set(tp.id, {
+    townProductId: tp.id,
+    stockWeightGrams: tp.stockWeightGrams ?? undefined,
+  });
+}
+
+        }
+
+        totalRefund = totalRefund.add(amount);
+      }
+
+      await tx.refund.update({
+        where: { id: refund.id },
+        data: { amount: totalRefund },
+      });
+
+      const itemsAfter = await tx.orderItem.findMany({
+        where: { orderId },
+        include: { refundItems: true },
+      });
+
+      const fullyRefunded = itemsAfter.every((i) => {
+        const q = (i.refundItems ?? []).reduce((s, r) => s + (r.quantity ?? 0), 0);
+        const g = (i.refundItems ?? []).reduce((s, r) => s + (r.weightGrams ?? 0), 0);
+        return (i.quantity == null || q >= i.quantity) && (i.weightGrams == null || g >= i.weightGrams);
+      });
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: fullyRefunded ? OrderStatus.CANCELLED : OrderStatus.PARTIALLY_REFUNDED,
+        },
+      });
+    });
+
+   return {
+  ok: true,
+  refundId: refund.id,
+  amount: totalRefund,
+  restocked: Array.from(restocked.values()),
+};
+
   }
 
   private generateDeliveryCode(): string {
@@ -72,6 +285,22 @@ export class OrdersService {
     if (!order) throw new NotFoundException(`Order not found: ${id}`);
     return order;
   }
+async getStockMovementsForOrder(
+  orderId: string,
+  options?: {
+    reason?: StockMovementReason;
+    limit?: number;
+  },
+) {
+  return this.prisma.stockMovement.findMany({
+    where: {
+      orderId,
+      ...(options?.reason ? { reason: options.reason } : {}),
+    },
+    orderBy: { createdAt: 'desc' },
+    take: options?.limit ?? 100,
+  });
+}
 
   async addItem(orderId: string, dto: AddOrderItemDto) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
@@ -315,6 +544,13 @@ export class OrdersService {
         if (updated.count !== 1) {
           throw new BadRequestException(`Insufficient stock for townProduct ${tp.id}`);
         }
+        await this.recordStockMovement(tx, {
+  townProductId: tp.id,
+  reason: StockMovementReason.FULFILMENT,
+  orderId,
+  deltaQty: -qty,
+});
+
         continue;
       }
 
@@ -336,6 +572,7 @@ export class OrdersService {
         if (updated.count !== 1) {
           throw new BadRequestException(`Insufficient stock (grams) for townProduct ${tp.id}`);
         }
+        
       }
     }
   }
@@ -594,6 +831,43 @@ export class OrdersService {
         : 'Goods payment initiated (Hubtel not configured / request not sent)',
     };
   }
+private async recordStockMovement(
+  tx: Prisma.TransactionClient,
+  params: {
+    townProductId: string;
+    reason: StockMovementReason;
+    orderId?: string;
+    refundId?: string;
+    deltaQty?: number;
+    deltaWeightGrams?: number;
+    note?: string;
+  },
+) {
+  const { deltaQty, deltaWeightGrams } = params;
+
+  const hasQty = typeof deltaQty === 'number' && deltaQty !== 0;
+  const hasWeight =
+    typeof deltaWeightGrams === 'number' && deltaWeightGrams !== 0;
+
+  // exactly one delta must be provided
+  if ((hasQty && hasWeight) || (!hasQty && !hasWeight)) {
+    throw new Error(
+      `Invalid StockMovement delta for townProductId=${params.townProductId}. Provide exactly one of deltaQty or deltaWeightGrams (non-zero).`,
+    );
+  }
+
+  await tx.stockMovement.create({
+    data: {
+      townProductId: params.townProductId,
+      reason: params.reason,
+      orderId: params.orderId ?? null,
+      refundId: params.refundId ?? null,
+      deltaQty: hasQty ? deltaQty : null,
+      deltaWeightGrams: hasWeight ? deltaWeightGrams : null,
+      note: params.note?.trim() || null,
+    },
+  });
+}
 
   private async recalculateTotals(orderId: string) {
     const [items, order] = await Promise.all([
