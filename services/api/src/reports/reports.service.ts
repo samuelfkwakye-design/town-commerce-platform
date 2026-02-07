@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StockValuationQueryDto } from './dto/stock-valuation.query.dto';
 import { SetCostDto } from './dto/set-cost.dto';
+import { ProfitReportQueryDto } from './dto/profit-report.query.dto';
+
 function toNumber(value: any): number | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number') return value;
@@ -187,7 +189,117 @@ export class ReportsService {
       pageInfo: { limit, hasNextPage, nextCursor },
     };
   }
-    async setCost(dto: SetCostDto) {
+    async getProfitReport(q: ProfitReportQueryDto) {
+  const limit = Number(q.limit ?? 50);
+
+
+  // Build WHERE filters (match your other report endpoints)
+  const where: any = {};
+  if (q.townId) where.townId = q.townId;
+  if (q.townProductId) where.id = q.townProductId;
+  if (q.pricingModel) where.pricingModel = q.pricingModel;
+
+  // Pagination (cursor = TownProduct.id) — same pattern as stock valuation
+  const townProducts = await this.prisma.townProduct.findMany({
+    where,
+    take: limit + 1,
+    ...(q.cursor ? { skip: 1, cursor: { id: q.cursor } } : {}),
+    orderBy: { id: 'asc' },
+    include: {
+      product: true, // if your relation name differs, adjust/remove
+      town: true,    // optional; remove if not needed
+    },
+  });
+
+  const hasNext = townProducts.length > limit;
+  const page = hasNext ? townProducts.slice(0, limit) : townProducts;
+  const nextCursor = hasNext ? page[page.length - 1]?.id : null;
+
+  // Use your existing normaliser if you already have one in this file.
+  // If you already have toNumber / normalizeDecimal in reports.service.ts,
+  // then DELETE this helper and use your existing one instead.
+  const toNumber = (v: any): number => {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === 'bigint') return Number(v);
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') return Number(v);
+    if (typeof v?.toNumber === 'function') return v.toNumber();
+    return Number(v);
+  };
+
+  let totalSellingValue = 0;
+  let totalCostValue = 0;
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+  const rows = page.map((tp) => {
+    const pricingModel = tp.pricingModel;
+
+    const stockQty = Number(tp.stockQty ?? 0);
+    const stockWeightGrams = Number(tp.stockWeightGrams ?? 0);
+
+    const pricePerUnit = toNumber(tp.pricePerUnit);
+    const pricePerKg = toNumber(tp.pricePerKg);
+
+    const costPerUnit = toNumber(tp.costPerUnit);
+    const costPerKg = toNumber(tp.costPerKg);
+
+    let sellingValue = 0;
+    let costValue = 0;
+
+    if (pricingModel === 'UNIT') {
+      sellingValue = stockQty * pricePerUnit;
+      costValue = stockQty * costPerUnit;
+    } else if (pricingModel === 'WEIGHT') {
+      const kg = stockWeightGrams / 1000;
+      sellingValue = kg * pricePerKg;
+      costValue = kg * costPerKg;
+    }
+
+    const profit = sellingValue - costValue;
+const marginPercent = sellingValue > 0 ? (profit / sellingValue) * 100 : 0;
+
+const sellingValueR = round2(sellingValue);
+const costValueR = round2(costValue);
+const profitR = round2(profit);
+const marginPercentR = round2(marginPercent);
+
+totalSellingValue += sellingValueR;
+totalCostValue += costValueR;
+
+return {
+  townProductId: tp.id,
+  townId: tp.townId,
+  productId: tp.productId,
+  productName: tp.product?.name ?? null,
+  pricingModel,
+
+  stockQty,
+  stockWeightGrams,
+
+  sellingValue: sellingValueR,
+  costValue: costValueR,
+  profit: profitR,
+  marginPercent: marginPercentR,
+};
+  });
+
+  const totalProfit = round2(totalSellingValue - totalCostValue);
+const totalMarginPercent =
+  totalSellingValue > 0 ? round2((totalProfit / totalSellingValue) * 100) : 0;
+
+return {
+  rows,
+  totals: {
+    sellingValue: round2(totalSellingValue),
+    costValue: round2(totalCostValue),
+    profit: totalProfit,
+    marginPercent: totalMarginPercent,
+  },
+  nextCursor,
+};
+}
+
+  async setCost(dto: SetCostDto) {
     const { townProductId, costPerUnit, costPerKg, note } = dto;
 
     if ((costPerUnit == null && costPerKg == null) || (costPerUnit != null && costPerKg != null)) {
