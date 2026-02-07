@@ -44,6 +44,8 @@ model TownProduct {
   pricingModel     PricingModel @default(UNIT)
   pricePerUnit     Decimal?     @db.Decimal(12, 2)
   pricePerKg       Decimal?     @db.Decimal(12, 2)
+  costPerUnit     Decimal?     @db.Decimal(12, 2)
+  costPerKg       Decimal?     @db.Decimal(12, 2)
   stockQty         Int?
   stockWeightGrams Int?
   isActive         Boolean      @default(true)
