@@ -3,6 +3,15 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StockValuationQueryDto } from './dto/stock-valuation.query.dto';
 import { SetCostDto } from './dto/set-cost.dto';
+function toNumber(value: any): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number(value);
+  if (typeof value === 'object' && typeof value.toNumber === 'function') {
+    return value.toNumber();
+  }
+  return Number(value);
+}
 
 function toNumberOrNull(value: any, fieldLabel: string): number | null {
   if (value === null || value === undefined) return null;
@@ -149,22 +158,16 @@ export class ReportsService {
           productName: tp.product?.name ?? null,
           pricingModel: tp.pricingModel,
 
-          pricePerUnit: tp.pricingModel === 'UNIT' ? pricePerUnit : null,
-          pricePerKg: tp.pricingModel === 'WEIGHT' ? pricePerKg : null,
-          costPerUnit: tp.pricingModel === 'UNIT' ? costPerUnit : null,
-          costPerKg: tp.pricingModel === 'WEIGHT' ? costPerKg : null,
-          mode,
-          rateUsed: unitRate,
+          pricePerUnit: tp.pricingModel === 'UNIT' ? toNumber(pricePerUnit) : null,
+          pricePerKg: tp.pricingModel === 'WEIGHT' ? toNumber(pricePerKg) : null,
 
-          snapshotQty: tp.pricingModel === 'UNIT' ? snapshotQty : null,
-          ledgerQty: tp.pricingModel === 'UNIT' ? ledgerQty : null,
+          costPerUnit: tp.pricingModel === 'UNIT' ? toNumber(costPerUnit) : null,
+          costPerKg: tp.pricingModel === 'WEIGHT' ? toNumber(costPerKg) : null,
 
-          snapshotWeightGrams: tp.pricingModel === 'WEIGHT' ? snapshotWg : null,
-          ledgerWeightGrams: tp.pricingModel === 'WEIGHT' ? ledgerWg : null,
-
-          snapshotValue,
-          ledgerValue,
-          diffValue: snapshotValue - ledgerValue,
+          rateUsed: toNumber(unitRate),
+          snapshotValue: toNumber(snapshotValue),
+          ledgerValue: toNumber(ledgerValue),
+          diffValue: toNumber(snapshotValue - ledgerValue),
 
           isMismatch,
           lastMovementAt: ledger.lastMovementAt,
@@ -176,10 +179,11 @@ export class ReportsService {
     return {
       items,
       totals: {
-        totalSnapshotValue,
-        totalLedgerValue,
-        diffValue: totalSnapshotValue - totalLedgerValue,
-      },
+        totalSnapshotValue: toNumber(totalSnapshotValue),
+        totalLedgerValue: toNumber(totalLedgerValue),
+        diffValue: toNumber(totalSnapshotValue - totalLedgerValue),
+},
+
       pageInfo: { limit, hasNextPage, nextCursor },
     };
   }
@@ -216,12 +220,13 @@ export class ReportsService {
     });
 
     return {
-      townProductId: updated.id,
-      pricingModel: updated.pricingModel,
-      costPerUnit: updated.costPerUnit,
-      costPerKg: updated.costPerKg,
-      note: note ?? null,
-    };
+  townProductId: updated.id,
+  pricingModel: updated.pricingModel,
+  costPerUnit: updated.costPerUnit === null ? null : Number(updated.costPerUnit),
+  costPerKg: updated.costPerKg === null ? null : Number(updated.costPerKg),
+  note: note ?? null,
+};
+
   }
 
 }
