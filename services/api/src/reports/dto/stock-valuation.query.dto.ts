@@ -11,6 +11,11 @@ export class StockValuationQueryDto {
   pricingModel?: 'UNIT' | 'WEIGHT';
 
   @IsOptional()
+  @IsIn(['selling', 'cost'])
+  mode?: 'selling' | 'cost';
+
+
+  @IsOptional()
   @Transform(({ value }) => (value === undefined ? undefined : String(value).trim().toLowerCase() === 'true'))
   onlyMismatches?: boolean;
 

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StockValuationQueryDto } from './dto/stock-valuation.query.dto';
+import { SetCostDto } from './dto/set-cost.dto';
 
 function toNumberOrNull(value: any, fieldLabel: string): number | null {
   if (value === null || value === undefined) return null;
@@ -25,6 +26,7 @@ export class ReportsService {
    */
   async stockValuation(q: StockValuationQueryDto) {
     const limit = Math.min(Math.max(q.limit ?? 50, 1), 200);
+    const mode: 'selling' | 'cost' = q.mode ?? 'selling';
 
     const tpWhere: Prisma.TownProductWhereInput = {
       ...(q.townId ? { townId: q.townId } : {}),
@@ -45,6 +47,8 @@ export class ReportsService {
         stockWeightGrams: true,
         pricePerUnit: true,
         pricePerKg: true,
+        costPerUnit: true,
+        costPerKg: true,
         updatedAt: true,
         product: { select: { name: true } },
       },
@@ -98,25 +102,42 @@ export class ReportsService {
           (tp.pricingModel === 'WEIGHT' && snapshotWg !== ledgerWg);
 
         // selling price selection
-        const pricePerUnit = toNumberOrNull(tp.pricePerUnit, `TownProduct.pricePerUnit for townProductId=${tp.id}`);
+                const pricePerUnit = toNumberOrNull(tp.pricePerUnit, `TownProduct.pricePerUnit for townProductId=${tp.id}`);
         const pricePerKg = toNumberOrNull(tp.pricePerKg, `TownProduct.pricePerKg for townProductId=${tp.id}`);
+        const costPerUnit = toNumberOrNull(tp.costPerUnit, `TownProduct.costPerUnit for townProductId=${tp.id}`);
+        const costPerKg = toNumberOrNull(tp.costPerKg, `TownProduct.costPerKg for townProductId=${tp.id}`);
 
-        if (tp.pricingModel === 'UNIT' && pricePerUnit === null) {
-          throw new BadRequestException(`Missing pricePerUnit for townProductId=${tp.id}`);
-        }
-        if (tp.pricingModel === 'WEIGHT' && pricePerKg === null) {
-          throw new BadRequestException(`Missing pricePerKg for townProductId=${tp.id}`);
+        const unitRate =
+          mode === 'selling'
+            ? tp.pricingModel === 'UNIT'
+              ? pricePerUnit
+              : pricePerKg
+            : tp.pricingModel === 'UNIT'
+              ? costPerUnit
+              : costPerKg;
+
+        const unitRateLabel =
+          mode === 'selling'
+            ? tp.pricingModel === 'UNIT'
+              ? 'pricePerUnit'
+              : 'pricePerKg'
+            : tp.pricingModel === 'UNIT'
+              ? 'costPerUnit'
+              : 'costPerKg';
+
+        if (unitRate === null) {
+          throw new BadRequestException(`Missing ${unitRateLabel} for townProductId=${tp.id} (mode=${mode})`);
         }
 
         const snapshotValue =
           tp.pricingModel === 'UNIT'
-            ? snapshotQty * (pricePerUnit as number)
-            : (snapshotWg / 1000) * (pricePerKg as number);
+            ? snapshotQty * unitRate
+            : (snapshotWg / 1000) * unitRate;
 
         const ledgerValue =
           tp.pricingModel === 'UNIT'
-            ? ledgerQty * (pricePerUnit as number)
-            : (ledgerWg / 1000) * (pricePerKg as number);
+            ? ledgerQty * unitRate
+            : (ledgerWg / 1000) * unitRate;
 
         totalSnapshotValue += snapshotValue;
         totalLedgerValue += ledgerValue;
@@ -130,6 +151,10 @@ export class ReportsService {
 
           pricePerUnit: tp.pricingModel === 'UNIT' ? pricePerUnit : null,
           pricePerKg: tp.pricingModel === 'WEIGHT' ? pricePerKg : null,
+          costPerUnit: tp.pricingModel === 'UNIT' ? costPerUnit : null,
+          costPerKg: tp.pricingModel === 'WEIGHT' ? costPerKg : null,
+          mode,
+          rateUsed: unitRate,
 
           snapshotQty: tp.pricingModel === 'UNIT' ? snapshotQty : null,
           ledgerQty: tp.pricingModel === 'UNIT' ? ledgerQty : null,
@@ -158,4 +183,45 @@ export class ReportsService {
       pageInfo: { limit, hasNextPage, nextCursor },
     };
   }
+    async setCost(dto: SetCostDto) {
+    const { townProductId, costPerUnit, costPerKg, note } = dto;
+
+    if ((costPerUnit == null && costPerKg == null) || (costPerUnit != null && costPerKg != null)) {
+      throw new BadRequestException('Provide exactly one of costPerUnit or costPerKg');
+    }
+
+    const tp = await this.prisma.townProduct.findUnique({
+      where: { id: townProductId },
+      select: { id: true, pricingModel: true },
+    });
+
+    if (!tp) {
+      throw new BadRequestException('TownProduct not found');
+    }
+
+    if (tp.pricingModel === 'UNIT' && costPerUnit == null) {
+      throw new BadRequestException('UNIT products require costPerUnit');
+    }
+
+    if (tp.pricingModel === 'WEIGHT' && costPerKg == null) {
+      throw new BadRequestException('WEIGHT products require costPerKg');
+    }
+
+    const updated = await this.prisma.townProduct.update({
+      where: { id: townProductId },
+      data: {
+        ...(costPerUnit != null ? { costPerUnit } : {}),
+        ...(costPerKg != null ? { costPerKg } : {}),
+      },
+    });
+
+    return {
+      townProductId: updated.id,
+      pricingModel: updated.pricingModel,
+      costPerUnit: updated.costPerUnit,
+      costPerKg: updated.costPerKg,
+      note: note ?? null,
+    };
+  }
+
 }
