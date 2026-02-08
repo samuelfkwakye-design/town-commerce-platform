@@ -5,6 +5,8 @@ import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { ReconcileStockQueryDto } from './dto/reconcile-stock.query.dto';
 import { AdminKeyGuard } from '../auth/admin-key.guard';
 import { BaselineFromSnapshotDto } from './dto/baseline-from-snapshot.dto';
+import { FixMismatchDto } from './dto/fix-mismatch.dto';
+import { DevLedgerOnlyDto } from './dto/dev-ledger-only.dto';
 
 @Controller('stock-movements')
 export class StockMovementsController {
@@ -22,6 +24,12 @@ export class StockMovementsController {
   reconcile(@Query() q: ReconcileStockQueryDto) {
     return this.service.reconcile(q);
   }
+// POST /api/v1/stock-movements/dev/ledger-only (admin, dev-only)
+@UseGuards(AdminKeyGuard)
+@Post('dev/ledger-only')
+devLedgerOnly(@Body() dto: DevLedgerOnlyDto) {
+  return this.service.devLedgerOnly(dto);
+}
 
   // POST /api/v1/stock-movements/adjust (admin)
   @UseGuards(AdminKeyGuard)
@@ -29,7 +37,15 @@ export class StockMovementsController {
   adjust(@Body() dto: AdjustStockDto) {
     return this.service.adjust(dto);
   }
-    // POST /api/v1/stock-movements/baseline-from-snapshot (admin)
+   // POST /api/v1/stock-movements/fix-mismatch (admin)
+  @UseGuards(AdminKeyGuard)
+  @Post('fix-mismatch')
+  fixMismatch(@Body() dto: FixMismatchDto) {
+  return this.service.fixMismatch(dto.townProductId, dto.note);
+}
+
+
+  // POST /api/v1/stock-movements/baseline-from-snapshot (admin)
   @UseGuards(AdminKeyGuard)
   @Post('baseline-from-snapshot')
   baselineFromSnapshot(@Body() dto: BaselineFromSnapshotDto) {

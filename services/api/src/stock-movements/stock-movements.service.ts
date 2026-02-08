@@ -5,6 +5,7 @@ import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { ListStockMovementsQueryDto } from './dto/list-stock-movements.query.dto';
 import { ReconcileStockQueryDto } from './dto/reconcile-stock.query.dto';
 import { BaselineFromSnapshotDto } from './dto/baseline-from-snapshot.dto';
+import { DevLedgerOnlyDto } from './dto/dev-ledger-only.dto';
 
 type Cursor = { createdAt: Date; id: string };
 
@@ -271,114 +272,290 @@ export class StockMovementsService {
       created,
     };
   }
+async fixMismatch(townProductId: string, note?: string) {
+  return this.prisma.$transaction(async (tx) => {
+    const tp = await tx.townProduct.findUnique({
+      where: { id: townProductId },
+      select: {
+        id: true,
+        pricingModel: true,
+        stockQty: true,
+        stockWeightGrams: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!tp) {
+      // You don't currently import NotFoundException; keep it simple + consistent
+      throw new BadRequestException(`TownProduct not found: ${townProductId}`);
+    }
+
+    // Aggregate ledger totals (null sums treated as 0 for arithmetic)
+    const agg = await tx.stockMovement.aggregate({
+      where: { townProductId },
+      _sum: { deltaQty: true, deltaWeightGrams: true },
+      _max: { createdAt: true },
+    });
+
+    const ledgerQty = agg._sum.deltaQty ?? 0;
+    const ledgerWeightGrams = agg._sum.deltaWeightGrams ?? 0;
+
+    // Snapshot nulling rules
+    const snapshotQty =
+      tp.pricingModel === 'UNIT' ? (tp.stockQty ?? 0) : null;
+
+    const snapshotWeightGrams =
+      tp.pricingModel === 'WEIGHT' ? (tp.stockWeightGrams ?? 0) : null;
+
+    // Diff (must match reconcile definition)
+    const diffQty =
+      tp.pricingModel === 'UNIT' ? snapshotQty! - ledgerQty : null;
+
+    const diffWeightGrams =
+      tp.pricingModel === 'WEIGHT'
+        ? snapshotWeightGrams! - ledgerWeightGrams
+        : null;
+
+    const isMismatch =
+      tp.pricingModel === 'UNIT' ? diffQty !== 0 : diffWeightGrams !== 0;
+
+    if (!isMismatch) {
+      return {
+        fixed: false,
+        reason: 'NO_MISMATCH',
+        townProductId,
+        pricingModel: tp.pricingModel,
+
+        snapshotQty,
+        ledgerQty,
+        diffQty,
+
+        snapshotWeightGrams,
+        ledgerWeightGrams,
+        diffWeightGrams,
+
+        lastMovementAt: agg._max.createdAt ?? null,
+        snapshotUpdatedAt: tp.updatedAt,
+      };
+    }
+
+    // Create MANUAL_ADJUSTMENT to align ledger to snapshot
+    const movement = await tx.stockMovement.create({
+      data: {
+        townProductId,
+        reason: StockMovementReason.MANUAL_ADJUSTMENT,
+        deltaQty: tp.pricingModel === 'UNIT' ? diffQty! : null,
+        deltaWeightGrams: tp.pricingModel === 'WEIGHT' ? diffWeightGrams! : null,
+        note: note ?? 'Reconciliation fix: align ledger to snapshot',
+      },
+      select: { id: true, createdAt: true },
+    });
+
+    // Recompute ledger after fix
+    const after = await tx.stockMovement.aggregate({
+      where: { townProductId },
+      _sum: { deltaQty: true, deltaWeightGrams: true },
+      _max: { createdAt: true },
+    });
+
+    return {
+      fixed: true,
+      movementId: movement.id,
+      movementCreatedAt: movement.createdAt,
+
+      townProductId,
+      pricingModel: tp.pricingModel,
+
+      snapshotQty,
+      ledgerQtyBefore: ledgerQty,
+      diffQtyApplied: diffQty,
+      ledgerQtyAfter: after._sum.deltaQty ?? 0,
+
+      snapshotWeightGrams,
+      ledgerWeightGramsBefore: ledgerWeightGrams,
+      diffWeightGramsApplied: diffWeightGrams,
+      ledgerWeightGramsAfter: after._sum.deltaWeightGrams ?? 0,
+
+      lastMovementAtBefore: agg._max.createdAt ?? null,
+      lastMovementAtAfter: after._max.createdAt ?? null,
+
+      snapshotUpdatedAt: tp.updatedAt,
+    };
+  });
+}
 
   // ===============================
   // RECONCILIATION (ADMIN)
   // ===============================
   async reconcile(q: ReconcileStockQueryDto) {
-    const limit = Math.min(Math.max(q.limit ?? 50, 1), 200);
+  const limit = Math.min(Math.max(q.limit ?? 50, 1), 200);
 
-    const tpWhere: Prisma.TownProductWhereInput = {
-      ...(q.townId ? { townId: q.townId } : {}),
-      ...(q.townProductId ? { id: q.townProductId } : {}),
-    };
+  const tpWhere: Prisma.TownProductWhereInput = {
+    ...(q.townId ? { townId: q.townId } : {}),
+    ...(q.townProductId ? { id: q.townProductId } : {}),
+  };
 
-    const townProducts = await this.prisma.townProduct.findMany({
-      where: tpWhere,
-      orderBy: { id: 'asc' },
-      ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
-      take: limit + 1,
-      select: {
-        id: true,
-        townId: true,
-        productId: true,
-        pricingModel: true,
-        stockQty: true,
-        stockWeightGrams: true,
-        updatedAt: true,
-        town: { select: { name: true, slug: true } },
-        product: { select: { name: true } },
-      },
-    });
+  // 1) Snapshot page
+  const townProducts = await this.prisma.townProduct.findMany({
+    where: tpWhere,
+    orderBy: { id: 'asc' },
+    ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
+    take: limit + 1,
+    select: {
+      id: true,
+      townId: true,
+      productId: true,
+      pricingModel: true,
+      stockQty: true,
+      stockWeightGrams: true,
+      updatedAt: true,
+      town: { select: { name: true, slug: true } },
+      product: { select: { name: true } },
+    },
+  });
 
-    const hasNextPage = townProducts.length > limit;
-    const page = hasNextPage ? townProducts.slice(0, limit) : townProducts;
-    const nextCursor = hasNextPage ? page[page.length - 1].id : null;
+  const hasNextPage = townProducts.length > limit;
+  const page = hasNextPage ? townProducts.slice(0, limit) : townProducts;
+  const nextCursor = hasNextPage ? page[page.length - 1].id : null;
 
-    if (page.length === 0) {
-      return {
-        items: [],
-        pageInfo: { limit, hasNextPage: false, nextCursor: null },
-      };
-    }
-
-    const ids = page.map((tp) => tp.id);
-
-    const grouped = await this.prisma.stockMovement.groupBy({
-      by: ['townProductId'],
-      where: { townProductId: { in: ids } },
-      _sum: { deltaQty: true, deltaWeightGrams: true },
-      _max: { createdAt: true },
-    });
-
-    const ledgerByTpId = new Map<
-      string,
-      { sumQty: number; sumWg: number; lastMovementAt: Date | null }
-    >();
-
-    for (const g of grouped) {
-      ledgerByTpId.set(g.townProductId, {
-        sumQty: (g._sum.deltaQty ?? 0) as number,
-        sumWg: (g._sum.deltaWeightGrams ?? 0) as number,
-        lastMovementAt: (g._max.createdAt ?? null) as Date | null,
-      });
-    }
-
-    const items = page
-      .map((tp) => {
-        const ledger = ledgerByTpId.get(tp.id) ?? {
-          sumQty: 0,
-          sumWg: 0,
-          lastMovementAt: null,
-        };
-
-        const snapshotQty = tp.stockQty ?? 0;
-        const snapshotWg = tp.stockWeightGrams ?? 0;
-
-        const ledgerQty = tp.pricingModel === 'UNIT' ? ledger.sumQty : 0;
-        const ledgerWg = tp.pricingModel === 'WEIGHT' ? ledger.sumWg : 0;
-
-        const diffQty = tp.pricingModel === 'UNIT' ? snapshotQty - ledgerQty : null;
-        const diffWg = tp.pricingModel === 'WEIGHT' ? snapshotWg - ledgerWg : null;
-
-        const isMismatch =
-          (tp.pricingModel === 'UNIT' && diffQty !== 0) ||
-          (tp.pricingModel === 'WEIGHT' && diffWg !== 0);
-
-        return {
-          townProductId: tp.id,
-          townId: tp.townId,
-          townName: (tp as any).town?.name ?? null,
-          townSlug: (tp as any).town?.slug ?? null,
-          productId: tp.productId,
-          productName: (tp as any).product?.name ?? null,
-          pricingModel: tp.pricingModel,
-          snapshotQty: tp.pricingModel === 'UNIT' ? snapshotQty : null,
-          ledgerQty: tp.pricingModel === 'UNIT' ? ledgerQty : null,
-          diffQty,
-          snapshotWeightGrams: tp.pricingModel === 'WEIGHT' ? snapshotWg : null,
-          ledgerWeightGrams: tp.pricingModel === 'WEIGHT' ? ledgerWg : null,
-          diffWeightGrams: diffWg,
-          lastMovementAt: ledger.lastMovementAt,
-          snapshotUpdatedAt: tp.updatedAt,
-          isMismatch,
-        };
-      })
-      .filter((row) => (q.onlyMismatches ? row.isMismatch : true));
-
+  if (page.length === 0) {
     return {
-      items,
-      pageInfo: { limit, hasNextPage, nextCursor },
+      items: [],
+      pageInfo: { limit, hasNextPage: false, nextCursor: null },
     };
   }
+
+  const ids = page.map((tp) => tp.id);
+
+  // 2) Ledger aggregation for this page
+  const grouped = await this.prisma.stockMovement.groupBy({
+    by: ['townProductId'],
+    where: { townProductId: { in: ids } },
+    _sum: { deltaQty: true, deltaWeightGrams: true },
+    _max: { createdAt: true },
+  });
+
+  const ledgerByTpId = new Map<
+    string,
+    { sumQty: number; sumWg: number; lastMovementAt: Date | null }
+  >();
+
+  for (const g of grouped) {
+    ledgerByTpId.set(g.townProductId, {
+      sumQty: g._sum.deltaQty ?? 0,
+      sumWg: g._sum.deltaWeightGrams ?? 0,
+      lastMovementAt: g._max.createdAt ?? null,
+    });
+  }
+
+  // 3) Compare + shape (exact contract)
+  const items = page
+    .map((tp) => {
+      const ledger = ledgerByTpId.get(tp.id) ?? {
+        sumQty: 0,
+        sumWg: 0,
+        lastMovementAt: null,
+      };
+
+      const isUnit = tp.pricingModel === 'UNIT';
+      const isWeight = tp.pricingModel === 'WEIGHT';
+
+      const snapshotQtyRaw = tp.stockQty ?? 0;
+      const snapshotWgRaw = tp.stockWeightGrams ?? 0;
+
+      const ledgerQtyRaw = ledger.sumQty;
+      const ledgerWgRaw = ledger.sumWg;
+
+      const diffQtyRaw = snapshotQtyRaw - ledgerQtyRaw;
+      const diffWgRaw = snapshotWgRaw - ledgerWgRaw;
+
+      const isMismatch =
+        (isUnit && diffQtyRaw !== 0) ||
+        (isWeight && diffWgRaw !== 0);
+
+      return {
+        townProductId: tp.id,
+        townId: tp.townId,
+        townName: (tp as any).town?.name ?? null,
+        townSlug: (tp as any).town?.slug ?? null,
+        productId: tp.productId,
+        productName: (tp as any).product?.name ?? null,
+        pricingModel: tp.pricingModel,
+
+        // UNIT populated, WEIGHT null
+        snapshotQty: isUnit ? snapshotQtyRaw : null,
+        ledgerQty: isUnit ? ledgerQtyRaw : null,
+        diffQty: isUnit ? diffQtyRaw : null,
+
+        // WEIGHT populated, UNIT null
+        snapshotWeightGrams: isWeight ? snapshotWgRaw : null,
+        ledgerWeightGrams: isWeight ? ledgerWgRaw : null,
+        diffWeightGrams: isWeight ? diffWgRaw : null,
+
+        lastMovementAt: ledger.lastMovementAt,
+        snapshotUpdatedAt: tp.updatedAt,
+        isMismatch,
+      };
+    })
+    .filter((row) => (q.onlyMismatches ? row.isMismatch : true));
+
+  return {
+    items,
+    pageInfo: { limit, hasNextPage, nextCursor },
+  };
+}
+async devLedgerOnly(dto: DevLedgerOnlyDto) {
+  // Hard block unless explicitly enabled
+  const nodeEnv = (process.env.NODE_ENV ?? '').toLowerCase();
+  const isProd = nodeEnv === 'production';
+  const allowed = (process.env.ALLOW_DEV_STOCK_TOOLS ?? '').toLowerCase() === 'true';
+
+  if (isProd || !allowed) {
+    throw new BadRequestException('DEV stock tools are disabled');
+  }
+
+  const { townProductId, deltaQty, deltaWeightGrams, note } = dto;
+
+  if (
+    (deltaQty == null && deltaWeightGrams == null) ||
+    (deltaQty != null && deltaWeightGrams != null)
+  ) {
+    throw new BadRequestException(
+      'Provide exactly one of deltaQty or deltaWeightGrams',
+    );
+  }
+
+  // Ensure TownProduct exists
+  const tp = await this.prisma.townProduct.findUnique({
+    where: { id: townProductId },
+    select: { id: true, pricingModel: true },
+  });
+
+  if (!tp) {
+    throw new BadRequestException(`TownProduct not found: ${townProductId}`);
+  }
+
+  // Enforce correct field based on pricingModel
+  if (tp.pricingModel === 'UNIT' && deltaQty == null) {
+    throw new BadRequestException('UNIT pricingModel requires deltaQty');
+  }
+  if (tp.pricingModel === 'WEIGHT' && deltaWeightGrams == null) {
+    throw new BadRequestException('WEIGHT pricingModel requires deltaWeightGrams');
+  }
+
+  const movement = await this.prisma.stockMovement.create({
+    data: {
+      townProductId,
+      reason: StockMovementReason.MANUAL_ADJUSTMENT,
+      deltaQty: tp.pricingModel === 'UNIT' ? deltaQty! : null,
+      deltaWeightGrams: tp.pricingModel === 'WEIGHT' ? deltaWeightGrams! : null,
+      note: note ?? 'DEV: ledger-only drift injection',
+    },
+  });
+
+  return {
+    ok: true,
+    movement,
+  };
+}
 }
