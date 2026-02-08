@@ -35,6 +35,25 @@ export class ReportsService {
    * - UNIT: qty * pricePerUnit
    * - WEIGHT: (grams/1000) * pricePerKg
    */
+  private csvEscape(value: any): string {
+  if (value === null || value === undefined) return '';
+  const s = String(value);
+  // If contains comma, quote, or newline -> wrap in quotes and escape quotes
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+private toCsv(headers: string[], rows: Record<string, any>[]): string {
+  const lines: string[] = [];
+  lines.push(headers.map((h) => this.csvEscape(h)).join(','));
+  for (const row of rows) {
+    lines.push(headers.map((h) => this.csvEscape(row[h])).join(','));
+  }
+  return lines.join('\n') + '\n';
+}
+
   async stockValuation(q: StockValuationQueryDto) {
     const limit = Math.min(Math.max(q.limit ?? 50, 1), 200);
     const mode: 'selling' | 'cost' = q.mode ?? 'selling';
@@ -189,7 +208,55 @@ export class ReportsService {
       pageInfo: { limit, hasNextPage, nextCursor },
     };
   }
-    async getProfitReport(q: ProfitReportQueryDto) {
+    async stockValuationCsv(q: any) {
+  // Reuse existing JSON report
+  const limit = Number(q.limit ?? 1000);
+
+  const data = await this.stockValuation({ ...q, limit });
+
+  // These columns must match what your stockValuation rows actually return.
+  // If one column name differs, we’ll tweak it quickly after your first test.
+  const headers = [
+    'townProductId',
+    'townId',
+    'productId',
+    'productName',
+    'pricingModel',
+    'stockQty',
+    'stockWeightGrams',
+    'snapshotValue',
+    'ledgerValue',
+    'diff',
+    'isMismatch',
+    'lastMovementAt',
+  ];
+
+  const csvRows = data.items.map((r: any) => ({
+    ...r,
+  }));
+
+  // Totals row (if your valuation returns totals.*)
+  if (data.totals) {
+    csvRows.push({
+      townProductId: 'TOTALS',
+      townId: '',
+      productId: '',
+      productName: '',
+      pricingModel: '',
+      stockQty: '',
+      stockWeightGrams: '',
+      snapshotValue: data.totals.totalSnapshotValue ?? '',
+      ledgerValue: data.totals.totalLedgerValue ?? '',
+      diff: data.totals.diffValue ?? '',
+      isMismatch: '',
+      lastMovementAt: '',
+    });
+  }
+
+  return this.toCsv(headers, csvRows);
+}
+
+  async getProfitReport(q: ProfitReportQueryDto) {
   const limit = Number(q.limit ?? 50);
 
 
@@ -297,7 +364,50 @@ return {
   },
   nextCursor,
 };
+}async profitCsv(q: any) {
+  // Reuse existing JSON report (already rounded + paginated)
+  // For CSV exports, we usually want a larger default limit.
+  const limit = Number(q.limit ?? 1000);
+
+  const data = await this.getProfitReport({ ...q, limit });
+
+  const headers = [
+    'townProductId',
+    'townId',
+    'productId',
+    'productName',
+    'pricingModel',
+    'stockQty',
+    'stockWeightGrams',
+    'sellingValue',
+    'costValue',
+    'profit',
+    'marginPercent',
+  ];
+
+  // rows already contain these keys
+  const csvRows = data.rows.map((r: any) => ({
+    ...r,
+  }));
+
+  // Add totals row at bottom (accountant-friendly)
+  csvRows.push({
+    townProductId: 'TOTALS',
+    townId: '',
+    productId: '',
+    productName: '',
+    pricingModel: '',
+    stockQty: '',
+    stockWeightGrams: '',
+    sellingValue: data.totals.sellingValue,
+    costValue: data.totals.costValue,
+    profit: data.totals.profit,
+    marginPercent: data.totals.marginPercent,
+  });
+
+  return this.toCsv(headers, csvRows);
 }
+
 
   async setCost(dto: SetCostDto) {
     const { townProductId, costPerUnit, costPerKg, note } = dto;

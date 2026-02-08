@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { AdminKeyGuard } from '../auth/admin-key.guard';
 import { ReportsService } from './reports.service';
 import { StockValuationQueryDto } from './dto/stock-valuation.query.dto';
@@ -26,5 +27,23 @@ export class ReportsController {
   @Get('profit')
   profit(@Query() q: ProfitReportQueryDto) {
     return this.service.getProfitReport(q);
+  }
+
+  // GET /api/v1/reports/profit.csv
+  @Get('profit.csv')
+  async profitCsv(@Query() q: ProfitReportQueryDto, @Res() res: Response) {
+    const csv = await this.service.profitCsv(q);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="profit-report.csv"');
+    res.send(csv);
+  }
+
+  // GET /api/v1/reports/stock-valuation.csv
+  @Get('stock-valuation.csv')
+  async stockValuationCsv(@Query() q: StockValuationQueryDto, @Res() res: Response) {
+    const csv = await this.service.stockValuationCsv(q);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="stock-valuation.csv"');
+    res.send(csv);
   }
 }
