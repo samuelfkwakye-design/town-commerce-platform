@@ -296,6 +296,8 @@ export class StockMovementsService {
         stockQty: true,
         stockWeightGrams: true,
         updatedAt: true,
+        town: { select: { name: true, slug: true } },
+        product: { select: { name: true } },
       },
     });
 
@@ -356,7 +358,10 @@ export class StockMovementsService {
         return {
           townProductId: tp.id,
           townId: tp.townId,
+          townName: (tp as any).town?.name ?? null,
+          townSlug: (tp as any).town?.slug ?? null,
           productId: tp.productId,
+          productName: (tp as any).product?.name ?? null,
           pricingModel: tp.pricingModel,
           snapshotQty: tp.pricingModel === 'UNIT' ? snapshotQty : null,
           ledgerQty: tp.pricingModel === 'UNIT' ? ledgerQty : null,
