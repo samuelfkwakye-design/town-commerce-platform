@@ -6,6 +6,9 @@ import { StockValuationQueryDto } from './dto/stock-valuation.query.dto';
 import { SetCostDto } from './dto/set-cost.dto';
 import { ProfitReportQueryDto } from './dto/profit-report.query.dto';
 import { SalesProfitQueryDto } from './dto/sales-profit.query.dto';
+import { SalesTimeseriesQueryDto } from './dto/sales-timeseries.query.dto';
+import { SalesSummaryQueryDto } from './dto/sales-summary.query.dto';
+import { TopProductsQueryDto } from './dto/top-products.query.dto';
 
 @UseGuards(AdminKeyGuard)
 @Controller('reports')
@@ -23,6 +26,11 @@ export class ReportsController {
   setCost(@Body() dto: SetCostDto) {
     return this.service.setCost(dto);
   }
+// GET /api/v1/reports/top-products
+@Get('top-products')
+topProducts(@Query() q: TopProductsQueryDto) {
+  return this.service.topProducts(q);
+}
 
   // GET /api/v1/reports/profit
   @Get('profit')
@@ -59,6 +67,25 @@ async salesProfitCsv(@Query() q: SalesProfitQueryDto, @Res() res: Response) {
 @Get('sales-profit')
 salesProfit(@Query() q: SalesProfitQueryDto) {
   return this.service.salesProfitReport(q);
+}
+// GET /api/v1/reports/sales-summary
+@Get('sales-summary')
+salesSummary(@Query() q: SalesSummaryQueryDto) {
+  return this.service.salesSummary(q);
+}
+// GET /api/v1/reports/top-products.csv
+@Get('top-products.csv')
+async topProductsCsv(@Query() q: TopProductsQueryDto, @Res() res: Response) {
+  const csv = await this.service.topProductsCsv(q);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="top-products.csv"');
+  res.send(csv);
+}
+
+// GET /api/v1/reports/sales-timeseries
+@Get('sales-timeseries')
+salesTimeseries(@Query() q: SalesTimeseriesQueryDto) {
+  return this.service.salesTimeseries(q);
 }
 
 }

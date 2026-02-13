@@ -30,6 +30,302 @@ function toNumberOrNull(value: any, fieldLabel: string): number | null {
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private round2(n: number) {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+// ISO week helper (UTC-based)
+private getISOWeekKey(d: Date) {
+  const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  // Thursday in current week decides the year.
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  const year = date.getUTCFullYear();
+  const ww = String(weekNo).padStart(2, '0');
+  return `${year}-W${ww}`;
+}
+
+private getDayKey(d: Date) {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+private getMonthKey(d: Date) {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
+private async townProductIdsForTown(townId: string) {
+  const tps = await this.prisma.townProduct.findMany({
+    where: { townId },
+    select: { id: true },
+  });
+  return tps.map(x => x.id);
+}
+
+async salesSummary(q: any) {
+  const where: Prisma.SaleItemWhereInput = {
+    ...(q.from || q.to
+      ? {
+          createdAt: {
+            ...(q.from ? { gte: new Date(q.from) } : {}),
+            ...(q.to ? { lte: new Date(q.to) } : {}),
+          },
+        }
+      : {}),
+  };
+
+  if (q.townId) {
+    const ids = await this.townProductIdsForTown(q.townId);
+    where.townProductId = { in: ids };
+  }
+
+  const agg = await this.prisma.saleItem.aggregate({
+    where,
+    _sum: { revenue: true, cogs: true, profit: true },
+    _count: true,
+  });
+
+  // distinct “sales count” (roughly: number of delivered orders) using groupBy saleId
+  const salesGroups = await this.prisma.saleItem.groupBy({
+    by: ['saleId'],
+    where,
+    _count: true,
+  });
+
+  const revenue = Number(agg._sum.revenue ?? 0);
+  const cogs = Number(agg._sum.cogs ?? 0);
+  const profit = Number(agg._sum.profit ?? 0);
+  const marginPercent = revenue > 0 ? (profit / revenue) * 100 : 0;
+
+  return {
+    filters: {
+      from: q.from ?? null,
+      to: q.to ?? null,
+      townId: q.townId ?? null,
+    },
+    totals: {
+      revenue: this.round2(revenue),
+      cogs: this.round2(cogs),
+      profit: this.round2(profit),
+      marginPercent: this.round2(marginPercent),
+    },
+    counts: {
+      saleItemsCount: Number(agg._count ?? 0),
+      salesCount: salesGroups.length, // distinct saleId
+    },
+  };
+}
+async topProducts(q: any) {
+  const limit = Math.min(Math.max(Number(q.limit ?? 10), 1), 50);
+  const metric: 'profit' | 'revenue' | 'margin' | 'saleItemsCount' = q.metric ?? 'profit';
+
+  const where: Prisma.SaleItemWhereInput = {
+    ...(q.from || q.to
+      ? {
+          createdAt: {
+            ...(q.from ? { gte: new Date(q.from) } : {}),
+            ...(q.to ? { lte: new Date(q.to) } : {}),
+          },
+        }
+      : {}),
+  };
+
+  // Optional town filter via townProductIds
+  if (q.townId) {
+    const ids = await this.townProductIdsForTown(q.townId); // you already added this helper
+    where.townProductId = { in: ids };
+  }
+
+  // Aggregate by TownProduct (this is your product-in-a-town SKU)
+  const grouped = await this.prisma.saleItem.groupBy({
+    by: ['townProductId'],
+    where,
+    _sum: {
+      revenue: true,
+      cogs: true,
+      profit: true,
+    },
+    _count: true,
+  });
+
+  if (grouped.length === 0) {
+    return {
+      filters: {
+        from: q.from ?? null,
+        to: q.to ?? null,
+        townId: q.townId ?? null,
+        metric,
+        limit,
+      },
+      rows: [],
+    };
+  }
+
+  // Decorate with names (Town + Product) by fetching TownProduct records
+  const tpIds = grouped.map((g) => g.townProductId);
+
+  const tps = await this.prisma.townProduct.findMany({
+    where: { id: { in: tpIds } },
+    select: {
+      id: true,
+      townId: true,
+      pricingModel: true,
+      town: { select: { name: true, slug: true } },
+      product: { select: { name: true } },
+    },
+  });
+
+  const tpMap = new Map(tps.map((tp) => [tp.id, tp]));
+
+  // Build rows
+  const rows = grouped.map((g) => {
+    const revenue = Number(g._sum.revenue ?? 0);
+    const cogs = Number(g._sum.cogs ?? 0);
+    const profit = Number(g._sum.profit ?? 0);
+    const marginPercent = revenue > 0 ? (profit / revenue) * 100 : 0;
+    const saleItemsCount = Number(g._count ?? 0);
+
+    const tp = tpMap.get(g.townProductId);
+
+    return {
+      townProductId: g.townProductId,
+      townId: tp?.townId ?? null,
+      townName: tp?.town?.name ?? null,
+      townSlug: tp?.town?.slug ?? null,
+      productName: tp?.product?.name ?? null,
+      pricingModel: tp?.pricingModel ?? null,
+
+      saleItemsCount,
+      revenue: this.round2(revenue),
+      cogs: this.round2(cogs),
+      profit: this.round2(profit),
+      marginPercent: this.round2(marginPercent),
+    };
+  });
+
+  // Sort by requested metric
+  const sorted = rows.sort((a, b) => {
+    if (metric === 'profit') return b.profit - a.profit;
+    if (metric === 'revenue') return b.revenue - a.revenue;
+    if (metric === 'margin') return b.marginPercent - a.marginPercent;
+    return b.saleItemsCount - a.saleItemsCount;
+  });
+
+  return {
+    filters: {
+      from: q.from ?? null,
+      to: q.to ?? null,
+      townId: q.townId ?? null,
+      metric,
+      limit,
+    },
+    rows: sorted.slice(0, limit),
+  };
+}
+async topProductsCsv(q: any) {
+  const data = await this.topProducts(q);
+
+  const headers = [
+    'townProductId',
+    'townId',
+    'townName',
+    'townSlug',
+    'productName',
+    'pricingModel',
+    'saleItemsCount',
+    'revenue',
+    'cogs',
+    'profit',
+    'marginPercent',
+  ];
+
+  return this.toCsv(headers, data.rows);
+}
+
+async salesTimeseries(q: any) {
+  const bucket: 'day' | 'week' | 'month' = q.bucket ?? 'day';
+
+  const where: Prisma.SaleItemWhereInput = {
+    ...(q.from || q.to
+      ? {
+          createdAt: {
+            ...(q.from ? { gte: new Date(q.from) } : {}),
+            ...(q.to ? { lte: new Date(q.to) } : {}),
+          },
+        }
+      : {}),
+  };
+
+  if (q.townId) {
+    const ids = await this.townProductIdsForTown(q.townId);
+    where.townProductId = { in: ids };
+  }
+
+  // Pull the minimum fields we need, then bucket in JS (safe & deterministic)
+  const items = await this.prisma.saleItem.findMany({
+    where,
+    select: {
+      createdAt: true,
+      revenue: true,
+      cogs: true,
+      profit: true,
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const map = new Map<string, { revenue: number; cogs: number; profit: number; count: number }>();
+
+  for (const it of items) {
+    const d = it.createdAt;
+    const key =
+      bucket === 'day'
+        ? this.getDayKey(d)
+        : bucket === 'week'
+          ? this.getISOWeekKey(d)
+          : this.getMonthKey(d);
+
+    const revenue = Number(it.revenue ?? 0);
+    const cogs = Number(it.cogs ?? 0);
+    const profit = Number(it.profit ?? 0);
+
+    const cur = map.get(key) ?? { revenue: 0, cogs: 0, profit: 0, count: 0 };
+    cur.revenue += revenue;
+    cur.cogs += cogs;
+    cur.profit += profit;
+    cur.count += 1;
+    map.set(key, cur);
+  }
+
+  const rows = Array.from(map.entries())
+    .map(([period, v]) => {
+      const marginPercent = v.revenue > 0 ? (v.profit / v.revenue) * 100 : 0;
+      return {
+        period,
+        saleItemsCount: v.count,
+        revenue: this.round2(v.revenue),
+        cogs: this.round2(v.cogs),
+        profit: this.round2(v.profit),
+        marginPercent: this.round2(marginPercent),
+      };
+    })
+    .sort((a, b) => (a.period < b.period ? -1 : a.period > b.period ? 1 : 0));
+
+  return {
+    filters: {
+      from: q.from ?? null,
+      to: q.to ?? null,
+      townId: q.townId ?? null,
+      bucket,
+    },
+    rows,
+  };
+}
+
   /**
    * Stock valuation using SELLING PRICE from TownProduct:
    * - UNIT: qty * pricePerUnit
