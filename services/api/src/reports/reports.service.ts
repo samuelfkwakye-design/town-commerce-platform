@@ -524,6 +524,15 @@ async salesProfitCsv(q: any) {
   }
 async salesProfitReport(q: any) {
   const limit = Math.min(Math.max(Number(q.limit ?? 50), 1), 200);
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+const chunk = <T>(arr: T[], size: number) => {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+};
 
   const where: Prisma.SaleItemWhereInput = {
     ...(q.townProductId ? { townProductId: q.townProductId } : {}),
@@ -536,17 +545,89 @@ async salesProfitReport(q: any) {
         }
       : {}),
   };
+const baseWhere: Prisma.SaleItemWhereInput = { ...where };
 
   // If filtering by townId, get townProductIds first
-  if (q.townId) {
-    const tps = await this.prisma.townProduct.findMany({
-      where: { townId: q.townId },
-      select: { id: true },
+  let townProductIdsForTown: string[] | null = null;
+
+if (q.townId) {
+  const tps = await this.prisma.townProduct.findMany({
+    where: { townId: q.townId },
+    select: { id: true },
+  });
+
+  townProductIdsForTown = tps.map((x) => x.id);
+
+  // apply to both "where" (used for page groupBy) and "baseWhere" (used for grandTotals)
+  where.townProductId = { in: townProductIdsForTown };
+  baseWhere.townProductId = { in: townProductIdsForTown };
+}
+let grandTotals: null | {
+  revenue: number;
+  cogs: number;
+  profit: number;
+  marginPercent: number;
+  saleItemsCount: number;
+} = null;
+
+if (q.grandTotals) {
+  // If we have a potentially large IN(...) list, aggregate in chunks
+  if (townProductIdsForTown && townProductIdsForTown.length > 0) {
+    let sumRevenue = 0;
+    let sumCogs = 0;
+    let sumProfit = 0;
+    let count = 0;
+
+    const chunks = chunk(townProductIdsForTown, 500);
+
+    for (const ids of chunks) {
+      const agg = await this.prisma.saleItem.aggregate({
+        where: {
+          ...baseWhere,
+          townProductId: { in: ids },
+        },
+        _sum: { revenue: true, cogs: true, profit: true },
+        _count: true,
+      });
+
+      sumRevenue += Number(agg._sum.revenue ?? 0);
+      sumCogs += Number(agg._sum.cogs ?? 0);
+      sumProfit += Number(agg._sum.profit ?? 0);
+      count += Number(agg._count ?? 0);
+    }
+
+    const mp = sumRevenue > 0 ? (sumProfit / sumRevenue) * 100 : 0;
+
+    grandTotals = {
+      revenue: round2(sumRevenue),
+      cogs: round2(sumCogs),
+      profit: round2(sumProfit),
+      marginPercent: round2(mp),
+      saleItemsCount: count,
+    };
+  } else {
+    // No big IN(...) case → one clean aggregate
+    const agg = await this.prisma.saleItem.aggregate({
+      where: baseWhere,
+      _sum: { revenue: true, cogs: true, profit: true },
+      _count: true,
     });
 
-    const ids = tps.map((x) => x.id);
-    where.townProductId = { in: ids };
+    const sumRevenue = Number(agg._sum.revenue ?? 0);
+    const sumCogs = Number(agg._sum.cogs ?? 0);
+    const sumProfit = Number(agg._sum.profit ?? 0);
+    const mp = sumRevenue > 0 ? (sumProfit / sumRevenue) * 100 : 0;
+
+    grandTotals = {
+      revenue: round2(sumRevenue),
+      cogs: round2(sumCogs),
+      profit: round2(sumProfit),
+      marginPercent: round2(mp),
+      saleItemsCount: Number(agg._count ?? 0),
+    };
   }
+}
+
 
   const tpPage = await this.prisma.townProduct.findMany({
     where: {
@@ -663,6 +744,7 @@ return {
     marginPercent: Math.round((marginPercent + Number.EPSILON) * 100) / 100,
   },
   pageInfo: { limit, hasNextPage, nextCursor },
+  grandTotals,
 };
 
 }

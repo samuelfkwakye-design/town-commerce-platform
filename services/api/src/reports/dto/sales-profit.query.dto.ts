@@ -33,4 +33,10 @@ export class SalesProfitQueryDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   onlyWithSales?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  grandTotals?: boolean;
+
 }
