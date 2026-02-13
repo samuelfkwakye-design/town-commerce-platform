@@ -246,6 +246,136 @@ async topProductsCsv(q: any) {
 
   return this.toCsv(headers, data.rows);
 }
+async townLeaderboard(q: any) {
+  const limit = Math.min(Math.max(Number(q.limit ?? 10), 1), 50);
+  const metric: 'profit' | 'revenue' | 'margin' | 'saleItemsCount' = q.metric ?? 'profit';
+
+  const where: Prisma.SaleItemWhereInput = {
+    ...(q.from || q.to
+      ? {
+          createdAt: {
+            ...(q.from ? { gte: new Date(q.from) } : {}),
+            ...(q.to ? { lte: new Date(q.to) } : {}),
+          },
+        }
+      : {}),
+  };
+
+  // 1) Aggregate sales by townProductId (DB-side)
+  const grouped = await this.prisma.saleItem.groupBy({
+    by: ['townProductId'],
+    where,
+    _sum: { revenue: true, cogs: true, profit: true },
+    _count: true,
+  });
+
+  if (grouped.length === 0) {
+    return {
+      filters: {
+        from: q.from ?? null,
+        to: q.to ?? null,
+        metric,
+        limit,
+      },
+      rows: [],
+    };
+  }
+
+  // 2) Fetch town info for those townProductIds
+  const tpIds = grouped.map((g) => g.townProductId);
+
+  const tps = await this.prisma.townProduct.findMany({
+    where: { id: { in: tpIds } },
+    select: {
+      id: true,
+      townId: true,
+      town: { select: { name: true, slug: true } },
+    },
+  });
+
+  const tpToTown = new Map(tps.map((tp) => [tp.id, tp]));
+
+  // 3) Roll up by townId (JS-side)
+  const townMap = new Map<
+    string,
+    { townId: string; townName: string | null; townSlug: string | null; revenue: number; cogs: number; profit: number; saleItemsCount: number }
+  >();
+
+  for (const g of grouped) {
+    const tp = tpToTown.get(g.townProductId);
+    if (!tp?.townId) continue;
+
+    const revenue = Number(g._sum.revenue ?? 0);
+    const cogs = Number(g._sum.cogs ?? 0);
+    const profit = Number(g._sum.profit ?? 0);
+    const saleItemsCount = Number(g._count ?? 0);
+
+    const cur = townMap.get(tp.townId) ?? {
+      townId: tp.townId,
+      townName: tp.town?.name ?? null,
+      townSlug: tp.town?.slug ?? null,
+      revenue: 0,
+      cogs: 0,
+      profit: 0,
+      saleItemsCount: 0,
+    };
+
+    cur.revenue += revenue;
+    cur.cogs += cogs;
+    cur.profit += profit;
+    cur.saleItemsCount += saleItemsCount;
+
+    townMap.set(tp.townId, cur);
+  }
+
+  const rows = Array.from(townMap.values()).map((t) => {
+    const marginPercent = t.revenue > 0 ? (t.profit / t.revenue) * 100 : 0;
+    return {
+      townId: t.townId,
+      townName: t.townName,
+      townSlug: t.townSlug,
+      saleItemsCount: t.saleItemsCount,
+      revenue: this.round2(t.revenue),
+      cogs: this.round2(t.cogs),
+      profit: this.round2(t.profit),
+      marginPercent: this.round2(marginPercent),
+    };
+  });
+
+  // Sort
+  rows.sort((a, b) => {
+    if (metric === 'profit') return b.profit - a.profit;
+    if (metric === 'revenue') return b.revenue - a.revenue;
+    if (metric === 'margin') return b.marginPercent - a.marginPercent;
+    return b.saleItemsCount - a.saleItemsCount;
+  });
+
+  return {
+    filters: {
+      from: q.from ?? null,
+      to: q.to ?? null,
+      metric,
+      limit,
+    },
+    rows: rows.slice(0, limit),
+  };
+}
+async townLeaderboardCsv(q: any) {
+  const data = await this.townLeaderboard(q);
+
+  const headers = [
+    'townId',
+    'townName',
+    'townSlug',
+    'saleItemsCount',
+    'revenue',
+    'cogs',
+    'profit',
+    'marginPercent',
+  ];
+
+  return this.toCsv(headers, data.rows);
+}
 
 async salesTimeseries(q: any) {
   const bucket: 'day' | 'week' | 'month' = q.bucket ?? 'day';

@@ -9,6 +9,7 @@ import { SalesProfitQueryDto } from './dto/sales-profit.query.dto';
 import { SalesTimeseriesQueryDto } from './dto/sales-timeseries.query.dto';
 import { SalesSummaryQueryDto } from './dto/sales-summary.query.dto';
 import { TopProductsQueryDto } from './dto/top-products.query.dto';
+import { TownLeaderboardQueryDto } from './dto/town-leaderboard.query.dto';
 
 @UseGuards(AdminKeyGuard)
 @Controller('reports')
@@ -79,6 +80,20 @@ async topProductsCsv(@Query() q: TopProductsQueryDto, @Res() res: Response) {
   const csv = await this.service.topProductsCsv(q);
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="top-products.csv"');
+  res.send(csv);
+}
+// GET /api/v1/reports/town-leaderboard
+@Get('town-leaderboard')
+townLeaderboard(@Query() q: TownLeaderboardQueryDto) {
+  return this.service.townLeaderboard(q);
+}
+
+// GET /api/v1/reports/town-leaderboard.csv
+@Get('town-leaderboard.csv')
+async townLeaderboardCsv(@Query() q: TownLeaderboardQueryDto, @Res() res: Response) {
+  const csv = await this.service.townLeaderboardCsv(q);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="town-leaderboard.csv"');
   res.send(csv);
 }
 
