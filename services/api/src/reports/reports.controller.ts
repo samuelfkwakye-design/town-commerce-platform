@@ -5,6 +5,7 @@ import { ReportsService } from './reports.service';
 import { StockValuationQueryDto } from './dto/stock-valuation.query.dto';
 import { SetCostDto } from './dto/set-cost.dto';
 import { ProfitReportQueryDto } from './dto/profit-report.query.dto';
+import { SalesProfitQueryDto } from './dto/sales-profit.query.dto';
 
 @UseGuards(AdminKeyGuard)
 @Controller('reports')
@@ -37,6 +38,14 @@ export class ReportsController {
     res.setHeader('Content-Disposition', 'attachment; filename="profit-report.csv"');
     res.send(csv);
   }
+// GET /api/v1/reports/sales-profit.csv
+@Get('sales-profit.csv')
+async salesProfitCsv(@Query() q: SalesProfitQueryDto, @Res() res: Response) {
+  const csv = await this.service.salesProfitCsv(q);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="sales-profit-report.csv"');
+  res.send(csv);
+}
 
   // GET /api/v1/reports/stock-valuation.csv
   @Get('stock-valuation.csv')
@@ -46,4 +55,10 @@ export class ReportsController {
     res.setHeader('Content-Disposition', 'attachment; filename="stock-valuation.csv"');
     res.send(csv);
   }
+  // GET /api/v1/reports/sales-profit
+@Get('sales-profit')
+salesProfit(@Query() q: SalesProfitQueryDto) {
+  return this.service.salesProfitReport(q);
+}
+
 }

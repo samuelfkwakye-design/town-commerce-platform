@@ -408,6 +408,78 @@ return {
   return this.toCsv(headers, csvRows);
 }
 
+async salesProfitCsv(q: any) {
+  // We page through TownProducts in chunks, because SalesProfitQueryDto limit caps at 200.
+  const pageLimit = Math.min(Math.max(Number(q.limit ?? 200), 1), 200);
+  const maxRows = Number(q.maxRows ?? 5000); // safety guard for very large exports
+
+  let cursor: string | null = q.cursor ?? null;
+
+  const allRows: any[] = [];
+
+  let revenue = 0;
+  let cogs = 0;
+  let profit = 0;
+
+  while (true) {
+    const data = await this.salesProfitReport({
+      ...q,
+      limit: pageLimit,
+      cursor,
+    });
+
+    for (const r of data.rows) {
+      allRows.push(r);
+      revenue += Number(r.revenue ?? 0);
+      cogs += Number(r.cogs ?? 0);
+      profit += Number(r.profit ?? 0);
+    }
+
+    if (!data.pageInfo?.hasNextPage) break;
+
+    cursor = data.pageInfo.nextCursor;
+
+    // safety stop
+    if (allRows.length >= maxRows) break;
+  }
+
+  const marginPercent = revenue > 0 ? (profit / revenue) * 100 : 0;
+
+  const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+  const headers = [
+    'townProductId',
+    'townId',
+    'townName',
+    'townSlug',
+    'productName',
+    'pricingModel',
+    'saleItemsCount',
+    'revenue',
+    'cogs',
+    'profit',
+    'marginPercent',
+  ];
+
+  const csvRows = allRows.map((r: any) => ({ ...r }));
+
+  // Totals row at bottom (accountant-friendly)
+  csvRows.push({
+    townProductId: 'TOTALS',
+    townId: '',
+    townName: '',
+    townSlug: '',
+    productName: '',
+    pricingModel: '',
+    saleItemsCount: '',
+    revenue: round2(revenue),
+    cogs: round2(cogs),
+    profit: round2(profit),
+    marginPercent: round2(marginPercent),
+  });
+
+  return this.toCsv(headers, csvRows);
+}
 
   async setCost(dto: SetCostDto) {
     const { townProductId, costPerUnit, costPerKg, note } = dto;
@@ -450,5 +522,149 @@ return {
 };
 
   }
+async salesProfitReport(q: any) {
+  const limit = Math.min(Math.max(Number(q.limit ?? 50), 1), 200);
+
+  const where: Prisma.SaleItemWhereInput = {
+    ...(q.townProductId ? { townProductId: q.townProductId } : {}),
+    ...(q.from || q.to
+      ? {
+          createdAt: {
+            ...(q.from ? { gte: new Date(q.from) } : {}),
+            ...(q.to ? { lte: new Date(q.to) } : {}),
+          },
+        }
+      : {}),
+  };
+
+  // If filtering by townId, get townProductIds first
+  if (q.townId) {
+    const tps = await this.prisma.townProduct.findMany({
+      where: { townId: q.townId },
+      select: { id: true },
+    });
+
+    const ids = tps.map((x) => x.id);
+    where.townProductId = { in: ids };
+  }
+
+  const tpPage = await this.prisma.townProduct.findMany({
+    where: {
+      ...(q.townId ? { townId: q.townId } : {}),
+      ...(q.townProductId ? { id: q.townProductId } : {}),
+    },
+    orderBy: { id: 'asc' },
+    take: limit + 1,
+    ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
+    select: {
+      id: true,
+      townId: true,
+      pricingModel: true,
+      product: { select: { name: true } },
+      town: { select: { name: true, slug: true } },
+    },
+  });
+
+  const hasNextPage = tpPage.length > limit;
+  const page = hasNextPage ? tpPage.slice(0, limit) : tpPage;
+  const nextCursor = hasNextPage ? page[page.length - 1].id : null;
+
+  if (page.length === 0) {
+    return {
+      rows: [],
+      totals: { revenue: 0, cogs: 0, profit: 0, marginPercent: 0 },
+      pageInfo: { limit, hasNextPage: false, nextCursor: null },
+    };
+  }
+
+  const pageIds = page.map((x) => x.id);
+
+  const grouped = await this.prisma.saleItem.groupBy({
+    by: ['townProductId'],
+    where: {
+      ...where,
+      townProductId: { in: pageIds },
+    },
+    _sum: {
+      revenue: true,
+      cogs: true,
+      profit: true,
+    },
+    _count: true,
+  });
+
+  const sumsByTp = new Map(
+    grouped.map((g) => [
+      g.townProductId,
+      {
+        revenue: Number(g._sum.revenue ?? 0),
+        cogs: Number(g._sum.cogs ?? 0),
+        profit: Number(g._sum.profit ?? 0),
+        count: g._count ?? 0,
+      },
+    ]),
+  );
+
+  let totalRevenue = 0;
+  let totalCogs = 0;
+  let totalProfit = 0;
+
+  const rows = page.map((tp) => {
+    const s = sumsByTp.get(tp.id) ?? { revenue: 0, cogs: 0, profit: 0, count: 0 };
+
+    totalRevenue += s.revenue;
+    totalCogs += s.cogs;
+    totalProfit += s.profit;
+
+    const marginPercent = s.revenue > 0 ? (s.profit / s.revenue) * 100 : 0;
+
+    return {
+      townProductId: tp.id,
+      townId: tp.townId,
+      townName: tp.town?.name ?? null,
+      townSlug: tp.town?.slug ?? null,
+
+      productName: tp.product?.name ?? null,
+      pricingModel: tp.pricingModel,
+
+      saleItemsCount: s.count,
+      revenue: Math.round((s.revenue + Number.EPSILON) * 100) / 100,
+      cogs: Math.round((s.cogs + Number.EPSILON) * 100) / 100,
+      profit: Math.round((s.profit + Number.EPSILON) * 100) / 100,
+      marginPercent: Math.round((marginPercent + Number.EPSILON) * 100) / 100,
+    };
+  });
+
+  // Optional filter: only show products that actually had sales
+const filteredRows = q.onlyWithSales
+  ? rows.filter((r) => r.saleItemsCount > 0)
+  : rows;
+
+// Recalculate totals if filtering is enabled
+let revenue = 0;
+let cogs = 0;
+let profit = 0;
+
+for (const r of filteredRows) {
+  revenue += r.revenue;
+  cogs += r.cogs;
+  profit += r.profit;
+}
+
+const marginPercent =
+  revenue > 0 ? (profit / revenue) * 100 : 0;
+
+return {
+  rows: filteredRows,
+  totals: {
+    revenue: Math.round((revenue + Number.EPSILON) * 100) / 100,
+    cogs: Math.round((cogs + Number.EPSILON) * 100) / 100,
+    profit: Math.round((profit + Number.EPSILON) * 100) / 100,
+    marginPercent: Math.round((marginPercent + Number.EPSILON) * 100) / 100,
+  },
+  pageInfo: { limit, hasNextPage, nextCursor },
+};
+
+}
 
 }
