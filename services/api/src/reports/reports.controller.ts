@@ -10,6 +10,8 @@ import { SalesTimeseriesQueryDto } from './dto/sales-timeseries.query.dto';
 import { SalesSummaryQueryDto } from './dto/sales-summary.query.dto';
 import { TopProductsQueryDto } from './dto/top-products.query.dto';
 import { TownLeaderboardQueryDto } from './dto/town-leaderboard.query.dto';
+import { NetProfitQueryDto } from './dto/net-profit.query.dto';
+import { RefundLeaderboardQueryDto } from './dto/refund-leaderboard.query.dto';
 
 @UseGuards(AdminKeyGuard)
 @Controller('reports')
@@ -87,6 +89,17 @@ async topProductsCsv(@Query() q: TopProductsQueryDto, @Res() res: Response) {
 townLeaderboard(@Query() q: TownLeaderboardQueryDto) {
   return this.service.townLeaderboard(q);
 }
+// GET /api/v1/reports/net-profit
+@Get('net-profit')
+netProfit(@Query() q: NetProfitQueryDto) {
+  return this.service.netProfit(q);
+}
+
+// GET /api/v1/reports/net-profit-timeseries
+@Get('net-profit-timeseries')
+netProfitTimeseries(@Query() q: NetProfitQueryDto) {
+  return this.service.netProfitTimeseries(q);
+}
 
 // GET /api/v1/reports/town-leaderboard.csv
 @Get('town-leaderboard.csv')
@@ -94,6 +107,20 @@ async townLeaderboardCsv(@Query() q: TownLeaderboardQueryDto, @Res() res: Respon
   const csv = await this.service.townLeaderboardCsv(q);
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="town-leaderboard.csv"');
+  res.send(csv);
+}
+// GET /api/v1/reports/refund-leaderboard
+@Get('refund-leaderboard')
+refundLeaderboard(@Query() q: RefundLeaderboardQueryDto) {
+  return this.service.refundLeaderboard(q);
+}
+
+// GET /api/v1/reports/refund-leaderboard.csv
+@Get('refund-leaderboard.csv')
+async refundLeaderboardCsv(@Query() q: RefundLeaderboardQueryDto, @Res() res: Response) {
+  const csv = await this.service.refundLeaderboardCsv(q);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="refund-leaderboard.csv"');
   res.send(csv);
 }
 

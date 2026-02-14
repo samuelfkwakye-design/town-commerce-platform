@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StockValuationQueryDto } from './dto/stock-valuation.query.dto';
 import { SetCostDto } from './dto/set-cost.dto';
 import { ProfitReportQueryDto } from './dto/profit-report.query.dto';
+import { RefundLeaderboardQueryDto } from './dto/refund-leaderboard.query.dto';
 
 function toNumber(value: any): number | null {
   if (value === null || value === undefined) return null;
@@ -375,6 +376,606 @@ async townLeaderboardCsv(q: any) {
   ];
 
   return this.toCsv(headers, data.rows);
+}
+async refundLeaderboard(q: RefundLeaderboardQueryDto) {
+  const limit = Math.min(Math.max(Number(q.limit ?? 10), 1), 100);
+  const metric: 'refundedRevenue' | 'refundItemsCount' | 'nonRestockedCost' =
+    q.metric ?? 'refundedRevenue';
+
+  // Date window applies to REFUND date (createdAt)
+  const from = q.from ? new Date(q.from) : null;
+  const to = q.to ? new Date(q.to) : null;
+
+  // SQL uses SaleItem snapshot money (revenue + cogs) and applies proportional ratios
+  const rows = await this.prisma.$queryRaw<any[]>`
+    WITH refund_rows AS (
+      SELECT
+        r.id                              AS refund_id,
+        p."orderId" AS order_id,
+        r.restock                         AS restock,
+        r."createdAt"                     AS refund_created_at,
+
+        si."townProductId"                AS town_product_id,
+        tp."pricingModel"                 AS pricing_model,
+
+        CASE
+          WHEN si.quantity IS NOT NULL AND si.quantity > 0
+            THEN (ri.quantity::numeric / si.quantity::numeric)
+          WHEN si."weightGrams" IS NOT NULL AND si."weightGrams" > 0
+            THEN (ri."weightGrams"::numeric / si."weightGrams"::numeric)
+          ELSE 0
+        END                               AS ratio,
+
+        si.revenue::numeric               AS si_revenue,
+        si.cogs::numeric                  AS si_cogs
+      FROM "RefundItem" ri
+      JOIN "Refund" r
+        ON r.id = ri."refundId"
+      JOIN "Payment" p
+        ON p.id = r."paymentId"
+      JOIN "SaleItem" si
+        ON si."orderItemId" = ri."orderItemId"
+      JOIN "TownProduct" tp
+        ON tp.id = si."townProductId"
+      WHERE 1=1
+        AND (${from}::timestamptz IS NULL OR r."createdAt" >= ${from}::timestamptz)
+        AND (${to}::timestamptz   IS NULL OR r."createdAt" <= ${to}::timestamptz)
+        AND (${q.townId ?? null}::text IS NULL OR tp."townId" = ${q.townId ?? null}::text)
+        AND (${q.productId ?? null}::text IS NULL OR tp."productId" = ${q.productId ?? null}::text)
+    ),
+    agg AS (
+      SELECT
+        town_product_id,
+        pricing_model,
+
+        SUM(si_revenue * ratio) AS refunded_revenue,
+
+        SUM(CASE WHEN restock = true
+          THEN (si_cogs * ratio) ELSE 0 END) AS refunded_cogs_restocked,
+
+        SUM(CASE WHEN restock = false
+          THEN (si_cogs * ratio) ELSE 0 END) AS non_restocked_cost,
+
+        COUNT(*) AS refund_items_count,
+        COUNT(DISTINCT refund_id) AS refunds_count,
+        COUNT(DISTINCT order_id)  AS refunded_orders_count,
+
+        SUM(CASE WHEN restock = true  THEN 1 ELSE 0 END) AS restocked_refund_items_count,
+        SUM(CASE WHEN restock = false THEN 1 ELSE 0 END) AS non_restocked_refund_items_count
+      FROM refund_rows
+      GROUP BY town_product_id, pricing_model
+    )
+    SELECT
+      a.town_product_id      AS "townProductId",
+      tp."townId"            AS "townId",
+      t.name                 AS "townName",
+      t.slug                 AS "townSlug",
+      tp."productId"         AS "productId",
+      p.name                 AS "productName",
+      a.pricing_model        AS "pricingModel",
+
+      a.refunded_revenue     AS "refundedRevenue",
+      a.refunded_cogs_restocked AS "refundedCogsRestocked",
+      a.non_restocked_cost   AS "nonRestockedCost",
+
+      a.refund_items_count   AS "refundItemsCount",
+      a.refunds_count        AS "refundsCount",
+      a.refunded_orders_count AS "refundedOrdersCount",
+      a.restocked_refund_items_count AS "restockedRefundItemsCount",
+      a.non_restocked_refund_items_count AS "nonRestockedRefundItemsCount"
+    FROM agg a
+    JOIN "TownProduct" tp ON tp.id = a.town_product_id
+    JOIN "Town" t        ON t.id  = tp."townId"
+    JOIN "Product" p     ON p.id  = tp."productId"
+  `;
+
+  const normalised = rows.map((r) => {
+    const refundedRevenue = this.round2(Number(r.refundedRevenue ?? 0));
+    const refundedCogsRestocked = this.round2(Number(r.refundedCogsRestocked ?? 0));
+    const nonRestockedCost = this.round2(Number(r.nonRestockedCost ?? 0));
+
+    return {
+      townProductId: r.townProductId,
+      townId: r.townId,
+      townName: r.townName,
+      townSlug: r.townSlug,
+      productId: r.productId,
+      productName: r.productName,
+      pricingModel: r.pricingModel,
+
+      refundedRevenue,
+      refundedCogsRestocked,
+      nonRestockedCost,
+
+      refundItemsCount: Number(r.refundItemsCount ?? 0),
+      refundsCount: Number(r.refundsCount ?? 0),
+      refundedOrdersCount: Number(r.refundedOrdersCount ?? 0),
+      restockedRefundItemsCount: Number(r.restockedRefundItemsCount ?? 0),
+      nonRestockedRefundItemsCount: Number(r.nonRestockedRefundItemsCount ?? 0),
+    };
+  });
+
+  const sorted = normalised
+    .sort((a, b) => {
+      const av =
+        metric === 'refundItemsCount'
+          ? a.refundItemsCount
+          : metric === 'nonRestockedCost'
+          ? a.nonRestockedCost
+          : a.refundedRevenue;
+
+      const bv =
+        metric === 'refundItemsCount'
+          ? b.refundItemsCount
+          : metric === 'nonRestockedCost'
+          ? b.nonRestockedCost
+          : b.refundedRevenue;
+
+      // desc
+      if (bv !== av) return bv - av;
+
+      // tie-breaker stable
+      return String(a.townProductId).localeCompare(String(b.townProductId));
+    })
+    .slice(0, limit);
+
+  return {
+    filters: {
+      from: q.from ?? null,
+      to: q.to ?? null,
+      townId: q.townId ?? null,
+      productId: q.productId ?? null,
+      metric,
+      limit,
+    },
+    rows: sorted,
+  };
+}
+
+async refundLeaderboardCsv(q: RefundLeaderboardQueryDto) {
+  const data = await this.refundLeaderboard(q);
+
+  const headers = [
+    'townProductId',
+    'townId',
+    'townName',
+    'townSlug',
+    'productId',
+    'productName',
+    'pricingModel',
+    'refundItemsCount',
+    'refundsCount',
+    'refundedOrdersCount',
+    'refundedRevenue',
+    'refundedCogsRestocked',
+    'nonRestockedCost',
+    'restockedRefundItemsCount',
+    'nonRestockedRefundItemsCount',
+  ];
+
+  const csvRows = data.rows.map((r: any) => ({ ...r }));
+  return this.toCsv(headers, csvRows);
+}
+
+async netProfit(q: any) {
+  const saleWhere: Prisma.SaleItemWhereInput = {
+    ...(q.from || q.to
+      ? {
+          createdAt: {
+            ...(q.from ? { gte: new Date(q.from) } : {}),
+            ...(q.to ? { lte: new Date(q.to) } : {}),
+          },
+        }
+      : {}),
+  };
+
+  // Town filter via townProductIds
+  if (q.townId) {
+    const ids = await this.townProductIdsForTown(q.townId);
+    saleWhere.townProductId = { in: ids };
+  }
+
+  // 1) Gross totals from SaleItem
+  const grossAgg = await this.prisma.saleItem.aggregate({
+    where: saleWhere,
+    _sum: { revenue: true, cogs: true, profit: true },
+  });
+
+  const grossRevenue = Number(grossAgg._sum.revenue ?? 0);
+  const grossCogs = Number(grossAgg._sum.cogs ?? 0);
+  const grossProfit = Number(grossAgg._sum.profit ?? 0);
+
+  // 2) Refund impact (join RefundItem → Refund + SaleItem via orderItemId)
+  const refundWhere: Prisma.RefundItemWhereInput = {
+    ...(q.from || q.to
+      ? {
+          refund: {
+            createdAt: {
+              ...(q.from ? { gte: new Date(q.from) } : {}),
+              ...(q.to ? { lte: new Date(q.to) } : {}),
+            },
+          },
+        }
+      : {}),
+  };
+
+  // If townId: limit refunds to those townProductIds by joining through SaleItem later (we filter after join)
+  const refundItems = await this.prisma.refundItem.findMany({
+    where: refundWhere,
+    select: {
+  id: true,
+  orderItemId: true,
+  quantity: true,
+  weightGrams: true,
+  refund: { select: { id: true, createdAt: true, restock: true } },
+  orderItem: { select: { orderId: true } },
+},
+
+  });
+const refundIds = new Set<string>();
+const refundedOrderIds = new Set<string>();
+let restockedRefundItemsCount = 0;
+let nonRestockedRefundItemsCount = 0;
+
+for (const r of refundItems) {
+  if (r.refund?.id) refundIds.add(r.refund.id);
+  if (r.orderItem?.orderId) refundedOrderIds.add(r.orderItem.orderId);
+
+  if (r.refund?.restock) restockedRefundItemsCount += 1;
+  else nonRestockedRefundItemsCount += 1;
+}
+
+  const orderItemIds = Array.from(new Set(refundItems.map((r) => r.orderItemId)));
+
+  const saleItems = await this.prisma.saleItem.findMany({
+    where: {
+      orderItemId: { in: orderItemIds },
+      ...(saleWhere.townProductId ? { townProductId: saleWhere.townProductId } : {}),
+    },
+    select: {
+  orderItemId: true,
+  townProductId: true,
+  unitPrice: true,
+  unitCost: true,
+  townProduct: {
+    select: {
+      pricingModel: true,
+    },
+  },
+},
+
+  });
+
+  const saleByOrderItemId = new Map(saleItems.map((s) => [s.orderItemId, s]));
+
+  let refundedRevenue = 0;
+  let refundedCogsRestocked = 0;
+  let refundedCount = 0;
+
+  for (const r of refundItems) {
+    const si = saleByOrderItemId.get(r.orderItemId);
+    if (!si) continue; // not in this town filter or no matching sale snapshot
+
+    const unitPrice = Number(si.unitPrice ?? 0);
+    const unitCost = Number(si.unitCost ?? 0);
+
+    const isRestocked = Boolean(r.refund?.restock);
+
+    const pricingModel = si.townProduct?.pricingModel;
+
+if (pricingModel === 'UNIT') {
+
+      const qty = Number(r.quantity ?? 0);
+      const rev = unitPrice * qty;
+      refundedRevenue += rev;
+
+      if (isRestocked) {
+        refundedCogsRestocked += unitCost * qty;
+      }
+    } else {
+      const grams = Number(r.weightGrams ?? 0);
+      const kg = grams / 1000;
+      const rev = unitPrice * kg; // unitPrice is per kg in your design
+      refundedRevenue += rev;
+
+      if (isRestocked) {
+        refundedCogsRestocked += unitCost * kg; // unitCost per kg
+      }
+    }
+
+    refundedCount += 1;
+  }
+
+  const netRevenue = grossRevenue - refundedRevenue;
+  const netCogs = grossCogs - refundedCogsRestocked;
+  const netProfit = netRevenue - netCogs;
+
+  const grossMargin = grossRevenue > 0 ? (grossProfit / grossRevenue) * 100 : 0;
+  const netMargin = netRevenue > 0 ? (netProfit / netRevenue) * 100 : 0;
+
+  return {
+    filters: {
+      from: q.from ?? null,
+      to: q.to ?? null,
+      townId: q.townId ?? null,
+    },
+    gross: {
+      revenue: this.round2(grossRevenue),
+      cogs: this.round2(grossCogs),
+      profit: this.round2(grossProfit),
+      marginPercent: this.round2(grossMargin),
+    },
+    refunds: {
+  refundedRevenue: this.round2(refundedRevenue),
+  refundedCogsRestocked: this.round2(refundedCogsRestocked),
+
+  refundItemsCount: refundItems.length,
+  refundsCount: refundIds.size,
+  refundedOrdersCount: refundedOrderIds.size,
+
+  restockedRefundItemsCount,
+  nonRestockedRefundItemsCount,
+},
+
+    net: {
+      revenue: this.round2(netRevenue),
+      cogs: this.round2(netCogs),
+      profit: this.round2(netProfit),
+      marginPercent: this.round2(netMargin),
+    },
+  };
+}
+async netProfitTimeseries(q: any) {
+  const bucket: 'day' | 'week' | 'month' = q.bucket ?? 'day';
+
+  // Helper to get bucket key
+  const keyFor = (d: Date) =>
+    bucket === 'day'
+      ? this.getDayKey(d)
+      : bucket === 'week'
+        ? this.getISOWeekKey(d)
+        : this.getMonthKey(d);
+
+  // -------------------------
+  // 1) Build SaleItem where
+  // -------------------------
+  const saleWhere: Prisma.SaleItemWhereInput = {
+    ...(q.from || q.to
+      ? {
+          createdAt: {
+            ...(q.from ? { gte: new Date(q.from) } : {}),
+            ...(q.to ? { lte: new Date(q.to) } : {}),
+          },
+        }
+      : {}),
+  };
+
+  if (q.townId) {
+    const ids = await this.townProductIdsForTown(q.townId);
+    saleWhere.townProductId = { in: ids };
+  }
+
+  // -------------------------
+  // 2) Fetch SaleItems (gross)
+  // -------------------------
+  const saleItems = await this.prisma.saleItem.findMany({
+    where: saleWhere,
+    select: {
+      createdAt: true,
+      revenue: true,
+      cogs: true,
+      profit: true,
+      orderItemId: true,
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  // Map sale snapshot by orderItemId (for sale createdAt bucketing)
+  const saleByOrderItemId = new Map<string, { createdAt: Date }>();
+  for (const s of saleItems) {
+    saleByOrderItemId.set(s.orderItemId, { createdAt: s.createdAt });
+  }
+
+  // -------------------------
+  // 3) Fetch RefundItems (refund date filter ONLY)
+  // -------------------------
+  const refundItems = await this.prisma.refundItem.findMany({
+    where: {
+      ...(q.from || q.to
+        ? {
+            refund: {
+              createdAt: {
+                ...(q.from ? { gte: new Date(q.from) } : {}),
+                ...(q.to ? { lte: new Date(q.to) } : {}),
+              },
+            },
+          }
+        : {}),
+      ...(q.townId
+        ? {
+            // Optional: filter refunds to this town by limiting to orderItems that belong to town's townProducts
+            // We already restrict meta lookup by saleWhere (townProductId in ids) below, so this is not required.
+          }
+        : {}),
+    },
+    select: {
+      id: true,
+      orderItemId: true,
+      quantity: true,
+      weightGrams: true,
+      refund: { select: { id: true, createdAt: true, restock: true } },
+      orderItem: { select: { orderId: true } },
+    },
+  });
+
+  // No refunds and no sales → return empty
+  if (saleItems.length === 0 && refundItems.length === 0) {
+    return {
+      filters: { from: q.from ?? null, to: q.to ?? null, townId: q.townId ?? null, bucket },
+      rows: [],
+    };
+  }
+
+  // -------------------------
+  // 4) Fetch Sale meta for refund impact (unitPrice/unitCost/pricingModel/createdAt)
+  // -------------------------
+  const orderItemIds = Array.from(new Set(refundItems.map((r) => r.orderItemId)));
+
+  const saleMeta = await this.prisma.saleItem.findMany({
+    where: {
+      orderItemId: { in: orderItemIds },
+      ...(saleWhere.townProductId ? { townProductId: saleWhere.townProductId } : {}),
+    },
+    select: {
+      orderItemId: true,
+      createdAt: true,
+      unitPrice: true,
+      unitCost: true,
+      townProduct: { select: { pricingModel: true } },
+    },
+  });
+
+  const metaByOrderItemId = new Map<string, typeof saleMeta[number]>();
+  for (const m of saleMeta) {
+    metaByOrderItemId.set(m.orderItemId, m);
+  }
+
+  // -------------------------
+  // 5) Buckets
+  // -------------------------
+  type Bucket = {
+    grossRevenue: number;
+    grossCogs: number;
+    refundedRevenue: number;
+    refundedCogsRestocked: number;
+    saleItemsCount: number;
+    refundItemsCount: number;
+
+    refundsCountSet: Set<string>;
+    refundedOrdersCountSet: Set<string>;
+    restockedRefundItemsCount: number;
+    nonRestockedRefundItemsCount: number;
+  };
+
+  const buckets = new Map<string, Bucket>();
+
+  const ensureBucket = (key: string): Bucket => {
+    let cur = buckets.get(key);
+    if (!cur) {
+      cur = {
+        grossRevenue: 0,
+        grossCogs: 0,
+        refundedRevenue: 0,
+        refundedCogsRestocked: 0,
+        saleItemsCount: 0,
+        refundItemsCount: 0,
+
+        refundsCountSet: new Set<string>(),
+        refundedOrdersCountSet: new Set<string>(),
+        restockedRefundItemsCount: 0,
+        nonRestockedRefundItemsCount: 0,
+      };
+      buckets.set(key, cur);
+    }
+    return cur;
+  };
+
+  // -------------------------
+  // 6) Gross bucketing (by SaleItem.createdAt)
+  // -------------------------
+  for (const s of saleItems) {
+    const key = keyFor(s.createdAt);
+    const cur = ensureBucket(key);
+
+    cur.grossRevenue += Number(s.revenue ?? 0);
+    cur.grossCogs += Number(s.cogs ?? 0);
+    cur.saleItemsCount += 1;
+  }
+
+  // -------------------------
+  // 7) Refund bucketing (IMPORTANT: bucket by SALE createdAt, not refund createdAt)
+  // -------------------------
+  for (const r of refundItems) {
+    const meta = metaByOrderItemId.get(r.orderItemId);
+    if (!meta) continue;
+
+    // Bucket by the sale date (prefer the sale snapshot date)
+    const saleCreatedAt =
+      saleByOrderItemId.get(r.orderItemId)?.createdAt ?? meta.createdAt;
+
+    if (!saleCreatedAt) continue;
+
+    const key = keyFor(saleCreatedAt);
+    const cur = ensureBucket(key);
+
+    if (r.refund?.id) cur.refundsCountSet.add(r.refund.id);
+    if (r.orderItem?.orderId) cur.refundedOrdersCountSet.add(r.orderItem.orderId);
+
+    if (Boolean(r.refund?.restock)) cur.restockedRefundItemsCount += 1;
+    else cur.nonRestockedRefundItemsCount += 1;
+
+    const unitPrice = Number(meta.unitPrice ?? 0);
+    const unitCost = Number(meta.unitCost ?? 0);
+    const isRestocked = Boolean(r.refund?.restock);
+    const pricingModel = meta.townProduct?.pricingModel;
+
+    if (pricingModel === 'UNIT') {
+      const qty = Number(r.quantity ?? 0);
+      cur.refundedRevenue += unitPrice * qty;
+      if (isRestocked) cur.refundedCogsRestocked += unitCost * qty;
+    } else {
+      const grams = Number(r.weightGrams ?? 0);
+      const kg = grams / 1000;
+      cur.refundedRevenue += unitPrice * kg;
+      if (isRestocked) cur.refundedCogsRestocked += unitCost * kg;
+    }
+
+    cur.refundItemsCount += 1;
+  }
+
+  // -------------------------
+  // 8) Build rows
+  // -------------------------
+  const rows = Array.from(buckets.entries())
+    .map(([period, v]) => {
+      const grossProfit = v.grossRevenue - v.grossCogs;
+
+      const netRevenue = v.grossRevenue - v.refundedRevenue;
+      const netCogs = v.grossCogs - v.refundedCogsRestocked;
+      const netProfit = netRevenue - netCogs;
+
+      return {
+        period,
+
+        saleItemsCount: v.saleItemsCount,
+        refundItemsCount: v.refundItemsCount,
+
+        grossRevenue: this.round2(v.grossRevenue),
+        grossCogs: this.round2(v.grossCogs),
+        grossProfit: this.round2(grossProfit),
+
+        refundedRevenue: this.round2(v.refundedRevenue),
+        refundedCogsRestocked: this.round2(v.refundedCogsRestocked),
+
+        netRevenue: this.round2(netRevenue),
+        netCogs: this.round2(netCogs),
+        netProfit: this.round2(netProfit),
+
+        grossMarginPercent: this.round2(v.grossRevenue > 0 ? (grossProfit / v.grossRevenue) * 100 : 0),
+        netMarginPercent: this.round2(netRevenue > 0 ? (netProfit / netRevenue) * 100 : 0),
+
+        refundsCount: v.refundsCountSet.size,
+        refundedOrdersCount: v.refundedOrdersCountSet.size,
+        restockedRefundItemsCount: v.restockedRefundItemsCount,
+        nonRestockedRefundItemsCount: v.nonRestockedRefundItemsCount,
+      };
+    })
+    .sort((a, b) => (a.period < b.period ? -1 : a.period > b.period ? 1 : 0));
+
+  return {
+    filters: { from: q.from ?? null, to: q.to ?? null, townId: q.townId ?? null, bucket },
+    rows,
+  };
 }
 
 async salesTimeseries(q: any) {
