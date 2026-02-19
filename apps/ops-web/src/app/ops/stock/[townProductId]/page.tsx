@@ -241,6 +241,10 @@ export default function StockPage() {
       setAdjErr(`${unitLabel} change cannot be 0.`);
       return;
     }
+if (!adjNote.trim()) {
+  setAdjErr('Note is required for manual adjustments.');
+  return;
+}
 
     setAdjErr(null);
     setAdjBusy(true);

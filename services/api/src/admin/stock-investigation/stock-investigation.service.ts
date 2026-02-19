@@ -175,6 +175,79 @@ export class StockInvestigationService {
 
     return this.getTownProductStock(townProductId);
   }
+async manualAdjustTownProductStock(args: {
+  townProductId: string;
+  deltaQty?: number;
+  deltaWeightGrams?: number;
+  note?: string;
+}): Promise<{ ok: true; movementId: string }> {
+  const tp = await this.prisma.townProduct.findUnique({
+    where: { id: args.townProductId },
+  });
+  if (!tp) throw new NotFoundException('TownProduct not found');
+
+  const pricingModel = tp.pricingModel as 'UNIT' | 'WEIGHT';
+  const MAX_ABS_QTY = 500;
+  const MAX_ABS_GRAMS = 200000; // 200kg
+
+  const deltaQtyRaw = args.deltaQty;
+  const deltaWeightRaw = args.deltaWeightGrams;
+
+  const deltaQty = deltaQtyRaw === undefined ? undefined : Number(deltaQtyRaw);
+  const deltaWeightGrams = deltaWeightRaw === undefined ? undefined : Number(deltaWeightRaw);
+
+  // Validate based on pricing model
+  if (pricingModel === 'UNIT') {
+    if (deltaQty === undefined || !Number.isFinite(deltaQty)) {
+      throw new BadRequestException('deltaQty is required for UNIT products');
+    }
+    if (!Number.isInteger(deltaQty)) {
+      throw new BadRequestException('deltaQty must be an integer');
+    }
+    if (deltaQty === 0) {
+      throw new BadRequestException('deltaQty cannot be 0');
+    }
+    if (deltaWeightGrams !== undefined) {
+      throw new BadRequestException('Do not send deltaWeightGrams for UNIT products');
+    }
+  } else {
+    if (deltaWeightGrams === undefined || !Number.isFinite(deltaWeightGrams)) {
+      throw new BadRequestException('deltaWeightGrams is required for WEIGHT products');
+    }
+    if (!Number.isInteger(deltaWeightGrams)) {
+      throw new BadRequestException('deltaWeightGrams must be an integer number of grams');
+    }
+    if (deltaWeightGrams === 0) {
+      throw new BadRequestException('deltaWeightGrams cannot be 0');
+    }
+    if (deltaQty !== undefined) {
+      throw new BadRequestException('Do not send deltaQty for WEIGHT products');
+    }
+  }
+
+  const note = (args.note ?? '').trim();
+  if (!note) {
+  throw new BadRequestException('note is required for manual adjustments');
+}
+if (pricingModel === 'UNIT' && Math.abs(deltaQty!) > MAX_ABS_QTY) {
+  throw new BadRequestException(`deltaQty exceeds safety cap (±${MAX_ABS_QTY})`);
+}
+if (pricingModel === 'WEIGHT' && Math.abs(deltaWeightGrams!) > MAX_ABS_GRAMS) {
+  throw new BadRequestException(`deltaWeightGrams exceeds safety cap (±${MAX_ABS_GRAMS}g)`);
+}
+
+  const movement = await this.prisma.stockMovement.create({
+    data: {
+      townProductId: args.townProductId,
+      reason: 'MANUAL_ADJUSTMENT' as any,
+      note: note || null,
+      deltaQty: pricingModel === 'UNIT' ? deltaQty! : null,
+      deltaWeightGrams: pricingModel === 'WEIGHT' ? deltaWeightGrams! : null,
+    } as any,
+  });
+
+  return { ok: true, movementId: movement.id };
+}
 
   async listStockMismatches(args: {
     limit: number;
