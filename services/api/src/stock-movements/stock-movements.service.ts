@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, StockMovementReason } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
@@ -557,5 +557,158 @@ async devLedgerOnly(dto: DevLedgerOnlyDto) {
     ok: true,
     movement,
   };
+}
+// ===============================
+// STOCK DETAIL (ADMIN)
+// ===============================
+async getTownProductStock(townProductId: string) {
+  const tp = await this.prisma.townProduct.findUnique({
+    where: { id: townProductId },
+    select: {
+      id: true,
+      townId: true,
+      productId: true,
+      pricingModel: true,
+      stockQty: true,
+      stockWeightGrams: true,
+      updatedAt: true,
+      town: { select: { name: true, slug: true } },
+      product: { select: { name: true } },
+    },
+  });
+
+  if (!tp) throw new NotFoundException('TownProduct not found');
+
+  const agg = await this.prisma.stockMovement.aggregate({
+    where: { townProductId },
+    _sum: { deltaQty: true, deltaWeightGrams: true },
+    _max: { createdAt: true },
+  });
+
+  const ledgerQty = (agg._sum.deltaQty ?? 0) as number;
+  const ledgerWeightGrams = (agg._sum.deltaWeightGrams ?? 0) as number;
+
+  const snapshotQty = tp.stockQty ?? null;
+  const snapshotWeightGrams = tp.stockWeightGrams ?? null;
+
+  const diffQty = tp.pricingModel === 'UNIT' && snapshotQty !== null ? snapshotQty - ledgerQty : null;
+  const diffWeightGrams =
+    tp.pricingModel === 'WEIGHT' && snapshotWeightGrams !== null
+      ? snapshotWeightGrams - ledgerWeightGrams
+      : null;
+
+  const movements = await this.prisma.stockMovement.findMany({
+    where: { townProductId },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: 200,
+  });
+
+  return {
+    summary: {
+      townProductId: tp.id,
+      townId: tp.townId,
+      townName: tp.town.name,
+      townSlug: tp.town.slug,
+      productId: tp.productId,
+      productName: tp.product.name,
+      pricingModel: tp.pricingModel,
+
+      snapshotQty,
+      snapshotWeightGrams,
+
+      ledgerQty: tp.pricingModel === 'UNIT' ? ledgerQty : null,
+      ledgerWeightGrams: tp.pricingModel === 'WEIGHT' ? ledgerWeightGrams : null,
+
+      diffQty,
+      diffWeightGrams,
+
+      lastMovementAt: (agg._max.createdAt ?? null) as any,
+      snapshotUpdatedAt: tp.updatedAt,
+    },
+    movements,
+  };
+}
+
+// ===============================
+// RECONCILE ONE TOWN PRODUCT (ADMIN)
+// Sets snapshot stock = ledger stock
+// ===============================
+async reconcileTownProduct(townProductId: string, note?: string) {
+  const tp = await this.prisma.townProduct.findUnique({
+    where: { id: townProductId },
+    select: { id: true, pricingModel: true },
+  });
+  if (!tp) throw new NotFoundException('TownProduct not found');
+
+  const agg = await this.prisma.stockMovement.aggregate({
+    where: { townProductId },
+    _sum: { deltaQty: true, deltaWeightGrams: true },
+  });
+
+  const ledgerQty = (agg._sum.deltaQty ?? 0) as number;
+  const ledgerWeightGrams = (agg._sum.deltaWeightGrams ?? 0) as number;
+
+  await this.prisma.townProduct.update({
+    where: { id: townProductId },
+    data: tp.pricingModel === 'UNIT' ? { stockQty: ledgerQty } : { stockWeightGrams: ledgerWeightGrams },
+  });
+
+  // audit marker (0-delta) so reconcile action is visible in ledger history
+  await this.prisma.stockMovement.create({
+    data: {
+      townProductId,
+      deltaQty: tp.pricingModel === 'UNIT' ? 0 : null,
+      deltaWeightGrams: tp.pricingModel === 'WEIGHT' ? 0 : null,
+      reason: StockMovementReason.MANUAL_ADJUSTMENT,
+      note: note ?? 'Reconciled snapshot to ledger',
+    },
+  });
+
+  return this.getTownProductStock(townProductId);
+}
+
+// ===============================
+// MANUAL LEDGER ADJUSTMENT (ADMIN)
+// Creates StockMovement only (does NOT change snapshot)
+// ===============================
+async manualLedgerAdjustment(dto: {
+  townProductId: string;
+  deltaQty?: number;
+  deltaWeightGrams?: number;
+  note: string;
+}) {
+  const { townProductId, deltaQty, deltaWeightGrams, note } = dto;
+
+  const hasQty = typeof deltaQty === 'number';
+  const hasWg = typeof deltaWeightGrams === 'number';
+
+  if ((hasQty && hasWg) || (!hasQty && !hasWg)) {
+    throw new BadRequestException('Provide exactly one of deltaQty or deltaWeightGrams');
+  }
+
+  const tp = await this.prisma.townProduct.findUnique({
+    where: { id: townProductId },
+    select: { id: true, pricingModel: true },
+  });
+  if (!tp) throw new NotFoundException('TownProduct not found');
+
+  if (tp.pricingModel === 'UNIT' && !hasQty) {
+    throw new BadRequestException('UNIT products require deltaQty');
+  }
+  if (tp.pricingModel === 'WEIGHT' && !hasWg) {
+    throw new BadRequestException('WEIGHT products require deltaWeightGrams');
+  }
+
+  const movement = await this.prisma.stockMovement.create({
+    data: {
+      townProductId,
+      deltaQty: hasQty ? (deltaQty as number) : null,
+      deltaWeightGrams: hasWg ? (deltaWeightGrams as number) : null,
+      reason: StockMovementReason.MANUAL_ADJUSTMENT,
+      note,
+    },
+  });
+
+  return { stockMovement: movement };
 }
 }

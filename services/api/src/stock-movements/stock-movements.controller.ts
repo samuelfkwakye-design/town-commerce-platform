@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { StockMovementsService } from './stock-movements.service';
 import { ListStockMovementsQueryDto } from './dto/list-stock-movements.query.dto';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
@@ -24,12 +24,45 @@ export class StockMovementsController {
   reconcile(@Query() q: ReconcileStockQueryDto) {
     return this.service.reconcile(q);
   }
-// POST /api/v1/stock-movements/dev/ledger-only (admin, dev-only)
-@UseGuards(AdminKeyGuard)
-@Post('dev/ledger-only')
-devLedgerOnly(@Body() dto: DevLedgerOnlyDto) {
-  return this.service.devLedgerOnly(dto);
-}
+
+  // GET /api/v1/stock-movements/:townProductId (admin)
+  @UseGuards(AdminKeyGuard)
+  @Get(':townProductId')
+  getTownProductStock(@Param('townProductId') townProductId: string) {
+    return this.service.getTownProductStock(townProductId);
+  }
+
+  // POST /api/v1/stock-movements/:townProductId/reconcile (admin)
+  @UseGuards(AdminKeyGuard)
+  @Post(':townProductId/reconcile')
+  reconcileTownProduct(
+    @Param('townProductId') townProductId: string,
+    @Body() body: { note?: string },
+  ) {
+    return this.service.reconcileTownProduct(townProductId, body?.note);
+  }
+
+  // POST /api/v1/stock-movements/:townProductId/manual-adjustment (admin)
+  @UseGuards(AdminKeyGuard)
+  @Post(':townProductId/manual-adjustment')
+  manualAdjustment(
+    @Param('townProductId') townProductId: string,
+    @Body() body: { deltaQty?: number; deltaWeightGrams?: number; note: string },
+  ) {
+    return this.service.manualLedgerAdjustment({
+      townProductId,
+      deltaQty: body?.deltaQty,
+      deltaWeightGrams: body?.deltaWeightGrams,
+      note: body?.note,
+    });
+  }
+
+  // POST /api/v1/stock-movements/dev/ledger-only (admin, dev-only)
+  @UseGuards(AdminKeyGuard)
+  @Post('dev/ledger-only')
+  devLedgerOnly(@Body() dto: DevLedgerOnlyDto) {
+    return this.service.devLedgerOnly(dto);
+  }
 
   // POST /api/v1/stock-movements/adjust (admin)
   @UseGuards(AdminKeyGuard)
@@ -37,13 +70,13 @@ devLedgerOnly(@Body() dto: DevLedgerOnlyDto) {
   adjust(@Body() dto: AdjustStockDto) {
     return this.service.adjust(dto);
   }
-   // POST /api/v1/stock-movements/fix-mismatch (admin)
+
+  // POST /api/v1/stock-movements/fix-mismatch (admin)
   @UseGuards(AdminKeyGuard)
   @Post('fix-mismatch')
   fixMismatch(@Body() dto: FixMismatchDto) {
-  return this.service.fixMismatch(dto.townProductId, dto.note);
-}
-
+    return this.service.fixMismatch(dto.townProductId, dto.note);
+  }
 
   // POST /api/v1/stock-movements/baseline-from-snapshot (admin)
   @UseGuards(AdminKeyGuard)
@@ -51,5 +84,4 @@ devLedgerOnly(@Body() dto: DevLedgerOnlyDto) {
   baselineFromSnapshot(@Body() dto: BaselineFromSnapshotDto) {
     return this.service.baselineFromSnapshot(dto);
   }
-
 }

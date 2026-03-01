@@ -88,4 +88,26 @@ export class OrdersController {
   refundItems(@Param('id') id: string, @Body() dto: RefundItemsDto) {
     return this.service.refundItems(id, dto.reason, dto.restock, dto.items);
   }
+  // POST /api/v1/orders/:id/dev/rebuild-sale
+  @Post(':id/dev/rebuild-sale')
+  rebuildSale(@Param('id') id: string) {
+    return this.service.devRebuildSale(id);
+  }
+  // PATCH /api/v1/orders/:id/cancel
+@Patch(':id/cancel')
+cancel(@Param('id') id: string) {
+  return this.service.cancelOrder(id);
+}
+// PATCH /api/v1/orders/admin/:id/cod-collected
+@Patch('admin/:id/cod-collected')
+adminCodCollected(@Param('id') id: string, @Body() dto: CodCollectedDto) {
+  return this.service.markCodCollected(id, dto.note);
+}
+
+    // POST /api/v1/orders/:id/dev/force-settle
+  @Post(':id/dev/force-settle')
+  forceSettle(@Param('id') id: string) {
+    return this.service.devForceSettle(id);
+  }
+
 }

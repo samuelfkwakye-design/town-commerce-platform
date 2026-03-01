@@ -1,7 +1,8 @@
-import { Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Controller, Get, Body, Param, Post, Query } from '@nestjs/common';
 import { AdminKeyGuard } from '../../auth/admin-key.guard';
 import { UseGuards } from '@nestjs/common';
 import { StockInvestigationService } from './stock-investigation.service';
+import { ManualAdjustmentDto } from './dto/manual-adjustment.dto';
 
 @UseGuards(AdminKeyGuard)
 @Controller('admin')
@@ -13,6 +14,18 @@ export class StockInvestigationController {
   async getStock(@Param('id') id: string) {
     return this.svc.getTownProductStock(id);
   }
+@Post('town-products/:id/manual-adjustment')
+async manualAdjustment(
+  @Param('id') townProductId: string,
+  @Body() body: ManualAdjustmentDto,
+) {
+  return this.svc.manualAdjustTownProductStock({
+    townProductId,
+    deltaQty: body.deltaQty,
+    deltaWeightGrams: body.deltaWeightGrams,
+    note: body.note,
+  });
+}
 
   // 2) GET /api/v1/admin/town-products/:id/stock-movements?limit=20&cursor=...
   @Get('town-products/:id/stock-movements')

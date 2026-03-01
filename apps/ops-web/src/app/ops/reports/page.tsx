@@ -13,14 +13,18 @@ export default function ReportsHomePage() {
           <span className="mx-1">/</span>
           <span>Reports</span>
         </div>
+
         <h1 className="text-xl font-semibold mt-1">Reports</h1>
-        <div className="text-sm text-gray-600 mt-1">Operational & accountant-ready reporting.</div>
+        <div className="text-sm text-gray-600 mt-1">
+          Operational & accountant-ready reporting.
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Profit & Valuation */}
         <Link
           href="/ops/reports/profit"
-          className="rounded border bg-white p-4 hover:bg-gray-50"
+          className="rounded border bg-white p-4 hover:bg-gray-50 transition"
         >
           <div className="font-medium">Profit & Valuation</div>
           <div className="text-sm text-gray-600 mt-1">
@@ -28,12 +32,16 @@ export default function ReportsHomePage() {
           </div>
         </Link>
 
-        <div className="rounded border bg-white p-4 opacity-60">
+        {/* Net Profit Timeseries */}
+        <Link
+          href="/ops/reports/net-profit"
+          className="rounded border bg-white p-4 hover:bg-gray-50 transition"
+        >
           <div className="font-medium">Net Profit Timeseries</div>
           <div className="text-sm text-gray-600 mt-1">
-            Coming next — daily/weekly/monthly net profit view.
+            Daily, weekly or monthly net profit including refund impact.
           </div>
-        </div>
+        </Link>
       </div>
     </div>
   );

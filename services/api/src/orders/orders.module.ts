@@ -5,11 +5,10 @@ import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 
 @Module({
-  imports: [
-    PrismaModule,
-    HubtelModule,
-  ],
+  imports: [PrismaModule, HubtelModule],
   controllers: [OrdersController],
   providers: [OrdersService],
+  exports: [OrdersService], // ✅ add this line
 })
 export class OrdersModule {}
+
