@@ -13,7 +13,12 @@ import { StockMovementsModule } from './stock-movements/stock-movements.module';
 import { ReportsModule } from './reports/reports.module';
 import { AdminModule } from './admin/admin.module';
 import { UploadsModule } from './uploads/uploads.module';
-
+import { CustomerAuthModule } from './customer-auth/customer-auth.module';
+import { CustomersModule } from './customers/customers.module';
+import { TownSettingsModule } from './town-settings/town-settings.module';
+import { PromosModule } from './promos/promos.module';
+import { PromosAdminModule } from './admin/promos/promos.admin.module';
+import { AdminCustomersModule } from './admin/customers/admin-customers.module';
 @Module({
   imports: [
     HealthModule,
@@ -28,6 +33,12 @@ import { UploadsModule } from './uploads/uploads.module';
     AdminModule,    // 👈 ADD THIS LINE
     CatalogModule,
     UploadsModule,
+    CustomerAuthModule,
+    CustomersModule,
+    TownSettingsModule,
+    PromosModule,
+    PromosAdminModule,
+    AdminCustomersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

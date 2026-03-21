@@ -6,9 +6,12 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { StockMovementReason } from '@prisma/client';
 
+import { OptionalCustomerAuthGuard } from '../customer-auth/optional-customer-auth.guard';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { AddOrderItemDto } from './dto/add-order-item.dto';
@@ -17,15 +20,24 @@ import { CompleteOrderDto } from './dto/complete-order.dto';
 import { CodCollectedDto } from './dto/cod-collected.dto';
 import { PayGoodsDto } from './dto/pay-goods.dto';
 import { RefundItemsDto } from './dto/refund-items.dto';
+import { QuoteOrderDto } from './dto/quote-order.dto';
 
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly service: OrdersService) {}
 
+  // POST /api/v1/orders/quote
+  @Post('quote')
+  quote(@Body() dto: QuoteOrderDto) {
+    return this.service.quoteOrder(dto);
+  }
+
   // POST /api/v1/orders
   @Post()
-  create(@Body() dto: CreateOrderDto) {
-    return this.service.createOrder(dto);
+  @UseGuards(OptionalCustomerAuthGuard)
+  create(@Body() dto: CreateOrderDto, @Req() req: any) {
+    const customerId = req.user?.id as string | undefined;
+    return this.service.createOrder(dto, customerId);
   }
 
   // GET /api/v1/orders/:id
@@ -88,26 +100,28 @@ export class OrdersController {
   refundItems(@Param('id') id: string, @Body() dto: RefundItemsDto) {
     return this.service.refundItems(id, dto.reason, dto.restock, dto.items);
   }
+
   // POST /api/v1/orders/:id/dev/rebuild-sale
   @Post(':id/dev/rebuild-sale')
   rebuildSale(@Param('id') id: string) {
     return this.service.devRebuildSale(id);
   }
-  // PATCH /api/v1/orders/:id/cancel
-@Patch(':id/cancel')
-cancel(@Param('id') id: string) {
-  return this.service.cancelOrder(id);
-}
-// PATCH /api/v1/orders/admin/:id/cod-collected
-@Patch('admin/:id/cod-collected')
-adminCodCollected(@Param('id') id: string, @Body() dto: CodCollectedDto) {
-  return this.service.markCodCollected(id, dto.note);
-}
 
-    // POST /api/v1/orders/:id/dev/force-settle
+  // PATCH /api/v1/orders/:id/cancel
+  @Patch(':id/cancel')
+  cancel(@Param('id') id: string) {
+    return this.service.cancelOrder(id);
+  }
+
+  // PATCH /api/v1/orders/admin/:id/cod-collected
+  @Patch('admin/:id/cod-collected')
+  adminCodCollected(@Param('id') id: string, @Body() dto: CodCollectedDto) {
+    return this.service.markCodCollected(id, dto.note);
+  }
+
+  // POST /api/v1/orders/:id/dev/force-settle
   @Post(':id/dev/force-settle')
   forceSettle(@Param('id') id: string) {
     return this.service.devForceSettle(id);
   }
-
 }

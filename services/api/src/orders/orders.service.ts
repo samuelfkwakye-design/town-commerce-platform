@@ -1,14 +1,17 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { WhatsappService } from '../notifications/whatsapp.service';
 import {
   OrderStatus,
   PaymentMethod,
   PaymentPurpose,
   PaymentStatus,
   PricingModel,
+  PromoType,
   RefundStatus,
   Prisma,
   StockMovementReason,
@@ -22,18 +25,249 @@ import { AddOrderItemDto } from './dto/add-order-item.dto';
 import { CreateOrderDto, CreateOrderItemDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { RefundItemLineDto } from './dto/refund-items.dto';
+import { QuoteOrderDto } from './dto/quote-order.dto';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly hubtel: HubtelService,
+    private readonly whatsappService: WhatsappService,
   ) {}
-
   private dec(value: string | number): Prisma.Decimal {
     return new Prisma.Decimal(String(value));
   }
+  private toDecimal(value: Prisma.Decimal | string | number | null | undefined) {
+    return new Prisma.Decimal(value ?? 0);
+  }
+private normalizeTownText(value?: string | null) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+  private async resolveTownBySlug(townSlug: string) {
+    const town = await this.prisma.town.findUnique({
+      where: { slug: townSlug },
+      select: { id: true, name: true, slug: true },
+    });
 
+    if (!town) {
+      throw new NotFoundException(`Town not found: ${townSlug}`);
+    }
+
+    return town;
+  }
+
+  private async resolvePromo(code?: string) {
+    if (!code?.trim()) return null;
+
+    const promo = await this.prisma.promoCode.findUnique({
+      where: { code: code.trim().toUpperCase() },
+    });
+
+    if (!promo) {
+      throw new BadRequestException('Promo code not found');
+    }
+
+    if (!promo.isActive) {
+      throw new BadRequestException('Promo code is inactive');
+    }
+
+    if (promo.expiresAt && promo.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('Promo code has expired');
+    }
+
+    return promo;
+  }
+    async quoteOrder(dto: QuoteOrderDto) {
+    if (!dto.items || dto.items.length === 0) {
+      throw new BadRequestException('Order must include at least one item');
+    }
+
+    const town = await this.resolveTownBySlug(dto.townSlug);
+
+    const townSettings = await this.prisma.townSettings.findUnique({
+      where: { townId: town.id },
+    });
+
+    let itemsSubtotal = new Prisma.Decimal(0);
+
+    for (const item of dto.items) {
+      const townProduct = await this.prisma.townProduct.findUnique({
+        where: { id: item.townProductId },
+        include: {
+          variants: true,
+        },
+      });
+
+      if (!townProduct) {
+        throw new NotFoundException(
+          `TownProduct not found: ${item.townProductId}`,
+        );
+      }
+
+      if (townProduct.townId !== town.id) {
+        throw new BadRequestException(
+          `TownProduct ${item.townProductId} does not belong to town ${dto.townSlug}`,
+        );
+      }
+
+      if (!townProduct.isActive) {
+        throw new BadRequestException(
+          `TownProduct is inactive: ${item.townProductId}`,
+        );
+      }
+
+      if (townProduct.pricingModel === PricingModel.UNIT) {
+        if (!item.quantity || item.quantity < 1) {
+          throw new BadRequestException(
+            `UNIT item requires quantity: ${item.townProductId}`,
+          );
+        }
+
+        if (!townProduct.pricePerUnit) {
+          throw new BadRequestException(
+            `Missing pricePerUnit for ${item.townProductId}`,
+          );
+        }
+
+        const lineTotal = new Prisma.Decimal(townProduct.pricePerUnit).mul(
+          item.quantity,
+        );
+        itemsSubtotal = itemsSubtotal.add(lineTotal);
+        continue;
+      }
+
+      if (townProduct.pricingModel === PricingModel.WEIGHT) {
+        if (!item.weightGrams || item.weightGrams < 1) {
+          throw new BadRequestException(
+            `WEIGHT item requires weightGrams: ${item.townProductId}`,
+          );
+        }
+
+        if (!townProduct.pricePerKg) {
+          throw new BadRequestException(
+            `Missing pricePerKg for ${item.townProductId}`,
+          );
+        }
+
+        const kg = new Prisma.Decimal(item.weightGrams).div(1000);
+        const lineTotal = new Prisma.Decimal(townProduct.pricePerKg).mul(kg);
+        itemsSubtotal = itemsSubtotal.add(lineTotal);
+        continue;
+      }
+
+      if (townProduct.pricingModel === PricingModel.VARIANT) {
+        if (!item.quantity || item.quantity < 1) {
+          throw new BadRequestException(
+            `VARIANT item requires quantity: ${item.townProductId}`,
+          );
+        }
+
+        if (!item.townProductVariantId) {
+          throw new BadRequestException(
+            `VARIANT item requires townProductVariantId: ${item.townProductId}`,
+          );
+        }
+
+        const variant = townProduct.variants.find(
+          (v) => v.id === item.townProductVariantId,
+        );
+
+        if (!variant) {
+          throw new NotFoundException(
+            `TownProductVariant not found: ${item.townProductVariantId}`,
+          );
+        }
+
+        if (!variant.isActive) {
+          throw new BadRequestException(
+            `Variant is inactive: ${item.townProductVariantId}`,
+          );
+        }
+
+        const lineTotal = new Prisma.Decimal(variant.unitPrice).mul(
+          item.quantity,
+        );
+        itemsSubtotal = itemsSubtotal.add(lineTotal);
+        continue;
+      }
+
+      throw new BadRequestException(
+        `Unsupported pricing model for ${item.townProductId}`,
+      );
+    }
+
+    const minimumOrder = this.toDecimal(townSettings?.minimumOrder);
+    let deliveryFee = this.toDecimal(townSettings?.deliveryFee);
+    let serviceFee = this.toDecimal(townSettings?.serviceFee);
+    const currency = townSettings?.currency ?? 'GHS';
+
+    let discount = new Prisma.Decimal(0);
+    let promoApplied: null | {
+      code: string;
+      type: PromoType;
+      value: Prisma.Decimal | null;
+    } = null;
+
+    const promo = await this.resolvePromo(dto.promoCode);
+
+    if (promo) {
+      promoApplied = {
+        code: promo.code,
+        type: promo.type,
+        value: promo.value ? new Prisma.Decimal(promo.value) : null,
+      };
+
+      if (promo.townId && promo.townId !== town.id) {
+        throw new BadRequestException(
+          `Promo code ${promo.code} is not valid for this town`,
+        );
+      }
+
+            if (promo.type === PromoType.DELIVERY_FREE) {
+        deliveryFee = new Prisma.Decimal(0);
+      }
+
+      if (promo.type === PromoType.SERVICE_FREE) {
+        serviceFee = new Prisma.Decimal(0);
+      }
+      if (promo.type === PromoType.PERCENTAGE) {
+        const pct = new Prisma.Decimal(promo.value ?? 0);
+        const promoDiscount = itemsSubtotal.mul(pct).div(100);
+        discount = discount.add(promoDiscount);
+      }
+
+      if (promo.type === PromoType.FIXED) {
+        const fixed = new Prisma.Decimal(promo.value ?? 0);
+        discount = discount.add(fixed);
+      }
+    }
+
+    const preDiscountTotal = itemsSubtotal.add(deliveryFee).add(serviceFee);
+    const total =
+      discount.greaterThan(preDiscountTotal)
+        ? new Prisma.Decimal(0)
+        : preDiscountTotal.sub(discount);
+
+    return {
+      town,
+      pricing: {
+        itemsSubtotal,
+        subtotal: itemsSubtotal,
+        minimumOrder,
+        deliveryFee,
+        serviceFee,
+        discount,
+        total,
+        currency,
+      },
+      promo: promoApplied,
+    };
+  }
   // -------------------------
   // COD Admin (unchanged)
   // -------------------------
@@ -537,25 +771,167 @@ export class OrdersService {
     throw new BadRequestException('Unsupported pricing model');
   }
 
+  
+
   // ✅ UPDATED: create order now supports items[] (UNIT/WEIGHT/VARIANT)
-  async createOrder(dto: CreateOrderDto) {
+    async createOrder(dto: CreateOrderDto, customerId?: string) {
+  let townId = dto.townId;
+
+  if (!townId && dto.townSlug) {
+    const townBySlug = await this.prisma.town.findUnique({
+      where: { slug: dto.townSlug },
+      select: { id: true, name: true, slug: true },
+    });
+
+    if (!townBySlug) {
+      throw new NotFoundException(`Town not found: ${dto.townSlug}`);
+    }
+
+    townId = townBySlug.id;
+  }
+
+  if (!townId) {
+    throw new BadRequestException('townId or townSlug is required');
+  }
+
   const town = await this.prisma.town.findUnique({
-    where: { id: dto.townId },
+    where: { id: townId },
+    select: { id: true, name: true, slug: true },
   });
-  if (!town) throw new NotFoundException(`Town not found: ${dto.townId}`);
+
+  if (!town) {
+    throw new NotFoundException(`Town not found: ${townId}`);
+  }
 
   if (!dto.items || dto.items.length === 0) {
     throw new BadRequestException('Order must include at least one item');
   }
 
+  const resolvedCustomerPhone = dto.customerPhone ?? dto.phone ?? null;
+  const resolvedPaymentMethod = dto.goodsPaymentMethod ?? dto.paymentMethod;
+
+  let resolvedDeliveryAddress:
+    | {
+        recipientName: string;
+        phone: string;
+        line1: string;
+        line2: string | null;
+        area: string | null;
+        town: string;
+        landmark: string | null;
+        notes: string | null;
+      }
+    | null = null;
+
+  let resolvedCustomerAddressId: string | null = null;
+
+  if (customerId && dto.customerAddressId) {
+    const savedAddress = await this.prisma.customerAddress.findUnique({
+      where: { id: dto.customerAddressId },
+    });
+
+    if (!savedAddress) {
+      throw new NotFoundException('Selected address not found');
+    }
+
+    if (savedAddress.customerId !== customerId) {
+      throw new BadRequestException(
+        'Selected address does not belong to this customer',
+      );
+    }
+
+    resolvedCustomerAddressId = savedAddress.id;
+
+    resolvedDeliveryAddress = {
+      recipientName: savedAddress.recipientName,
+      phone: savedAddress.phone || resolvedCustomerPhone || '',
+      line1: savedAddress.line1,
+      line2: savedAddress.line2 || null,
+      area: savedAddress.area || null,
+      town: savedAddress.town,
+      landmark: savedAddress.landmark || null,
+      notes: savedAddress.notes || null,
+    };
+  } else if (dto.deliveryAddress) {
+    resolvedDeliveryAddress = {
+      recipientName: dto.deliveryAddress.recipientName.trim(),
+      phone: dto.deliveryAddress.phone.trim(),
+      line1: dto.deliveryAddress.line1.trim(),
+      line2: dto.deliveryAddress.line2?.trim() || null,
+      area: dto.deliveryAddress.area?.trim() || null,
+      town: dto.deliveryAddress.town.trim(),
+      landmark: dto.deliveryAddress.landmark?.trim() || null,
+      notes: dto.deliveryAddress.notes?.trim() || null,
+    };
+  }
+
+  if (!resolvedDeliveryAddress) {
+    throw new BadRequestException(
+      'Delivery address is required. Provide deliveryAddress or customerAddressId',
+    );
+  }
+
+  const selectedTownName = this.normalizeTownText(town.name);
+  const addressTownName = this.normalizeTownText(resolvedDeliveryAddress.town);
+
+  if (selectedTownName !== addressTownName) {
+    throw new BadRequestException(
+      `Delivery town does not match selected market. Selected market: ${town.name}, address town: ${resolvedDeliveryAddress.town}`,
+    );
+  }
+
+  const officialQuote = await this.quoteOrder({
+    townSlug: town.slug,
+    promoCode: dto.promoCode?.trim() || undefined,
+    items: dto.items.map((item) => ({
+      townProductId: item.townProductId,
+      townProductVariantId: item.townProductVariantId,
+      quantity: item.quantity,
+      weightGrams: item.weightGrams,
+    })),
+  });
+
+  const itemsSubtotal =
+    officialQuote.pricing.itemsSubtotal ?? new Prisma.Decimal(0);
+  const subtotal = officialQuote.pricing.subtotal ?? new Prisma.Decimal(0);
+  const serviceFee = officialQuote.pricing.serviceFee ?? new Prisma.Decimal(0);
+  const deliveryFee =
+    officialQuote.pricing.deliveryFee ?? new Prisma.Decimal(0);
+  const total = officialQuote.pricing.total ?? new Prisma.Decimal(0);
+
+  const payNowTotal =
+    resolvedPaymentMethod && resolvedPaymentMethod !== PaymentMethod.COD
+      ? total
+      : this.dec('0.00');
+
+  const payOnDeliveryTotal =
+    resolvedPaymentMethod === PaymentMethod.COD ? total : this.dec('0.00');
+
   const orderId = await this.prisma.$transaction(async (tx) => {
     const order = await tx.order.create({
       data: {
-        townId: dto.townId,
+        townId,
+        customerId: customerId ?? null,
         customerEmail: dto.customerEmail ?? null,
-        customerPhone: dto.customerPhone ?? null,
-        goodsPaymentMethod: dto.goodsPaymentMethod ?? undefined,
+        customerPhone: resolvedCustomerPhone,
+        goodsPaymentMethod: resolvedPaymentMethod ?? undefined,
         status: OrderStatus.DRAFT,
+
+        deliveryRecipientName: resolvedDeliveryAddress.recipientName,
+        deliveryPhone: resolvedDeliveryAddress.phone,
+        deliveryLine1: resolvedDeliveryAddress.line1,
+        deliveryLine2: resolvedDeliveryAddress.line2,
+        deliveryArea: resolvedDeliveryAddress.area,
+        deliveryTown: resolvedDeliveryAddress.town,
+        deliveryLandmark: resolvedDeliveryAddress.landmark,
+        deliveryNotes: resolvedDeliveryAddress.notes,
+
+        deliveryFee,
+        serviceFee,
+
+        itemsSubtotal: this.dec('0.00'),
+        payNowTotal: this.dec('0.00'),
+        payOnDeliveryTotal: this.dec('0.00'),
         subtotal: this.dec('0.00'),
         total: this.dec('0.00'),
       },
@@ -566,55 +942,120 @@ export class OrdersService {
       await this.addItemTx(tx, order.id, order.townId, item);
     }
 
-    // ✅ Use tx-aware totals inside the transaction
     await this.recalculateTotalsTx(tx, order.id);
+
+    await tx.order.update({
+      where: { id: order.id },
+      data: {
+        itemsSubtotal,
+        subtotal,
+        serviceFee,
+        deliveryFee,
+        total,
+        payNowTotal,
+        payOnDeliveryTotal,
+      },
+    });
+
+    if (officialQuote.promo?.code) {
+      const promoRow = await tx.promoCode.findUnique({
+        where: { code: officialQuote.promo.code },
+        select: { id: true },
+      });
+
+      if (promoRow) {
+        await tx.promoUsage.create({
+          data: {
+            promoCodeId: promoRow.id,
+            orderId: order.id,
+            phone: resolvedCustomerPhone,
+          },
+        });
+      }
+    }
 
     return order.id;
   });
 
-  // ✅ Now it’s committed, safe to fetch with normal prisma
-  return this.getOrder(orderId);
+  const fullOrder = await this.getOrder(orderId);
+
+  try {
+    await this.whatsappService.sendOrderConfirmation({
+      phoneNumber: fullOrder.customerPhone ?? '',
+      orderId: String(fullOrder.id),
+      totalAmount: Number(fullOrder.total ?? 0),
+      paymentMethod: fullOrder.goodsPaymentMethod
+        ? String(fullOrder.goodsPaymentMethod)
+        : null,
+      townSlug: fullOrder.town?.slug ?? null,
+    });
+  } catch (error) {
+    this.logger.warn(
+      `Failed to send WhatsApp confirmation for order ${orderId}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  return fullOrder;
 }
-
   async getOrder(id: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: {
-        town: true,
+  const order = await this.prisma.order.findUnique({
+    where: { id },
+    include: {
+      town: true,
 
-        items: {
-          include: {
-            townProduct: { include: { product: true, town: true } },
-            variant: true, // ✅ include variant for VARIANT items
-            refundItems: true,
-          },
+      items: {
+        include: {
+          townProduct: { include: { product: true, town: true } },
+          variant: true,
+          refundItems: true,
         },
+      },
 
-        payments: {
-          include: {
-            Refund: {
-              include: {
-                items: {
-                  include: {
-                    orderItem: true,
-                  },
+      payments: {
+        include: {
+          Refund: {
+            include: {
+              items: {
+                include: {
+                  orderItem: true,
                 },
               },
             },
           },
         },
+      },
 
-        sale: {
-          include: {
-            items: true,
-          },
+      sale: {
+        include: {
+          items: true,
         },
       },
-    });
+    },
+  });
 
-    if (!order) throw new NotFoundException(`Order not found: ${id}`);
-    return order;
-  }
+  if (!order) throw new NotFoundException(`Order not found: ${id}`);
+
+  const deliveryAddress =
+    order.deliveryLine1 || order.deliveryRecipientName || order.deliveryTown
+      ? {
+          recipientName: order.deliveryRecipientName,
+          phone: order.deliveryPhone,
+          line1: order.deliveryLine1,
+          line2: order.deliveryLine2,
+          area: order.deliveryArea,
+          town: order.deliveryTown,
+          landmark: order.deliveryLandmark,
+          notes: order.deliveryNotes,
+        }
+      : null;
+
+  return {
+    ...order,
+    deliveryAddress,
+  };
+}
 
   // -------------------------
   // DEV settle (unchanged)

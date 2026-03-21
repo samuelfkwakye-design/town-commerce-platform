@@ -1,12 +1,39 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { apiFetch } from '@/lib/api';
-import { TownProductImageUpload } from '@/components/TownProductImageUpload';
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import { apiFetch } from "@/lib/api";
+import { TownProductImageUpload } from "@/components/TownProductImageUpload";
 
-type PricingModel = 'UNIT' | 'WEIGHT';
+type PricingModel = "UNIT" | "WEIGHT" | "VARIANT";
+
+type TownProductResp = {
+  id: string;
+  pricingModel: PricingModel;
+
+  pricePerUnit: string | null;
+  costPerUnit: string | null;
+
+  pricePerKg: string | null;
+  costPerKg: string | null;
+
+  stockQty: number | null;
+  stockWeightGrams: number | null;
+
+  product?: { name: string | null } | null;
+  town?: { name: string | null; slug: string | null } | null;
+};
+
+type VariantResp = {
+  id: string;
+  label: string;
+  unitPrice: string;
+  unitCost: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  packWeightGrams: number | null;
+};
 
 type StockSummary = {
   townProductId: string;
@@ -30,21 +57,28 @@ type StockSummary = {
 type Movement = Record<string, any>;
 
 function fmtDate(iso: string | null | undefined) {
-  if (!iso) return '—';
+  if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString();
 }
 
 function fmtNumber(n: any) {
-  if (n === null || n === undefined) return '—';
+  if (n === null || n === undefined) return "—";
   const x = Number(n);
   if (!Number.isFinite(x)) return String(n);
   return x.toLocaleString();
 }
 
+function fmtMoney(v: any) {
+  if (v === null || v === undefined || v === "") return "—";
+  const x = Number(v);
+  if (!Number.isFinite(x)) return String(v);
+  return x.toFixed(2);
+}
+
 function fmtWeightGrams(n: any) {
-  if (n === null || n === undefined) return '—';
+  if (n === null || n === undefined) return "—";
   const grams = Number(n);
   if (!Number.isFinite(grams)) return String(n);
   const kg = grams / 1000;
@@ -89,25 +123,56 @@ export default function OpsStockDetailPage() {
   const [summary, setSummary] = useState<StockSummary | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
 
+  // ✅ NEW: pricing + variants
+  const [tp, setTp] = useState<TownProductResp | null>(null);
+  const [variants, setVariants] = useState<VariantResp[]>([]);
+
   const [showAdjust, setShowAdjust] = useState(false);
-  const [note, setNote] = useState('');
-  const [deltaQty, setDeltaQty] = useState<string>('0');
-  const [deltaWeightGrams, setDeltaWeightGrams] = useState<string>('0');
+  const [note, setNote] = useState("");
+  const [deltaQty, setDeltaQty] = useState<string>("0");
+  const [deltaWeightGrams, setDeltaWeightGrams] = useState<string>("0");
 
-  const pricingModel = (summary?.pricingModel as PricingModel | null) ?? null;
-  const isWeight = pricingModel === 'WEIGHT';
+  const pricingModel = (tp?.pricingModel ?? summary?.pricingModel ?? null) as PricingModel | null;
+  const isWeight = pricingModel === "WEIGHT";
+  const isVariant = pricingModel === "VARIANT";
 
-  async function refresh(id: string) {
+  async function refreshAll(id: string) {
     setLoading(true);
     setErr(null);
+
     try {
+      // 1) Stock + movements
       const res = await apiFetch<any>(`/stock-movements/${id}`);
       setSummary(pickSummaryShape(res, id));
       setMovements(pickMovements(res));
+
+      // 2) TownProduct pricing
+      const townProduct = await apiFetch<TownProductResp>(`/admin/town-products/${id}`, {
+        method: "GET",
+      });
+      setTp(townProduct);
+
+      // 3) Variants if needed
+      if (townProduct?.pricingModel === "VARIANT") {
+        const v = await apiFetch<{ rows: VariantResp[] }>(`/admin/town-products/${id}/variants`, {
+          method: "GET",
+        });
+        const rows = (v?.rows ?? []).slice().sort((a, b) => {
+          const ao = a.sortOrder ?? 0;
+          const bo = b.sortOrder ?? 0;
+          if (ao !== bo) return ao - bo;
+          return String(a.label).localeCompare(String(b.label));
+        });
+        setVariants(rows);
+      } else {
+        setVariants([]);
+      }
     } catch (e: any) {
       setErr(String(e?.message ?? e));
       setSummary(null);
       setMovements([]);
+      setTp(null);
+      setVariants([]);
     } finally {
       setLoading(false);
     }
@@ -115,7 +180,7 @@ export default function OpsStockDetailPage() {
 
   useEffect(() => {
     if (!townProductId) return;
-    void refresh(townProductId);
+    void refreshAll(townProductId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [townProductId]);
 
@@ -123,7 +188,7 @@ export default function OpsStockDetailPage() {
     if (!townProductId) return;
 
     const ok = window.confirm(
-      'Reconcile will set snapshot stock = ledger stock for this TownProduct.\n\nProceed?',
+      "Reconcile will set snapshot stock = ledger stock for this TownProduct.\n\nProceed?",
     );
     if (!ok) return;
 
@@ -131,10 +196,10 @@ export default function OpsStockDetailPage() {
     setErr(null);
     try {
       await apiFetch<any>(`/stock-movements/${townProductId}/reconcile`, {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify({}),
       });
-      await refresh(townProductId);
+      await refreshAll(townProductId);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
       setLoading(false);
@@ -146,7 +211,7 @@ export default function OpsStockDetailPage() {
 
     const trimmed = note.trim();
     if (!trimmed) {
-      alert('Note is required for audit.');
+      alert("Note is required for audit.");
       return;
     }
 
@@ -154,11 +219,11 @@ export default function OpsStockDetailPage() {
     const grams = Number(deltaWeightGrams);
 
     if (!isWeight && !Number.isFinite(qty)) {
-      alert('Please enter a valid UNIT delta quantity.');
+      alert("Please enter a valid UNIT delta quantity.");
       return;
     }
     if (isWeight && !Number.isFinite(grams)) {
-      alert('Please enter a valid WEIGHT delta grams.');
+      alert("Please enter a valid WEIGHT delta grams.");
       return;
     }
 
@@ -173,7 +238,7 @@ export default function OpsStockDetailPage() {
     setErr(null);
     try {
       await apiFetch<any>(`/stock-movements/${townProductId}/manual-adjustment`, {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify({
           note: trimmed,
           deltaQty: isWeight ? null : qty,
@@ -182,11 +247,11 @@ export default function OpsStockDetailPage() {
       });
 
       setShowAdjust(false);
-      setNote('');
-      setDeltaQty('0');
-      setDeltaWeightGrams('0');
+      setNote("");
+      setDeltaQty("0");
+      setDeltaWeightGrams("0");
 
-      await refresh(townProductId);
+      await refreshAll(townProductId);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
       setLoading(false);
@@ -197,19 +262,19 @@ export default function OpsStockDetailPage() {
     ? isWeight
       ? fmtWeightGrams(summary.snapshotWeightGrams)
       : fmtNumber(summary.snapshotQty)
-    : '—';
+    : "—";
 
   const ledgerText = summary
     ? isWeight
       ? fmtWeightGrams(summary.ledgerWeightGrams)
       : fmtNumber(summary.ledgerQty)
-    : '—';
+    : "—";
 
   const diffText = summary
     ? isWeight
       ? fmtWeightGrams(summary.diffWeightGrams)
       : fmtNumber(summary.diffQty)
-    : '—';
+    : "—";
 
   return (
     <div className="p-4 space-y-4">
@@ -218,21 +283,20 @@ export default function OpsStockDetailPage() {
           <div className="text-sm text-gray-500">
             <Link href="/ops/stock" className="underline">
               Stock
-            </Link>{' '}
+            </Link>{" "}
             <span className="mx-1">/</span>
             <span>Detail</span>
           </div>
 
           <h1 className="text-xl font-semibold mt-1">
-            {summary?.townName ?? '—'} • {summary?.productName ?? '—'}
+            {tp?.town?.name ?? summary?.townName ?? "—"} •{" "}
+            {tp?.product?.name ?? summary?.productName ?? "—"}
           </h1>
 
           <div className="text-sm text-gray-600">
-            TownProductId:{' '}
-            <span className="font-mono text-xs">{townProductId ?? '—'}</span>
+            TownProductId: <span className="font-mono text-xs">{townProductId ?? "—"}</span>
           </div>
 
-          {/* ✅ Image upload lives directly under the header */}
           {townProductId ? (
             <div className="mt-3">
               <TownProductImageUpload townProductId={townProductId} />
@@ -260,7 +324,7 @@ export default function OpsStockDetailPage() {
           <button
             className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
             disabled={loading || !townProductId}
-            onClick={() => townProductId && refresh(townProductId)}
+            onClick={() => townProductId && refreshAll(townProductId)}
           >
             Refresh
           </button>
@@ -273,32 +337,93 @@ export default function OpsStockDetailPage() {
         </div>
       ) : null}
 
+      {/* ✅ NEW: Pricing section */}
+      <div className="rounded-lg border bg-white p-3">
+        <div className="text-sm font-semibold">Pricing</div>
+        <div className="mt-2 text-sm text-gray-700">
+          Model: <span className="font-mono">{pricingModel ?? "—"}</span>
+        </div>
+
+        {pricingModel === "UNIT" ? (
+          <div className="mt-2 grid gap-2 md:grid-cols-2 text-sm">
+            <div>
+              <span className="text-gray-600">Price per unit:</span> {fmtMoney(tp?.pricePerUnit)}
+            </div>
+            <div>
+              <span className="text-gray-600">Cost per unit:</span> {fmtMoney(tp?.costPerUnit)}
+            </div>
+          </div>
+        ) : null}
+
+        {pricingModel === "WEIGHT" ? (
+          <div className="mt-2 grid gap-2 md:grid-cols-2 text-sm">
+            <div>
+              <span className="text-gray-600">Price per kg:</span> {fmtMoney(tp?.pricePerKg)}
+            </div>
+            <div>
+              <span className="text-gray-600">Cost per kg:</span> {fmtMoney(tp?.costPerKg)}
+            </div>
+          </div>
+        ) : null}
+
+        {pricingModel === "VARIANT" ? (
+          <div className="mt-3">
+            {variants.length ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-[700px] w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr className="text-left">
+                      <th className="p-2">Variant</th>
+                      <th className="p-2">Price</th>
+                      <th className="p-2">Cost</th>
+                      <th className="p-2">Pack grams</th>
+                      <th className="p-2">Active</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variants.map((v) => (
+                      <tr key={v.id} className="border-t">
+                        <td className="p-2">{v.label}</td>
+                        <td className="p-2">{fmtMoney(v.unitPrice)}</td>
+                        <td className="p-2">{fmtMoney(v.unitCost)}</td>
+                        <td className="p-2">{v.packWeightGrams ?? "—"}</td>
+                        <td className="p-2">{v.isActive ? "Yes" : "No"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-sm text-amber-700 mt-2">
+                No variants found yet. Add Small/Medium/Large in the Edit page.
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Stock cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="rounded-lg border bg-white p-3">
           <div className="text-xs text-gray-600">Snapshot</div>
           <div className="mt-1 text-lg font-semibold">{snapshotText}</div>
-          <div className="mt-1 text-xs text-gray-600">
-            Updated: {fmtDate(summary?.snapshotUpdatedAt)}
-          </div>
+          <div className="mt-1 text-xs text-gray-600">Updated: {fmtDate(summary?.snapshotUpdatedAt)}</div>
         </div>
 
         <div className="rounded-lg border bg-white p-3">
           <div className="text-xs text-gray-600">Ledger</div>
           <div className="mt-1 text-lg font-semibold">{ledgerText}</div>
-          <div className="mt-1 text-xs text-gray-600">
-            Last movement: {fmtDate(summary?.lastMovementAt)}
-          </div>
+          <div className="mt-1 text-xs text-gray-600">Last movement: {fmtDate(summary?.lastMovementAt)}</div>
         </div>
 
         <div className="rounded-lg border bg-white p-3">
           <div className="text-xs text-gray-600">Diff</div>
           <div className="mt-1 text-lg font-semibold">{diffText}</div>
-          <div className="mt-1 text-xs text-gray-600">
-            Model: {summary?.pricingModel ?? '—'}
-          </div>
+          <div className="mt-1 text-xs text-gray-600">Model: {pricingModel ?? "—"}</div>
         </div>
       </div>
 
+      {/* Movements table */}
       <div className="rounded-lg border bg-white overflow-x-auto">
         <div className="p-3 border-b">
           <div className="font-medium">Movements</div>
@@ -323,10 +448,10 @@ export default function OpsStockDetailPage() {
             {movements.length ? (
               movements.map((m, idx) => {
                 const when = m.createdAt ?? m.at ?? m.timestamp ?? m.occurredAt ?? null;
-                const type = m.type ?? m.kind ?? m.reasonType ?? '—';
+                const type = m.type ?? m.kind ?? m.reasonType ?? "—";
                 const dQty = m.deltaQty ?? m.deltaQuantity ?? m.qtyDelta ?? m.quantityDelta ?? null;
                 const dG = m.deltaWeightGrams ?? m.deltaGrams ?? m.weightDeltaGrams ?? null;
-                const noteText = m.note ?? m.reason ?? m.memo ?? m.description ?? '—';
+                const noteText = m.note ?? m.reason ?? m.memo ?? m.description ?? "—";
                 const refType = m.refType ?? m.sourceType ?? null;
                 const refId = m.refId ?? m.sourceId ?? null;
 
@@ -340,14 +465,14 @@ export default function OpsStockDetailPage() {
                     <td className="p-3">
                       {refType || refId ? (
                         <span className="font-mono text-xs">
-                          {String(refType ?? 'ref')}:{String(refId ?? '—')}
+                          {String(refType ?? "ref")}:{String(refId ?? "—")}
                         </span>
                       ) : (
-                        '—'
+                        "—"
                       )}
                     </td>
                     <td className="p-3">
-                      <span className="font-mono text-xs">{String(m.id ?? '—')}</span>
+                      <span className="font-mono text-xs">{String(m.id ?? "—")}</span>
                     </td>
                   </tr>
                 );

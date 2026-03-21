@@ -4,19 +4,22 @@ import type { CatalogResponse } from "@/lib/types";
 import ProductClient from "./product-client";
 
 function sortImages(images: any[] | null | undefined) {
-  const list = images ?? [];
-  if (!list.length) return [];
+  if (!Array.isArray(images)) return [];
 
-  return list.slice().sort((a, b) => {
-    const ao = a?.sortOrder ?? 0;
-    const bo = b?.sortOrder ?? 0;
-    if (ao !== bo) return ao - bo;
+  return images
+    .slice()
+    .sort((a, b) => {
+      const ao = a?.sortOrder ?? 999;
+      const bo = b?.sortOrder ?? 999;
 
-    // tie-breaker: newest createdAt first
-    const at = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const bt = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return bt - at;
-  });
+      if (ao !== bo) return ao - bo;
+
+      const at = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bt = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+
+      return bt - at;
+    })
+    .filter((img) => img?.url);
 }
 
 export default async function ProductPage({
@@ -27,17 +30,24 @@ export default async function ProductPage({
   const { townSlug, townProductId } = await params;
 
   const data = await apiFetch<CatalogResponse>(
-    `/catalog?townSlug=${encodeURIComponent(townSlug)}&search=&categorySlug=`
+    `/catalog?townSlug=${encodeURIComponent(
+      townSlug
+    )}&search=&categorySlug=`
   );
 
-  const all = data.categories.flatMap((c: any) => c.products ?? []);
-  const product = all.find((p: any) => p.townProductId === townProductId);
+  const allCategories = data?.categories ?? [];
+  const allProducts = allCategories.flatMap((c: any) => c.products ?? []);
+
+  const product = allProducts.find(
+    (p: any) => p.townProductId === townProductId
+  );
 
   if (!product) {
     return (
       <div className="pt-6">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="text-lg font-semibold">Product not found</div>
+
           <p className="mt-2 text-sm text-slate-600">
             This item may have been removed or is not available in this market.
           </p>
@@ -62,21 +72,51 @@ export default async function ProductPage({
     );
   }
 
-  const images = sortImages(product.images);
-  const cover = images[0] ?? null;
+  const parentCategory =
+    allCategories.find((c: any) =>
+      (c.products ?? []).some((p: any) => p.townProductId === townProductId)
+    ) ?? null;
 
+  const fallbackRelatedProducts = (parentCategory?.products ?? [])
+    .filter(
+      (p: any) =>
+        p.townProductId !== townProductId && p?.isActive !== false
+    )
+    .slice(0, 6);
+
+  let relatedProducts = fallbackRelatedProducts;
+
+  try {
+    const alsoBought = await apiFetch<any>(
+      `/catalog/also-bought?townSlug=${encodeURIComponent(
+        townSlug
+      )}&townProductId=${encodeURIComponent(townProductId)}&limit=6`
+    );
+
+    if (Array.isArray(alsoBought?.items) && alsoBought.items.length > 0) {
+      relatedProducts = alsoBought.items;
+    }
+  } catch {
+    relatedProducts = fallbackRelatedProducts;
+  }
+
+  const images = sortImages(product.images);
+
+  const cover = images.length > 0 ? images[0] : null;
   const coverUrl = cover?.url ?? null;
-  const coverAlt = cover?.alt ?? product.name;
+  const coverAlt = cover?.alt ?? product.name ?? "Product";
 
   return (
     <div className="pt-6">
       <ProductClient
         townSlug={townSlug}
-        townId={data.town.id}
+        townId={data?.town?.id}
         product={product}
         images={images}
         coverUrl={coverUrl}
         coverAlt={coverAlt}
+        relatedProducts={relatedProducts}
+        allProducts={allProducts}
       />
     </div>
   );

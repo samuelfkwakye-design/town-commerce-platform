@@ -18,28 +18,27 @@ type OpsDashboardResponse = {
   refundsToday: number;
   confirmedStaleCount: number;
 
-  missingImagesTop: OpsDashboardItemLink[];
-  lowStockTop: OpsDashboardItemLink[];
-  confirmedStaleTop: OpsDashboardItemLink[];
+  missingImagesTop?: OpsDashboardItemLink[];
+  lowStockTop?: OpsDashboardItemLink[];
+  confirmedStaleTop?: OpsDashboardItemLink[];
 };
 
-type RevenueTrendPoint = { day: string; revenue: number };
+type TownsResponse = { rows: TownOption[] };
+
+type RevenueTrendRow = { period: string; revenue: number };
 type RevenueTrendResponse = {
-  generatedAt: string;
-  townId: string | null;
-  days: number;
-  points: RevenueTrendPoint[];
+  filters?: { townId?: string | null; from?: string; to?: string; bucket?: string };
+  rows: RevenueTrendRow[];
 };
 
-export default async function OpsDashboardPage({
-  searchParams,
-}: {
-  searchParams?: { townId?: string };
+export default async function OpsDashboardPage(props: {
+  searchParams?: Promise<{ townId?: string }>;
 }) {
-  const townId = searchParams?.townId ?? "";
+  const sp = (await props.searchParams) ?? {};
+  const townId = sp.townId ?? "";
 
-  const [towns, snapshot, trend] = await Promise.all([
-    apiFetch<TownOption[]>(`/admin/reports/towns`, { method: "GET" }),
+  const [townsResp, snapshot, trendResp] = await Promise.all([
+    apiFetch<TownsResponse>(`/admin/reports/towns`, { method: "GET" }),
     apiFetch<OpsDashboardResponse>(
       `/admin/reports/ops-dashboard${townId ? `?townId=${encodeURIComponent(townId)}` : ""}`,
       { method: "GET" }
@@ -50,12 +49,24 @@ export default async function OpsDashboardPage({
     ),
   ]);
 
+  const towns = Array.isArray((townsResp as any)) ? ((townsResp as any) as TownOption[]) : townsResp.rows ?? [];
+
+  const trendPoints = (trendResp.rows ?? []).map((r) => ({
+    day: r.period,
+    revenue: Number(r.revenue ?? 0),
+  }));
+
   return (
     <DashboardClient
       towns={towns}
       selectedTownId={townId || null}
-      snapshot={snapshot}
-      trend={trend}
+      snapshot={{
+        ...snapshot,
+        missingImagesTop: snapshot.missingImagesTop ?? [],
+        lowStockTop: snapshot.lowStockTop ?? [],
+        confirmedStaleTop: snapshot.confirmedStaleTop ?? [],
+      }}
+      trend={{ days: 7, points: trendPoints }}
     />
   );
 }

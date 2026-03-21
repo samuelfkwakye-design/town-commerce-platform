@@ -11,7 +11,7 @@ export type CatalogResponse = {
       productId: string;
       name: string;
       description: string | null;
-      pricingModel: 'UNIT' | 'WEIGHT' | 'VARIANT';
+      pricingModel: "UNIT" | "WEIGHT" | "VARIANT";
       pricePerUnit: string | null;
       pricePerKg: string | null;
       variants: Array<{
@@ -26,21 +26,21 @@ export type CatalogResponse = {
 
 export type CartItem =
   | {
-      pricingModel: 'UNIT';
+      pricingModel: "UNIT";
       townProductId: string;
       name: string;
       unitPrice: string;
       quantity: number;
     }
   | {
-      pricingModel: 'WEIGHT';
+      pricingModel: "WEIGHT";
       townProductId: string;
       name: string;
       pricePerKg: string;
       weightGrams: number;
     }
   | {
-      pricingModel: 'VARIANT';
+      pricingModel: "VARIANT";
       townProductId: string;
       townProductVariantId: string;
       name: string;
@@ -53,10 +53,36 @@ export type CreateOrderPayload = {
   townId: string;
   customerPhone?: string | null;
   customerEmail?: string | null;
-  goodsPaymentMethod?: 'COD' | 'MOMO';
+  goodsPaymentMethod?: "COD" | "MOMO";
   items: Array<
     | { townProductId: string; quantity: number }
     | { townProductId: string; weightGrams: number }
     | { townProductId: string; townProductVariantId: string; quantity: number }
   >;
+};
+
+export type SearchableProduct = {
+  id: string;
+  name: string;
+  categorySlug?: string | null;
+  categoryName?: string | null;
+  imageUrl?: string | null;
+  pricingModel: "UNIT" | "WEIGHT" | "VARIANT";
+  priceLabel: string;
+};
+
+export type SearchableCategory = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+export type MiniCartItemAddedDetail = {
+  townSlug: string;
+  townProductId: string;
+  name: string;
+  pricingModel: "UNIT" | "WEIGHT" | "VARIANT";
+  quantity?: number;
+  weightGrams?: number;
+  variantLabel?: string;
 };

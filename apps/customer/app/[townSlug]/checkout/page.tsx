@@ -1,221 +1,1133 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { clearCart, loadCart } from "@/lib/cart";
-import type { CartItem, CatalogResponse, CreateOrderPayload } from "@/lib/types";
+import { apiFetch } from "@/lib/api";
+import type { CartItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import CheckoutProgress from "@/components/CheckoutProgress";
+
+type TownSettingsResponse = {
+  town?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  settings?: {
+    townId?: string;
+    deliveryFee?: string;
+    serviceFee?: string;
+    minimumOrder?: string;
+    currency?: string;
+  };
+};
+
+type QuoteResponse = {
+  town?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  pricing?: {
+    itemsSubtotal?: string | number;
+    subtotal?: string | number;
+    minimumOrder?: string | number;
+    deliveryFee?: string | number;
+    serviceFee?: string | number;
+    discount?: string | number;
+    total?: string | number;
+    currency?: string;
+  };
+  promo?: {
+    code: string;
+    type: string;
+    value?: string | number | null;
+  } | null;
+};
+
+type MeResponse = {
+  ok: boolean;
+  customer?: {
+    id: string;
+    phone: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    defaultTown?: {
+      id: string;
+      name: string;
+      slug: string;
+    } | null;
+  } | null;
+};
+
+type CustomerAddress = {
+  id: string;
+  label?: string | null;
+  recipientName: string;
+  phone?: string | null;
+  line1: string;
+  line2?: string | null;
+  area?: string | null;
+  town: string;
+  landmark?: string | null;
+  notes?: string | null;
+  isDefault: boolean;
+};
+
+type FieldErrors = {
+  phone?: string;
+  selectedAddressId?: string;
+  recipientName?: string;
+  line1?: string;
+  town?: string;
+};
 
 function money(n: number) {
   return n.toFixed(2);
 }
 
+function normalizeTown(value?: string | null) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function toTownSlug(value?: string | null) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+}
+
+function inputClass(hasError?: boolean) {
+  return `w-full rounded-xl border bg-white px-4 py-3 text-sm outline-none focus:border-primary ${
+    hasError ? "border-red-400 bg-red-50" : "border-slate-200"
+  }`;
+}
+
 export default function CheckoutPage() {
   const params = useParams<{ townSlug: string }>();
+  const router = useRouter();
   const townSlug = params?.townSlug;
-
-  const [townId, setTownId] = useState<string>("");
+  const searchParams = useSearchParams();
+  const [highlightPlaceOrder, setHighlightPlaceOrder] = useState(false);
+  const summaryRef = useRef<HTMLDivElement | null>(null);
   const [items, setItems] = useState<CartItem[]>([]);
-  const [phone, setPhone] = useState("0240000000");
-  const [method, setMethod] = useState<"COD" | "MOMO">("COD");
+  const [phone, setPhone] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("COD");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  const [serviceFee, setServiceFee] = useState(0);
+  const [minimumOrder, setMinimumOrder] = useState(0);
+  const [currency, setCurrency] = useState("GHS");
+
+  const [promoCode, setPromoCode] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<QuoteResponse["promo"]>(null);
+  const [discount, setDiscount] = useState(0);
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+  const [promoMessage, setPromoMessage] = useState("");
+  const [promoError, setPromoError] = useState("");
+
+  const [customer, setCustomer] = useState<MeResponse["customer"]>(null);
+  const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
+  const [useSavedAddress, setUseSavedAddress] = useState(true);
+
+  const [recipientName, setRecipientName] = useState("");
+  const [line1, setLine1] = useState("");
+  const [line2, setLine2] = useState("");
+  const [area, setArea] = useState("");
+  const [addressTown, setAddressTown] = useState("");
+  const [landmark, setLandmark] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const [checkoutError, setCheckoutError] = useState("");
+  const [addressError, setAddressError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
     setItems(loadCart());
   }, []);
 
   useEffect(() => {
+    async function loadCustomerContext() {
+      try {
+        const me = await apiFetch<MeResponse>("/customer-auth/me");
+        if (!me?.ok || !me.customer) {
+          setCustomer(null);
+          setAddresses([]);
+          setUseSavedAddress(false);
+          return;
+        }
+
+        setCustomer(me.customer);
+        setPhone((prev) => prev || me.customer?.phone || "");
+        setRecipientName(
+          `${me.customer.firstName ?? ""} ${me.customer.lastName ?? ""}`.trim(),
+        );
+
+        try {
+          const rows = await apiFetch<CustomerAddress[]>("/customers/me/addresses");
+          setAddresses(rows);
+
+          const preferred = rows.find((a) => a.isDefault) || rows[0] || null;
+
+          if (preferred) {
+            setSelectedAddressId(preferred.id);
+            setUseSavedAddress(true);
+          } else {
+            setUseSavedAddress(false);
+          }
+        } catch {
+          setAddresses([]);
+          setUseSavedAddress(false);
+        }
+      } catch {
+        setCustomer(null);
+        setAddresses([]);
+        setUseSavedAddress(false);
+      }
+    }
+
+    void loadCustomerContext();
+  }, []);
+
+  useEffect(() => {
+    const updated = searchParams.get("addressUpdated");
+
+    if (updated === "1") {
+      setTimeout(() => {
+        summaryRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+        setHighlightPlaceOrder(true);
+
+        setTimeout(() => {
+          setHighlightPlaceOrder(false);
+        }, 2200);
+      }, 250);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (!townSlug) return;
 
-    (async () => {
+    async function loadTownSettings() {
       try {
-        setErr(null);
-        const data = await apiFetch<CatalogResponse>(
-          `/catalog?townSlug=${encodeURIComponent(townSlug)}&search=&categorySlug=`
+        const json = await apiFetch<TownSettingsResponse>(
+          `/town-settings/by-slug/${encodeURIComponent(townSlug)}`,
+          { cache: "no-store" },
         );
-        setTownId(data.town.id);
-      } catch (e: any) {
-        setTownId("");
-        setErr(e?.message ?? "Failed to load town");
-      }
-    })();
-  }, [townSlug]);
 
-  const totals = useMemo(() => {
-    let total = 0;
+        setDeliveryFee(Number(json?.settings?.deliveryFee ?? 0));
+        setServiceFee(Number(json?.settings?.serviceFee ?? 0));
+        setMinimumOrder(Number(json?.settings?.minimumOrder ?? 0));
+        setCurrency(json?.settings?.currency || "GHS");
+
+        if (!addressTown) {
+          setAddressTown(json?.town?.name || townSlug);
+        }
+      } catch {
+        setDeliveryFee(0);
+        setServiceFee(0);
+        setMinimumOrder(0);
+        setCurrency("GHS");
+      }
+    }
+
+    void loadTownSettings();
+  }, [townSlug, addressTown]);
+
+  const localTotals = useMemo(() => {
+    let subtotal = 0;
 
     for (const it of items) {
-      if (it.pricingModel === "UNIT") total += Number(it.unitPrice) * it.quantity;
-      else if (it.pricingModel === "WEIGHT")
-        total += (Number(it.pricePerKg) * it.weightGrams) / 1000;
-      else total += Number(it.unitPrice) * it.quantity;
+      if (it.pricingModel === "UNIT") {
+        subtotal += Number(it.unitPrice) * it.quantity;
+      } else if (it.pricingModel === "WEIGHT") {
+        subtotal += (Number(it.pricePerKg) * it.weightGrams) / 1000;
+      } else {
+        subtotal += Number(it.unitPrice) * it.quantity;
+      }
     }
 
-    return { total };
-  }, [items]);
+    const preDiscountTotal = subtotal + serviceFee + deliveryFee;
+    const total = Math.max(0, preDiscountTotal - discount);
+    const belowMinimum = subtotal > 0 && subtotal < minimumOrder;
 
-  async function placeOrder() {
-    setErr(null);
+    return {
+      subtotal,
+      serviceFee,
+      deliveryFee,
+      discount,
+      preDiscountTotal,
+      total,
+      belowMinimum,
+    };
+  }, [items, serviceFee, deliveryFee, minimumOrder, discount]);
 
+  const selectedAddress = useMemo(
+    () => addresses.find((a) => a.id === selectedAddressId) || null,
+    [addresses, selectedAddressId],
+  );
+
+  const usingSavedAddress = useMemo(
+    () => !!(customer && useSavedAddress && addresses.length > 0),
+    [customer, useSavedAddress, addresses.length],
+  );
+
+  const effectiveTown = useMemo(() => {
+    if (usingSavedAddress && selectedAddress) {
+      return selectedAddress.town;
+    }
+    return addressTown;
+  }, [usingSavedAddress, selectedAddress, addressTown]);
+
+  const townMismatch = useMemo(() => {
+    if (!townSlug) return false;
+    if (!effectiveTown?.trim()) return false;
+    return normalizeTown(effectiveTown) !== normalizeTown(townSlug);
+  }, [effectiveTown, townSlug]);
+
+  const canSubmit = useMemo(() => {
+    if (items.length === 0) return false;
+    if (isSubmitting) return false;
+    if (localTotals.belowMinimum) return false;
+    if (!phone.trim()) return false;
+    if (townMismatch) return false;
+
+    if (usingSavedAddress) {
+      return !!selectedAddressId;
+    }
+
+    return !!recipientName.trim() && !!line1.trim() && !!addressTown.trim();
+  }, [
+    items.length,
+    isSubmitting,
+    localTotals.belowMinimum,
+    phone,
+    townMismatch,
+    usingSavedAddress,
+    selectedAddressId,
+    recipientName,
+    line1,
+    addressTown,
+  ]);
+
+  useEffect(() => {
+    if (canSubmit && highlightPlaceOrder) {
+      setHighlightPlaceOrder(false);
+    }
+  }, [canSubmit, highlightPlaceOrder]);
+
+  async function fetchQuote(code?: string) {
+    if (!townSlug || items.length === 0) return null;
+
+    const json = await apiFetch<QuoteResponse>("/orders/quote", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        townSlug,
+        promoCode: code?.trim() ? code.trim() : undefined,
+        items: items.map((it) => ({
+          townProductId: it.townProductId,
+          townProductVariantId:
+            it.pricingModel === "VARIANT" ? it.townProductVariantId : undefined,
+          quantity:
+            it.pricingModel === "UNIT" || it.pricingModel === "VARIANT"
+              ? it.quantity
+              : undefined,
+          weightGrams: it.pricingModel === "WEIGHT" ? it.weightGrams : undefined,
+        })),
+      }),
+    });
+
+    return json;
+  }
+
+  async function applyPromo() {
     if (!townSlug) {
-      setErr("Missing town slug in URL. Go back to the market and retry.");
-      return;
-    }
-
-    if (!townId) {
-      setErr("TownId not loaded yet. Refresh and try again.");
-      return;
-    }
-
-    if (!phone.trim()) {
-      setErr("Phone number is required");
+      setPromoError("Town not found.");
+      setPromoMessage("");
       return;
     }
 
     if (items.length === 0) {
-      setErr("Cart is empty");
+      setPromoError("Your cart is empty.");
+      setPromoMessage("");
+      setAppliedPromo(null);
+      setDiscount(0);
       return;
     }
 
-    const payload: CreateOrderPayload = {
-      townId,
-      customerPhone: phone.trim(),
-      goodsPaymentMethod: method,
-      items: items.map((it) => {
-        if (it.pricingModel === "UNIT") {
-          return { townProductId: it.townProductId, quantity: it.quantity };
-        }
-        if (it.pricingModel === "WEIGHT") {
-          return { townProductId: it.townProductId, weightGrams: it.weightGrams };
-        }
-        return {
-          townProductId: it.townProductId,
-          townProductVariantId: it.townProductVariantId,
-          quantity: it.quantity,
-        };
-      }),
-    };
+    if (!promoCode.trim()) {
+      setPromoError("Enter a promo code.");
+      setPromoMessage("");
+      setAppliedPromo(null);
+      setDiscount(0);
+      return;
+    }
 
-    setLoading(true);
     try {
-      const order = await apiFetch<any>(`/orders`, {
+      setIsApplyingPromo(true);
+      setPromoError("");
+      setPromoMessage("");
+
+      const quote = await fetchQuote(promoCode.trim());
+
+      if (!quote?.pricing) {
+        throw new Error("Invalid quote response");
+      }
+
+      setDeliveryFee(Number(quote.pricing.deliveryFee ?? 0));
+      setServiceFee(Number(quote.pricing.serviceFee ?? 0));
+      setMinimumOrder(Number(quote.pricing.minimumOrder ?? 0));
+      setCurrency(quote.pricing.currency || "GHS");
+      setDiscount(Number(quote.pricing.discount ?? 0));
+      setAppliedPromo(quote.promo ?? null);
+
+      if (quote.promo?.code) {
+        setPromoMessage(`Promo applied: ${quote.promo.code}`);
+        setPromoError("");
+      } else {
+        setPromoError("Promo code is invalid or not applicable.");
+        setPromoMessage("");
+        setAppliedPromo(null);
+        setDiscount(0);
+      }
+    } catch (err: any) {
+      console.error("Apply promo failed:", err);
+      setPromoError(err?.message || "Promo code is invalid or expired.");
+      setPromoMessage("");
+      setAppliedPromo(null);
+      setDiscount(0);
+
+      try {
+        const quote = await fetchQuote();
+        if (quote?.pricing) {
+          setDeliveryFee(Number(quote.pricing.deliveryFee ?? 0));
+          setServiceFee(Number(quote.pricing.serviceFee ?? 0));
+          setMinimumOrder(Number(quote.pricing.minimumOrder ?? 0));
+          setCurrency(quote.pricing.currency || "GHS");
+        }
+      } catch {
+        // keep current values
+      }
+    } finally {
+      setIsApplyingPromo(false);
+    }
+  }
+
+  function validateForm() {
+    const nextErrors: FieldErrors = {};
+
+    if (!phone.trim()) {
+      nextErrors.phone = "Phone number is required";
+    }
+
+    if (usingSavedAddress) {
+      if (!selectedAddressId) {
+        nextErrors.selectedAddressId = "Please select a saved address";
+      }
+    } else {
+      if (!recipientName.trim()) {
+        nextErrors.recipientName = "Recipient name is required";
+      }
+      if (!line1.trim()) {
+        nextErrors.line1 = "Address line 1 is required";
+      }
+      if (!addressTown.trim()) {
+        nextErrors.town = "Town is required";
+      }
+    }
+
+    setFieldErrors(nextErrors);
+
+    if (townMismatch) {
+      setAddressError(
+        `Your delivery address town (${effectiveTown}) does not match the selected market (${townSlug}). Please update the address or switch town.`,
+      );
+    } else if (Object.keys(nextErrors).length > 0) {
+      setAddressError("Please complete the highlighted fields.");
+    } else {
+      setAddressError("");
+    }
+
+    return Object.keys(nextErrors).length === 0 && !townMismatch;
+  }
+
+  async function placeOrder() {
+    if (!townSlug) return;
+    if (!items.length) return;
+    if (localTotals.belowMinimum) return;
+
+    setCheckoutError("");
+    setAddressError("");
+
+    const isValid = validateForm();
+
+    if (!isValid) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      let finalPricing = {
+        subtotal: localTotals.subtotal,
+        serviceFee: localTotals.serviceFee,
+        deliveryFee: localTotals.deliveryFee,
+        total: localTotals.total,
+        currency,
+      };
+
+      try {
+        const quote = await fetchQuote(appliedPromo?.code || promoCode || undefined);
+        if (quote?.pricing) {
+          finalPricing = {
+            subtotal: Number(quote.pricing.subtotal ?? 0),
+            serviceFee: Number(quote.pricing.serviceFee ?? 0),
+            deliveryFee: Number(quote.pricing.deliveryFee ?? 0),
+            total: Number(quote.pricing.total ?? 0),
+            currency: quote.pricing.currency || currency,
+          };
+
+          setDeliveryFee(Number(quote.pricing.deliveryFee ?? 0));
+          setServiceFee(Number(quote.pricing.serviceFee ?? 0));
+          setMinimumOrder(Number(quote.pricing.minimumOrder ?? 0));
+          setCurrency(quote.pricing.currency || currency);
+          setDiscount(Number(quote.pricing.discount ?? 0));
+          setAppliedPromo(quote.promo ?? null);
+        }
+      } catch (err) {
+        console.error("Quote refresh failed before placing order", err);
+      }
+
+      const body: any = {
+        townSlug,
+        phone,
+        paymentMethod,
+        items: items.map((it) => ({
+          townProductId: it.townProductId,
+          townProductVariantId:
+            it.pricingModel === "VARIANT" ? it.townProductVariantId : undefined,
+          quantity:
+            it.pricingModel === "UNIT" || it.pricingModel === "VARIANT"
+              ? it.quantity
+              : undefined,
+          weightGrams: it.pricingModel === "WEIGHT" ? it.weightGrams : undefined,
+        })),
+        promoCode: appliedPromo?.code || promoCode || undefined,
+        pricing: {
+          subtotal: finalPricing.subtotal,
+          serviceFee: finalPricing.serviceFee,
+          deliveryFee: finalPricing.deliveryFee,
+          total: finalPricing.total,
+          currency: finalPricing.currency,
+        },
+      };
+
+      if (usingSavedAddress) {
+        body.customerAddressId = selectedAddressId;
+      } else {
+        body.deliveryAddress = {
+          recipientName: recipientName.trim(),
+          phone: phone.trim(),
+          line1: line1.trim(),
+          line2: line2.trim() || undefined,
+          area: area.trim() || undefined,
+          town: addressTown.trim(),
+          landmark: landmark.trim() || undefined,
+          notes: notes.trim() || undefined,
+        };
+      }
+
+      const json: any = await apiFetch("/orders", {
         method: "POST",
-        body: JSON.stringify(payload),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(body),
       });
 
       clearCart();
-      window.location.href = `/${townSlug}/order/${order.id}`;
-    } catch (e: any) {
-      setErr(e?.message ?? "Failed to create order");
+
+      if (json?.id) {
+        router.push(`/${townSlug}/order/${json.id}`);
+      } else {
+        router.push(`/${townSlug}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setCheckoutError(err?.message || "Failed to place order.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   }
 
   return (
     <div className="pt-6">
-      {/* Top row links */}
-      <div className="flex items-center justify-between">
+      <CheckoutProgress step="checkout" />
+
+      <div className="mt-6 flex items-center justify-between gap-3">
         <Link
           href={townSlug ? `/${townSlug}/cart` : "/"}
           className="text-sm text-slate-600 hover:text-slate-900"
         >
           ← Back to cart
         </Link>
-
-        <Link
-          href={townSlug ? `/${townSlug}` : "/"}
-          className="text-sm text-slate-600 hover:text-slate-900"
-        >
-          Market
-        </Link>
       </div>
 
       <h1 className="mt-4 text-2xl font-extrabold tracking-tight">Checkout</h1>
 
-      {err ? (
-        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          {err}
+      {checkoutError ? (
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {checkoutError}
+        </div>
+      ) : null}
+
+      {addressError ? (
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {addressError}
         </div>
       ) : null}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {/* Left column */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Contact */}
-          <Card className="rounded-2xl p-5">
-            <div className="text-lg font-semibold">Contact</div>
-            <Separator className="my-4" />
-            <label className="text-sm font-medium text-slate-700">Phone</label>
-            <div className="mt-2 max-w-sm">
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </div>
-            <div className="mt-2 text-xs text-slate-500">
+          <Card className="rounded-2xl p-6">
+            <div className="text-2xl font-semibold">Contact</div>
+            <Separator className="my-5" />
+
+            {customer ? (
+              <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                Logged in as {customer.firstName || customer.phone}
+              </div>
+            ) : (
+              <div className="mb-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-4 text-sm text-slate-800">
+                <div className="font-medium">Checking out as guest</div>
+
+                <div className="mt-1 text-slate-600">
+                  You can place your order without logging in, or sign in for a
+                  faster experience.
+                </div>
+
+                {townSlug ? (
+                  <div className="mt-3 flex items-center gap-3">
+                    <Link
+                      href={`/auth/login?redirect=${encodeURIComponent(`/${townSlug}/checkout`)}`}
+                    >
+                      <Button className="h-10 rounded-xl bg-orange-500 text-white hover:bg-orange-600">
+                        Login for faster checkout
+                      </Button>
+                    </Link>
+
+                    <span className="text-xs text-slate-500">
+                      Save addresses & checkout quicker
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            <label className="mb-2 block text-sm font-medium">Phone</label>
+            <input
+              type="text"
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                setCheckoutError("");
+                setAddressError("");
+                setFieldErrors((prev) => ({ ...prev, phone: undefined }));
+              }}
+              className={`max-w-xl ${inputClass(!!fieldErrors.phone)}`}
+            />
+            {fieldErrors.phone ? (
+              <div className="mt-2 text-xs text-red-600">{fieldErrors.phone}</div>
+            ) : null}
+
+            <div className="mt-3 text-sm text-slate-500">
               Use a number the rider can reach you on.
             </div>
           </Card>
 
-          {/* Payment */}
-          <Card className="rounded-2xl p-5">
-            <div className="text-lg font-semibold">Payment method (goods)</div>
-            <Separator className="my-4" />
+          <Card className="rounded-2xl p-6">
+            <div className="text-2xl font-semibold">Delivery address</div>
+            {customer && addresses.length > 0 ? (
+              <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                <div>Using saved addresses for faster checkout</div>
 
-            <label className="text-sm font-medium text-slate-700">
+                <Link
+                  href="/account/addresses"
+                  className="font-medium text-orange-600 hover:text-orange-700"
+                >
+                  Manage
+                </Link>
+              </div>
+            ) : null}
+            <Separator className="my-5" />
+
+            {customer && addresses.length > 0 ? (
+              <div className="mb-5 space-y-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    checked={useSavedAddress}
+                    onChange={() => {
+                      setUseSavedAddress(true);
+                      setAddressError("");
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        selectedAddressId: undefined,
+                        recipientName: undefined,
+                        line1: undefined,
+                        town: undefined,
+                      }));
+                    }}
+                  />
+                  Use a saved address
+                </label>
+
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    checked={!useSavedAddress}
+                    onChange={() => {
+                      setUseSavedAddress(false);
+                      setAddressError("");
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        selectedAddressId: undefined,
+                      }));
+                    }}
+                  />
+                  Enter a new address
+                </label>
+              </div>
+            ) : null}
+
+            {customer && useSavedAddress && addresses.length > 0 ? (
+              <div className="space-y-4">
+                <label className="mb-2 block text-sm font-medium">
+                  Select saved address
+                </label>
+
+                <select
+                  value={selectedAddressId}
+                  onChange={(e) => {
+                    setSelectedAddressId(e.target.value);
+                    setAddressError("");
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      selectedAddressId: undefined,
+                    }));
+                  }}
+                  className={inputClass(!!fieldErrors.selectedAddressId)}
+                >
+                  <option value="">Select an address</option>
+                  {addresses.map((addr) => (
+                    <option key={addr.id} value={addr.id}>
+                      {(addr.label || addr.recipientName) +
+                        " — " +
+                        addr.line1 +
+                        ", " +
+                        addr.town}
+                    </option>
+                  ))}
+                </select>
+
+                {fieldErrors.selectedAddressId ? (
+                  <div className="text-xs text-red-600">
+                    {fieldErrors.selectedAddressId}
+                  </div>
+                ) : null}
+
+                {selectedAddress ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    <div className="font-medium">{selectedAddress.recipientName}</div>
+                    <div>{selectedAddress.line1}</div>
+                    {selectedAddress.line2 ? <div>{selectedAddress.line2}</div> : null}
+                    {selectedAddress.area ? <div>{selectedAddress.area}</div> : null}
+                    <div>{selectedAddress.town}</div>
+                    {selectedAddress.landmark ? (
+                      <div>Landmark: {selectedAddress.landmark}</div>
+                    ) : null}
+                    {selectedAddress.phone ? <div>Phone: {selectedAddress.phone}</div> : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Recipient name
+                  </label>
+                  <input
+                    type="text"
+                    value={recipientName}
+                    onChange={(e) => {
+                      setRecipientName(e.target.value);
+                      setAddressError("");
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        recipientName: undefined,
+                      }));
+                    }}
+                    className={inputClass(!!fieldErrors.recipientName)}
+                  />
+                  {fieldErrors.recipientName ? (
+                    <div className="mt-2 text-xs text-red-600">
+                      {fieldErrors.recipientName}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Address line 1
+                  </label>
+                  <input
+                    type="text"
+                    value={line1}
+                    onChange={(e) => {
+                      setLine1(e.target.value);
+                      setAddressError("");
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        line1: undefined,
+                      }));
+                    }}
+                    className={inputClass(!!fieldErrors.line1)}
+                  />
+                  {fieldErrors.line1 ? (
+                    <div className="mt-2 text-xs text-red-600">
+                      {fieldErrors.line1}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Address line 2
+                  </label>
+                  <input
+                    type="text"
+                    value={line2}
+                    onChange={(e) => {
+                      setLine2(e.target.value);
+                      setAddressError("");
+                    }}
+                    className={inputClass(false)}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium">Area</label>
+                  <input
+                    type="text"
+                    value={area}
+                    onChange={(e) => {
+                      setArea(e.target.value);
+                      setAddressError("");
+                    }}
+                    className={inputClass(false)}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium">Town</label>
+                  <input
+                    type="text"
+                    value={addressTown}
+                    onChange={(e) => {
+                      setAddressTown(e.target.value);
+                      setAddressError("");
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        town: undefined,
+                      }));
+                    }}
+                    className={inputClass(!!fieldErrors.town || townMismatch)}
+                  />
+                  {fieldErrors.town ? (
+                    <div className="mt-2 text-xs text-red-600">{fieldErrors.town}</div>
+                  ) : null}
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Landmark
+                  </label>
+                  <input
+                    type="text"
+                    value={landmark}
+                    onChange={(e) => {
+                      setLandmark(e.target.value);
+                      setAddressError("");
+                    }}
+                    className={inputClass(false)}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium">Notes</label>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => {
+                      setNotes(e.target.value);
+                      setAddressError("");
+                    }}
+                    className="min-h-[100px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+            )}
+
+            {townMismatch ? (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <div className="font-medium">Town mismatch detected</div>
+
+                <div className="mt-1">
+                  Your delivery address is in <strong>{effectiveTown}</strong>, but
+                  you are shopping in <strong>{townSlug}</strong>.
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(
+                        `/account/addresses?redirect=${encodeURIComponent(`/${townSlug}/checkout`)}`,
+                      )
+                    }
+                    className="inline-flex items-center rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700"
+                  >
+                    Update address
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextTown = toTownSlug(effectiveTown);
+                      if (nextTown) {
+                        router.push(`/${nextTown}/checkout`);
+                      }
+                    }}
+                    className="inline-flex items-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                  >
+                    Switch to {effectiveTown}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  After updating, you’ll be returned here automatically.
+                </p>
+              </div>
+            ) : null}
+          </Card>
+
+          <Card className="rounded-2xl p-6">
+            <div className="text-2xl font-semibold">Payment method (goods)</div>
+            <Separator className="my-5" />
+
+            <label className="mb-2 block text-sm font-medium">
               Choose payment method
             </label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="w-full max-w-xl rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-primary"
+            >
+              <option value="COD">COD (pay on delivery)</option>
+              <option value="MOMO">MoMo on delivery</option>
+            </select>
 
-            <div className="mt-2 max-w-sm">
-              <select
-                value={method}
-                onChange={(e) => setMethod(e.target.value as any)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+            <div className="mt-3 text-sm text-slate-500">
+              Payment is collected on delivery.
+            </div>
+          </Card>
+
+          <Card className="rounded-2xl p-6">
+            <div className="text-2xl font-semibold">Promo code</div>
+            <Separator className="my-5" />
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                type="text"
+                value={promoCode}
+                onChange={(e) => {
+                  setPromoCode(e.target.value.toUpperCase());
+                  setPromoError("");
+                }}
+                placeholder="Enter promo code"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-primary"
+              />
+
+              <Button
+                type="button"
+                onClick={() => void applyPromo()}
+                disabled={isApplyingPromo}
               >
-                <option value="COD">COD (pay on delivery)</option>
-                <option value="MOMO">MOMO (pay on delivery)</option>
-              </select>
+                {isApplyingPromo ? "Applying..." : "Apply"}
+              </Button>
             </div>
 
-            <div className="mt-3 text-xs text-slate-500">
-              Current ops model: driver delivers first, then collects payment.
-            </div>
+            {promoMessage ? (
+              <div className="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                {promoMessage}
+              </div>
+            ) : null}
+
+            {promoError ? (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                {promoError}
+              </div>
+            ) : null}
+
+            {appliedPromo ? (
+              <div className="mt-3 text-sm text-slate-600">
+                Applied promo: <span className="font-medium">{appliedPromo.code}</span>{" "}
+                ({appliedPromo.type})
+              </div>
+            ) : null}
           </Card>
         </div>
 
-        {/* Right summary */}
-        <div className="lg:col-span-1">
-          <Card className="sticky top-6 rounded-2xl p-5">
-            <div className="text-lg font-semibold">Summary</div>
-            <Separator className="my-4" />
+        <div className="lg:col-span-1" ref={summaryRef}>
+          <Card className="sticky top-6 rounded-2xl p-6">
+            <div className="text-2xl font-semibold">Summary</div>
+            <Separator className="my-5" />
 
             <div className="flex items-center justify-between text-sm text-slate-600">
               <div>Items</div>
               <div>{items.length}</div>
             </div>
 
-            <div className="mt-3 flex items-center justify-between">
-              <div className="text-sm font-medium text-slate-700">Total</div>
-              <div className="text-xl font-extrabold">
-                {money(totals.total)}{" "}
-                <span className="text-base font-semibold">GHS</span>
+            <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+              <div>Subtotal</div>
+              <div>
+                {money(localTotals.subtotal)} {currency}
               </div>
             </div>
 
+            <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+              <div>Service fee</div>
+              <div className="text-right">
+                {appliedPromo?.type === "SERVICE_FREE" ? (
+                  <div className="font-medium text-green-700">FREE</div>
+                ) : (
+                  <div>
+                    {money(localTotals.serviceFee)} {currency}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {appliedPromo?.type === "SERVICE_FREE" ? (
+              <div className="mt-2 text-xs text-green-600">
+                Free service fee promo applied
+              </div>
+            ) : null}
+
+            <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+              <div>Delivery fee</div>
+              <div className="text-right">
+                {appliedPromo?.type === "DELIVERY_FREE" ? (
+                  <div className="font-medium text-green-700">FREE</div>
+                ) : (
+                  <div>
+                    {money(localTotals.deliveryFee)} {currency}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {appliedPromo?.type === "DELIVERY_FREE" ? (
+              <div className="mt-2 text-xs text-green-600">
+                Free delivery promo applied
+              </div>
+            ) : null}
+
+            {localTotals.discount > 0 ? (
+              <>
+                <div className="mt-4 flex items-center justify-between text-sm text-green-700">
+                  <div>Discount</div>
+                  <div>
+                    -{money(localTotals.discount)} {currency}
+                  </div>
+                </div>
+
+                <div className="mt-2 text-xs text-green-600">
+                  You saved {money(localTotals.discount)} {currency}
+                </div>
+              </>
+            ) : null}
+
+            <Separator className="my-5" />
+
+            <div className="flex items-center justify-between">
+              <div className="text-xl font-semibold">Total</div>
+
+              <div className="text-right">
+                {localTotals.discount > 0 ? (
+                  <div className="text-sm text-slate-400 line-through">
+                    {money(localTotals.preDiscountTotal)} {currency}
+                  </div>
+                ) : null}
+
+                <div className="text-2xl font-extrabold">
+                  {money(localTotals.total)} {currency}
+                </div>
+              </div>
+            </div>
+
+            {minimumOrder > 0 ? (
+              <div className="mt-4 text-sm text-slate-500">
+                Minimum order: {money(minimumOrder)} {currency}
+              </div>
+            ) : null}
+
+            {localTotals.belowMinimum ? (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Your subtotal is below the minimum order for this town.
+              </div>
+            ) : null}
+
+            {highlightPlaceOrder ? (
+              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                Address updated successfully. You can now place your order.
+              </div>
+            ) : null}
+
             <Button
+              className={`mt-6 w-full transition-all duration-300 ${
+                highlightPlaceOrder
+                  ? "ring-4 ring-green-300 shadow-lg scale-[1.02]"
+                  : ""
+              }`}
               onClick={placeOrder}
-              disabled={loading}
-              className="mt-5 w-full transition hover:bg-primary/90 active:scale-[0.98]"
+              disabled={!canSubmit}
             >
-              {loading ? "Placing order…" : "Place order"}
+              {isSubmitting ? "Placing order..." : "Place order"}
             </Button>
 
-            <div className="mt-3 text-xs text-slate-500">
+            {!canSubmit ? (
+              <div className="mt-3 text-xs text-slate-500">
+                Complete the required fields before placing your order.
+              </div>
+            ) : null}
+
+            <div className="mt-4 text-sm text-slate-500">
               You’ll see your order confirmation immediately after placing the order.
             </div>
           </Card>

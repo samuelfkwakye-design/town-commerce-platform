@@ -175,4 +175,205 @@ export class CatalogService {
       categories,
     };
   }
+      async getPopularProducts(townSlug: string, limit = 6) {
+    const safeLimit = Number.isFinite(limit)
+      ? Math.max(1, Math.min(limit, 24))
+      : 6;
+
+    const town = await this.prisma.town.findUnique({
+      where: { slug: townSlug },
+      select: { id: true, slug: true, name: true },
+    });
+
+    if (!town) {
+      throw new NotFoundException(`Town not found: ${townSlug}`);
+    }
+
+    const grouped = await this.prisma.orderItem.groupBy({
+      by: ['townProductId'],
+      where: {
+        order: {
+          townId: town.id,
+          status: {
+            in: ['CONFIRMED', 'FULFILLED', 'SETTLED', 'PARTIALLY_REFUNDED'],
+          },
+        },
+      },
+      _count: {
+        townProductId: true,
+      },
+      orderBy: {
+        _count: {
+          townProductId: 'desc',
+        },
+      },
+      take: safeLimit,
+    });
+
+    const ids = grouped.map((g) => g.townProductId);
+
+    if (!ids.length) {
+      return {
+        town,
+        items: [],
+      };
+    }
+
+    const catalog = await this.getCatalog({
+      townSlug,
+      search: '',
+      categorySlug: '',
+    } as any);
+
+    const allProducts = Array.isArray(catalog?.categories)
+      ? catalog.categories.flatMap((category: any) => category.products ?? [])
+      : [];
+
+    const byId = new Map(
+      allProducts.map((p: any) => [String(p.townProductId), p]),
+    );
+
+    const items = grouped
+      .map((g) => {
+        const product = byId.get(String(g.townProductId));
+        if (!product) return null;
+
+        return {
+          ...product,
+          popularityCount: g._count.townProductId,
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      town,
+      items,
+    };
+  }
+    async getAlsoBoughtProducts(
+    townSlug: string,
+    townProductId: string,
+    limit = 6,
+  ) {
+    const safeLimit = Number.isFinite(limit)
+      ? Math.max(1, Math.min(limit, 24))
+      : 6;
+
+    const town = await this.prisma.town.findUnique({
+      where: { slug: townSlug },
+      select: { id: true, slug: true, name: true },
+    });
+
+    if (!town) {
+      throw new NotFoundException(`Town not found: ${townSlug}`);
+    }
+
+    const sourceTownProduct = await this.prisma.townProduct.findUnique({
+      where: { id: townProductId },
+      select: { id: true, townId: true, isActive: true },
+    });
+
+    if (!sourceTownProduct) {
+      throw new NotFoundException(`TownProduct not found: ${townProductId}`);
+    }
+
+    if (sourceTownProduct.townId !== town.id) {
+      throw new NotFoundException(
+        `TownProduct ${townProductId} does not belong to town ${townSlug}`,
+      );
+    }
+
+    const sourceOrderItems = await this.prisma.orderItem.findMany({
+      where: {
+        townProductId,
+        order: {
+          townId: town.id,
+          status: {
+            in: ['CONFIRMED', 'FULFILLED', 'SETTLED', 'PARTIALLY_REFUNDED'],
+          },
+        },
+      },
+      select: {
+        orderId: true,
+      },
+      take: 500,
+    });
+
+    const orderIds = Array.from(
+      new Set(sourceOrderItems.map((item) => item.orderId).filter(Boolean)),
+    );
+
+    if (!orderIds.length) {
+      return {
+        town,
+        sourceTownProductId: townProductId,
+        items: [],
+      };
+    }
+
+    const grouped = await this.prisma.orderItem.groupBy({
+      by: ['townProductId'],
+      where: {
+        orderId: { in: orderIds },
+        townProductId: { not: townProductId },
+        order: {
+          townId: town.id,
+          status: {
+            in: ['CONFIRMED', 'FULFILLED', 'SETTLED', 'PARTIALLY_REFUNDED'],
+          },
+        },
+      },
+      _count: {
+        townProductId: true,
+      },
+      orderBy: {
+        _count: {
+          townProductId: 'desc',
+        },
+      },
+      take: safeLimit,
+    });
+
+    const ids = grouped.map((g) => g.townProductId);
+
+    if (!ids.length) {
+      return {
+        town,
+        sourceTownProductId: townProductId,
+        items: [],
+      };
+    }
+
+    const catalog = await this.getCatalog({
+      townSlug,
+      search: '',
+      categorySlug: '',
+    } as any);
+
+    const allProducts = Array.isArray(catalog?.categories)
+      ? catalog.categories.flatMap((category: any) => category.products ?? [])
+      : [];
+
+    const byId = new Map(
+      allProducts.map((p: any) => [String(p.townProductId), p]),
+    );
+
+    const items = grouped
+      .map((g) => {
+        const product = byId.get(String(g.townProductId));
+        if (!product) return null;
+
+        return {
+          ...product,
+          coPurchaseCount: g._count.townProductId,
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      town,
+      sourceTownProductId: townProductId,
+      items,
+    };
+  }
 }

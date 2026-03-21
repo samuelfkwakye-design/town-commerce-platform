@@ -4,10 +4,27 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { clearCart, loadCart, saveCart } from "@/lib/cart";
+import { apiFetch } from "@/lib/api";
 import type { CartItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import CheckoutProgress from "@/components/CheckoutProgress";
+
+type TownSettingsResponse = {
+  town?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  settings?: {
+    townId?: string;
+    deliveryFee?: string;
+    serviceFee?: string;
+    minimumOrder?: string;
+    currency?: string;
+  };
+};
 
 function money(n: number) {
   return n.toFixed(2);
@@ -18,23 +35,64 @@ export default function CartPage() {
   const townSlug = params?.townSlug;
 
   const [items, setItems] = useState<CartItem[]>([]);
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  const [serviceFee, setServiceFee] = useState(0);
+  const [minimumOrder, setMinimumOrder] = useState(0);
+  const [currency, setCurrency] = useState("GHS");
 
   useEffect(() => {
     setItems(loadCart());
   }, []);
 
-  const totals = useMemo(() => {
-    let total = 0;
+  useEffect(() => {
+    if (!townSlug) return;
 
-    for (const it of items) {
-      if (it.pricingModel === "UNIT") total += Number(it.unitPrice) * it.quantity;
-      else if (it.pricingModel === "WEIGHT")
-        total += (Number(it.pricePerKg) * it.weightGrams) / 1000;
-      else total += Number(it.unitPrice) * it.quantity;
+    async function loadTownSettings() {
+      try {
+        const json: TownSettingsResponse = await apiFetch(
+          `/town-settings/by-slug/${encodeURIComponent(townSlug)}`,
+          { cache: "no-store" },
+        );
+
+        setDeliveryFee(Number(json?.settings?.deliveryFee ?? 0));
+        setServiceFee(Number(json?.settings?.serviceFee ?? 0));
+        setMinimumOrder(Number(json?.settings?.minimumOrder ?? 0));
+        setCurrency(json?.settings?.currency || "GHS");
+      } catch {
+        setDeliveryFee(0);
+        setServiceFee(0);
+        setMinimumOrder(0);
+        setCurrency("GHS");
+      }
     }
 
-    return { total };
-  }, [items]);
+    loadTownSettings();
+  }, [townSlug]);
+
+  const totals = useMemo(() => {
+    let subtotal = 0;
+
+    for (const it of items) {
+      if (it.pricingModel === "UNIT") {
+        subtotal += Number(it.unitPrice) * it.quantity;
+      } else if (it.pricingModel === "WEIGHT") {
+        subtotal += (Number(it.pricePerKg) * it.weightGrams) / 1000;
+      } else {
+        subtotal += Number(it.unitPrice) * it.quantity;
+      }
+    }
+
+    const total = subtotal + deliveryFee + serviceFee;
+    const belowMinimum = subtotal > 0 && subtotal < minimumOrder;
+
+    return {
+      subtotal,
+      deliveryFee,
+      serviceFee,
+      total,
+      belowMinimum,
+    };
+  }, [items, deliveryFee, serviceFee, minimumOrder]);
 
   function removeAt(i: number) {
     const next = items.filter((_, idx) => idx !== i);
@@ -75,8 +133,9 @@ export default function CartPage() {
 
   return (
     <div className="pt-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <CheckoutProgress step="cart" />
+
+      <div className="mt-6 flex items-center justify-between gap-3">
         <Link
           href={townSlug ? `/${townSlug}` : "/"}
           className="text-sm text-slate-600 hover:text-slate-900"
@@ -98,19 +157,25 @@ export default function CartPage() {
       {items.length === 0 ? (
         <Card className="mt-6 rounded-2xl p-6">
           <div className="text-slate-700">Your cart is empty.</div>
-          <div className="mt-4">
+          <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href={townSlug ? `/${townSlug}` : "/"}
               className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98]"
             >
               Browse products →
             </Link>
+
+            <Link
+              href={townSlug ? `/${townSlug}` : "/"}
+              className="inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm transition hover:bg-slate-50 active:scale-[0.98]"
+            >
+              Continue shopping
+            </Link>
           </div>
         </Card>
       ) : (
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
-          {/* Items */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="space-y-4 lg:col-span-2">
             {items.map((it, idx) => (
               <Card key={idx} className="rounded-2xl p-5">
                 <div className="flex items-start justify-between gap-4">
@@ -151,7 +216,7 @@ export default function CartPage() {
                         className="w-40 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
                       />
                       <div className="text-sm text-slate-600">
-                        {it.pricePerKg} <span className="text-slate-500">GHS/kg</span>
+                        {it.pricePerKg} <span className="text-slate-500">{currency}/kg</span>
                       </div>
                     </div>
                   </div>
@@ -167,7 +232,7 @@ export default function CartPage() {
                         className="w-32 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
                       />
                       <div className="text-sm text-slate-600">
-                        {it.unitPrice} <span className="text-slate-500">GHS each</span>
+                        {it.unitPrice} <span className="text-slate-500">{currency} each</span>
                       </div>
                     </div>
                   </div>
@@ -176,7 +241,6 @@ export default function CartPage() {
             ))}
           </div>
 
-          {/* Summary */}
           <div className="lg:col-span-1">
             <Card className="sticky top-6 rounded-2xl p-5">
               <div className="text-lg font-semibold">Order summary</div>
@@ -187,23 +251,67 @@ export default function CartPage() {
                 <div>{items.length}</div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between text-base">
-                <div className="font-medium">Total</div>
-                <div className="text-xl font-extrabold">
-                  {money(totals.total)} <span className="text-base font-semibold">GHS</span>
+              <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
+                <div>Subtotal</div>
+                <div>
+                  {money(totals.subtotal)} {currency}
                 </div>
               </div>
 
-              <div className="mt-5">
+              <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
+                <div>Service fee</div>
+                <div>
+                  {money(totals.serviceFee)} {currency}
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
+                <div>Delivery fee</div>
+                <div>
+                  {money(totals.deliveryFee)} {currency}
+                </div>
+              </div>
+
+              <Separator className="my-4" />
+
+              <div className="mt-3 flex items-center justify-between text-base">
+                <div className="font-medium">Total</div>
+                <div className="text-xl font-extrabold">
+                  {money(totals.total)} <span className="text-base font-semibold">{currency}</span>
+                </div>
+              </div>
+
+              {minimumOrder > 0 ? (
+                <div className="mt-4 text-xs text-slate-500">
+                  Minimum order: {money(minimumOrder)} {currency}
+                </div>
+              ) : null}
+
+              {totals.belowMinimum ? (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Your subtotal is below the minimum order for this town.
+                </div>
+              ) : null}
+
+              <div className="mt-5 grid gap-3">
                 <Link href={townSlug ? `/${townSlug}/checkout` : "/"}>
-                  <Button className="w-full transition hover:bg-primary/90 active:scale-[0.98]">
+                  <Button
+                    className="w-full transition hover:bg-primary/90 active:scale-[0.98]"
+                    disabled={totals.belowMinimum}
+                  >
                     Checkout →
+                  </Button>
+                </Link>
+
+                <Link href={townSlug ? `/${townSlug}` : "/"}>
+                  <Button variant="outline" className="w-full">
+                    Continue shopping
                   </Button>
                 </Link>
               </div>
 
               <div className="mt-3 text-xs text-slate-500">
-                Delivery fees and promos will appear at checkout.
+                Fees are based on the selected town.
               </div>
             </Card>
           </div>

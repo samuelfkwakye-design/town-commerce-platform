@@ -86,18 +86,58 @@ function hasCodCollectedPayment(order: any) {
     (p: any) =>
       (p?.method ?? '').toUpperCase() === 'COD' &&
       (p?.status ?? '').toUpperCase() === 'SUCCESS' &&
-      // you mentioned provider "COD" in earlier logic; your actual payload shows provider "DEV"
-      // so we don't require provider match here.
       true,
   );
 }
 
-// For item display + refund modal max display
 function kgLabelFromGrams(grams: any) {
   if (grams == null) return '—';
   const n = Number(grams);
   if (!Number.isFinite(n)) return '—';
   return `${(n / 1000).toFixed(3)} kg`;
+}
+
+function isRegisteredCustomer(order: any) {
+  return Boolean(order?.customerId || order?.customer?.id);
+}
+
+function getCustomerDisplayName(order: any) {
+  const customer = order?.customer;
+
+  const fullName =
+    [customer?.firstName, customer?.lastName].filter(Boolean).join(' ').trim() ||
+    customer?.name ||
+    order?.customerName ||
+    order?.deliveryRecipientName ||
+    order?.deliveryAddress?.recipientName ||
+    '—';
+
+  return fullName;
+}
+
+function getCustomerPhone(order: any) {
+  return (
+    order?.customerPhone ||
+    order?.customer?.phone ||
+    order?.deliveryPhone ||
+    order?.deliveryAddress?.phone ||
+    '—'
+  );
+}
+
+function getDeliveryAddress(order: any) {
+  const d = order?.deliveryAddress;
+
+  return {
+    recipientName: d?.recipientName ?? order?.deliveryRecipientName ?? '—',
+    phone: d?.phone ?? order?.deliveryPhone ?? '—',
+    line1: d?.line1 ?? order?.deliveryLine1 ?? '—',
+    line2: d?.line2 ?? order?.deliveryLine2 ?? '',
+    area: d?.area ?? order?.deliveryArea ?? '',
+    town: d?.town ?? order?.deliveryTown ?? '—',
+    landmark: d?.landmark ?? order?.deliveryLandmark ?? '',
+    notes: d?.notes ?? order?.deliveryNotes ?? '',
+  };
 }
 
 export default function OrderDetailPage() {
@@ -109,17 +149,14 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // Quick actions state
   const [actionLoading, setActionLoading] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [actionOk, setActionOk] = useState<string | null>(null);
 
-  // Modal confirm state
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [confirmAction, setConfirmAction] = useState<null | (() => Promise<void>)>(null);
 
-  // Refund modal state
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundReason, setRefundReason] = useState('');
   const [refundRestock, setRefundRestock] = useState(true);
@@ -133,6 +170,11 @@ export default function OrderDetailPage() {
     return p0?.currency ?? 'GHS';
   }, [order?.payments]);
 
+  const customerName = useMemo(() => getCustomerDisplayName(order), [order]);
+  const customerPhone = useMemo(() => getCustomerPhone(order), [order]);
+  const deliveryAddress = useMemo(() => getDeliveryAddress(order), [order]);
+  const registeredCustomer = useMemo(() => isRegisteredCustomer(order), [order]);
+
   async function load() {
     if (!id) return;
     try {
@@ -142,7 +184,6 @@ export default function OrderDetailPage() {
       const o = await apiFetch<any>(`/admin/orders/${id}`);
       setOrder(o);
 
-      // Stock movements (best effort)
       try {
         const res = await apiFetch<any>(`/orders/${id}/stock-movements?limit=50`);
         const rows = Array.isArray(res) ? res : res?.items ?? res?.rows ?? [];
@@ -162,7 +203,6 @@ export default function OrderDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // Timeline: payments newest first, each payment’s refunds newest first
   const paymentsSorted = useMemo(() => {
     const p = [...(order?.payments ?? [])];
     p.sort(
@@ -367,7 +407,6 @@ export default function OrderDetailPage() {
     }
   }
 
-  // ✅ Key helper: map OrderItemId -> TownProductId (for RefundItem stock view link)
   const townProductIdByOrderItemId = useMemo(() => {
     const m = new Map<string, string>();
     for (const it of order?.items ?? []) {
@@ -432,8 +471,96 @@ export default function OrderDetailPage() {
           <div className="text-sm text-gray-600">{order.town?.name ?? '—'}</div>
           <div className="text-xs text-gray-500">{order.town?.slug ?? ''}</div>
           <div className="text-sm text-gray-700">
-            {order.customerPhone ?? '—'}
+            {customerPhone}
             {order.customerEmail ? ` • ${order.customerEmail}` : ''}
+          </div>
+        </div>
+      </div>
+
+      {/* Customer + delivery */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="border rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold">Customer</h2>
+            <span
+              className={`px-2 py-1 rounded-full text-xs border ${
+                registeredCustomer
+                  ? 'bg-green-50 border-green-200 text-green-800'
+                  : 'bg-amber-50 border-amber-200 text-amber-800'
+              }`}
+            >
+              {registeredCustomer ? 'Registered customer' : 'Guest checkout'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 text-sm">
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-600">Name</span>
+              <span className="font-semibold text-right">{customerName}</span>
+            </div>
+
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-600">Phone</span>
+              <span className="font-semibold text-right">{customerPhone}</span>
+            </div>
+
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-600">Email</span>
+              <span className="font-semibold text-right">{order.customerEmail ?? '—'}</span>
+            </div>
+
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-600">Account</span>
+              <span className="font-semibold text-right">
+                {registeredCustomer ? order.customerId ?? order.customer?.id ?? 'Registered' : 'Guest'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="border rounded-2xl p-4 space-y-3">
+          <h2 className="font-semibold">Delivery address</h2>
+
+          <div className="grid grid-cols-1 gap-2 text-sm">
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-600">Recipient</span>
+              <span className="font-semibold text-right">{deliveryAddress.recipientName}</span>
+            </div>
+
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-600">Phone</span>
+              <span className="font-semibold text-right">{deliveryAddress.phone}</span>
+            </div>
+
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-600">Address line 1</span>
+              <span className="font-semibold text-right">{deliveryAddress.line1}</span>
+            </div>
+
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-600">Address line 2</span>
+              <span className="font-semibold text-right">{deliveryAddress.line2 || '—'}</span>
+            </div>
+
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-600">Area</span>
+              <span className="font-semibold text-right">{deliveryAddress.area || '—'}</span>
+            </div>
+
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-600">Town</span>
+              <span className="font-semibold text-right">{deliveryAddress.town}</span>
+            </div>
+
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-600">Landmark</span>
+              <span className="font-semibold text-right">{deliveryAddress.landmark || '—'}</span>
+            </div>
+
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-600">Notes</span>
+              <span className="font-semibold text-right">{deliveryAddress.notes || '—'}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -613,7 +740,6 @@ export default function OrderDetailPage() {
           <div className="text-xs text-gray-500">Latest first</div>
         </div>
 
-        {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
           <div className="border rounded-xl p-3 bg-white">
             <div className="text-xs text-gray-500">Paid (SUCCESS)</div>
@@ -646,13 +772,10 @@ export default function OrderDetailPage() {
 
               return (
                 <div key={p.id} className="relative pl-7">
-                  {/* timeline rail */}
                   <div className="absolute left-2 top-0 bottom-0 w-px bg-gray-200" />
-                  {/* payment dot */}
                   <div className="absolute left-0 top-4 h-4 w-4 rounded-full border bg-white" />
 
                   <div className="border rounded-xl p-3 space-y-3 bg-white">
-                    {/* Payment header */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -694,7 +817,6 @@ export default function OrderDetailPage() {
                       </div>
                     </div>
 
-                    {/* Refunds under payment */}
                     <div className="border-t pt-3">
                       <div className="flex items-center justify-between">
                         <div className="text-sm font-semibold">Refunds</div>
@@ -707,9 +829,7 @@ export default function OrderDetailPage() {
                         <div className="space-y-3 mt-3">
                           {refunds.map((r: any) => (
                             <div key={r.id} className="relative pl-6">
-                              {/* mini rail */}
                               <div className="absolute left-2 top-0 bottom-0 w-px bg-gray-200" />
-                              {/* mini dot */}
                               <div className="absolute left-0 top-3 h-3 w-3 rounded-full border bg-white" />
 
                               <div className="bg-gray-50 border rounded-xl p-3 space-y-2">

@@ -1,27 +1,46 @@
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  // Prefer the URL you set in .env.local
+type ApiFetchInit = Omit<RequestInit, "body" | "headers"> & {
+  body?: unknown;
+  headers?: HeadersInit;
+};
+
+export async function apiFetch<T>(path: string, init: ApiFetchInit = {}): Promise<T> {
   const base =
     process.env.NEXT_PUBLIC_API_BASE_URL ||
     process.env.NEXT_PUBLIC_API_BASE ||
-    'http://localhost:3000/api/v1';
+    "http://localhost:3000/api/v1";
 
-  // Prefer localStorage (so /ops/login can update it), otherwise fall back to env key
   const adminKey =
-    typeof window !== 'undefined'
-      ? localStorage.getItem('ops_admin_key') || process.env.NEXT_PUBLIC_ADMIN_KEY
+    typeof window !== "undefined"
+      ? localStorage.getItem("ops_admin_key") || process.env.NEXT_PUBLIC_ADMIN_KEY
       : process.env.NEXT_PUBLIC_ADMIN_KEY;
 
-  const headers: Record<string, string> = {
-    ...(init.headers as Record<string, string> | undefined),
-    ...(adminKey ? { 'x-admin-key': adminKey } : {}),
-  };
+  const headers = new Headers(init.headers);
 
-  if (init.body && !headers['Content-Type']) {
-    headers['Content-Type'] = 'application/json';
+  if (adminKey) headers.set("x-admin-key", adminKey);
+
+  // Body handling: object => JSON, string => pass, FormData => pass
+  let body: BodyInit | null | undefined = init.body as any;
+
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  const isBodyObject =
+    body !== null &&
+    body !== undefined &&
+    typeof body === "object" &&
+    !isFormData &&
+    !(body instanceof Blob) &&
+    !(body instanceof ArrayBuffer);
+
+  if (isBodyObject) {
+    if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+    body = JSON.stringify(body);
+  } else if (typeof body === "string") {
+    if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   }
 
   const res = await fetch(`${base}${path}`, {
     ...init,
+    body,
+    cache: typeof window === "undefined" ? "no-store" : init.cache,
     headers,
   });
 
@@ -30,10 +49,10 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     throw new Error(text || `Request failed (${res.status})`);
   }
 
-  const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
     return (await res.text()) as unknown as T;
   }
 
-  return res.json();
+  return (await res.json()) as T;
 }

@@ -6,17 +6,79 @@ datasource db {
   provider = "postgresql"
 }
 
+model Customer {
+  id           String  @id @default(cuid())
+  phone        String  @unique
+  email        String? @unique
+  passwordHash String
+  firstName    String
+  lastName     String?
+  isActive     Boolean @default(true)
+
+  defaultTownId String?
+  defaultTown   Town?   @relation("CustomerDefaultTown", fields: [defaultTownId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  addresses CustomerAddress[]
+  orders    Order[]
+  passwordResets CustomerPasswordReset[]
+
+  @@index([phone])
+  @@index([defaultTownId])
+}
+
+model CustomerAddress {
+  id            String   @id @default(cuid())
+  customerId    String
+  label         String?
+  recipientName String
+  phone         String?
+  line1         String
+  line2         String?
+  area          String?
+  town          String
+  landmark      String?
+  notes         String?
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([customerId, isDefault])
+}
+
+model CustomerPasswordReset {
+  id         String   @id @default(cuid())
+  customerId String
+  codeHash   String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([expiresAt])
+}
+
 model Town {
-  id           String        @id @default(cuid())
-  name         String        @unique
-  slug         String        @unique
-  isActive     Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  orders       Order[]
-  townProducts TownProduct[]
-  warehouse    Warehouse?
-  suppliers    Supplier[]
+  id               String        @id @default(cuid())
+  name             String        @unique
+  slug             String        @unique
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  orders           Order[]
+  townProducts     TownProduct[]
+  warehouse        Warehouse?
+  suppliers        Supplier[]
+  settings         TownSettings?
+  promoCodes       PromoCode[]
+  defaultCustomers Customer[]    @relation("CustomerDefaultTown")
 }
 
 model Warehouse {
@@ -41,15 +103,15 @@ model Category {
 }
 
 model Product {
-  id           String        @id @default(cuid())
-  name         String
-  description  String?
-  categoryId   String?
-  isActive     Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  categoryId  String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   townProducts TownProduct[]
   suppliers    ProductSupplier[]
@@ -67,11 +129,11 @@ model Supplier {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  town     Town             @relation(fields: [townId], references: [id], onDelete: Cascade)
+  town     Town              @relation(fields: [townId], references: [id], onDelete: Cascade)
   products ProductSupplier[]
 
-  @@index([townId])
   @@unique([townId, name])
+  @@index([townId])
 }
 
 model ProductSupplier {
@@ -92,36 +154,36 @@ model ProductSupplier {
 }
 
 model TownProduct {
-  id               String       @id @default(cuid())
-  townId           String
-  productId        String
-  pricingModel     PricingModel @default(UNIT)
+  id           String       @id @default(cuid())
+  townId       String
+  productId    String
+  pricingModel PricingModel @default(UNIT)
 
   // For UNIT
-  pricePerUnit     Decimal?     @db.Decimal(12, 2)
-  costPerUnit      Decimal?     @db.Decimal(12, 2)
+  pricePerUnit Decimal? @db.Decimal(12, 2)
+  costPerUnit  Decimal? @db.Decimal(12, 2)
 
   // For WEIGHT (per kg)
-  pricePerKg       Decimal?     @db.Decimal(12, 2)
-  costPerKg        Decimal?     @db.Decimal(12, 2)
+  pricePerKg Decimal? @db.Decimal(12, 2)
+  costPerKg  Decimal? @db.Decimal(12, 2)
 
   // Stock snapshot fields (still optional / ledger source of truth)
   stockQty         Int?
   stockWeightGrams Int?
 
-  isActive         Boolean      @default(true)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // NEW: variants (for Small/Medium/Large etc.)
-  variants         TownProductVariant[]
+  variants TownProductVariant[]
 
   orderItems     OrderItem[]
   stockMovements StockMovement[]
   saleItems      SaleItem[]
-  images TownProductImage[]
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  town    Town    @relation(fields: [townId], references: [id], onDelete: Cascade)
+  images         TownProductImage[]
+  product        Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  town           Town               @relation(fields: [townId], references: [id], onDelete: Cascade)
 
   @@unique([townId, productId])
   @@index([townId])
@@ -129,15 +191,15 @@ model TownProduct {
 }
 
 model TownProductVariant {
-  id            String      @id @default(cuid())
+  id            String   @id @default(cuid())
   townProductId String
-  label         String      // e.g., "Small", "Medium", "Large", "Half", "1kg bag"
-  unitPrice     Decimal     @db.Decimal(12, 2)
-  unitCost      Decimal?    @db.Decimal(12, 2)
-  isActive      Boolean     @default(true)
-  sortOrder     Int         @default(0)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  label         String // e.g., "Small", "Medium", "Large", "Half", "1kg bag"
+  unitPrice     Decimal  @db.Decimal(12, 2)
+  unitCost      Decimal? @db.Decimal(12, 2)
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Optional: if you ever want "size" to imply an actual weight for reporting
   packWeightGrams Int?
@@ -158,11 +220,11 @@ model TownProductImage {
   sortOrder     Int      @default(0)
   createdAt     DateTime @default(now())
 
-  townProduct   TownProduct @relation(fields: [townProductId], references: [id], onDelete: Cascade)
+  townProduct TownProduct @relation(fields: [townProductId], references: [id], onDelete: Cascade)
 
   @@unique([townProductId, url])
-  @@index([townProductId])
   @@unique([townProductId, sortOrder])
+  @@index([townProductId])
 }
 
 model Order {
@@ -182,37 +244,49 @@ model Order {
   serviceFee            Decimal       @default(0) @db.Decimal(12, 2)
   deliveryCodeExpiresAt DateTime?
   deliveryCodeHash      String?
+  deliveryRecipientName String?
+  deliveryPhone         String?
+  deliveryLine1         String?
+  deliveryLine2         String?
+  deliveryArea          String?
+  deliveryTown          String?
+  deliveryLandmark      String?
+  deliveryNotes         String?
   goodsPaymentMethod    PaymentMethod @default(COD)
+  customerId            String?
+  customer              Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
-  town     Town       @relation(fields: [townId], references: [id], onDelete: Cascade)
-  items    OrderItem[]
-  payments Payment[]
-  sale     Sale?
+  town        Town         @relation(fields: [townId], references: [id], onDelete: Cascade)
+  items       OrderItem[]
+  payments    Payment[]
+  sale        Sale?
+  promoUsages PromoUsage[]
 
+  @@index([customerId])
   @@index([townId])
   @@index([status])
 }
 
 model OrderItem {
-  id                  String   @id @default(cuid())
-  orderId             String
-  townProductId       String
+  id            String @id @default(cuid())
+  orderId       String
+  townProductId String
 
   // NEW: only set when pricingModel = VARIANT
   townProductVariantId String?
 
-  quantity            Int?
-  weightGrams         Int?
+  quantity    Int?
+  weightGrams Int?
 
-  unitPrice           Decimal  @db.Decimal(12, 2)
-  lineTotal           Decimal  @db.Decimal(12, 2)
+  unitPrice Decimal @db.Decimal(12, 2)
+  lineTotal Decimal @db.Decimal(12, 2)
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  order        Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  townProduct  TownProduct         @relation(fields: [townProductId], references: [id], onDelete: Cascade)
-  variant      TownProductVariant? @relation(fields: [townProductVariantId], references: [id], onDelete: SetNull)
+  order       Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  townProduct TownProduct         @relation(fields: [townProductId], references: [id], onDelete: Cascade)
+  variant     TownProductVariant? @relation(fields: [townProductVariantId], references: [id], onDelete: SetNull)
 
   refundItems RefundItem[]
   saleItem    SaleItem?
@@ -299,7 +373,7 @@ model Refund {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  Payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  Payment Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   items   RefundItem[]
 
   @@index([paymentId])
@@ -307,19 +381,33 @@ model Refund {
 }
 
 model RefundItem {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   refundId    String
   orderItemId String
   quantity    Int?
   weightGrams Int?
-  amount      Decimal   @db.Decimal(12, 2)
-  createdAt   DateTime  @default(now())
+  amount      Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
 
   orderItem OrderItem @relation(fields: [orderItemId], references: [id])
   refund    Refund    @relation(fields: [refundId], references: [id], onDelete: Cascade)
 
   @@index([refundId])
   @@index([orderItemId])
+}
+
+model TownSettings {
+  id           String  @id @default(cuid())
+  townId       String  @unique
+  deliveryFee  Decimal @default(0)
+  serviceFee   Decimal @default(0)
+  minimumOrder Decimal @default(0)
+  currency     String  @default("GBP")
+
+  town Town @relation(fields: [townId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Payment {
@@ -344,6 +432,49 @@ model Payment {
   @@index([orderId])
   @@index([status])
   @@index([method])
+}
+
+model PromoCode {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  type      PromoType
+  value     Decimal?  @db.Decimal(12, 2)
+  isActive  Boolean   @default(true)
+  expiresAt DateTime?
+
+  townId String?
+  town   Town?   @relation(fields: [townId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usages PromoUsage[]
+
+  @@index([code])
+  @@index([townId])
+  @@index([isActive])
+}
+
+model PromoUsage {
+  id          String   @id @default(cuid())
+  promoCodeId String
+  orderId     String?
+  phone       String?
+  createdAt   DateTime @default(now())
+
+  promoCode PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  order     Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([promoCodeId])
+  @@index([orderId])
+  @@index([phone])
+}
+
+enum PromoType {
+  DELIVERY_FREE
+  SERVICE_FREE
+  PERCENTAGE
+  FIXED
 }
 
 enum PricingModel {

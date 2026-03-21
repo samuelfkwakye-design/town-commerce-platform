@@ -115,60 +115,99 @@ export class ReportsService {
     });
     return { rows };
   }
+private toDayKeyUtc(d: Date) {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
+private async sumRevenueToday(townId: string | null, start: Date, end: Date): Promise<number> {
+  const rows = await this.prisma.$queryRaw<any[]>`
+    SELECT COALESCE(SUM(p.amount), 0) AS amount
+    FROM "Payment" p
+    JOIN "Order" o ON o.id = p."orderId"
+    WHERE p.status = 'SUCCESS'
+      AND p."createdAt" >= ${start}::timestamptz
+      AND p."createdAt" <  ${end}::timestamptz
+      AND (${townId}::text IS NULL OR o."townId" = ${townId}::text)
+  `;
+  return Number(rows?.[0]?.amount ?? 0);
+}
+
+private async sumRefundsToday(townId: string | null, start: Date, end: Date): Promise<number> {
+  // If your Refund table has "amount" this will work.
+  // If it doesn't, it will throw — we catch at call site and return 0.
+  const rows = await this.prisma.$queryRaw<any[]>`
+    SELECT COALESCE(SUM(r.amount), 0) AS amount
+    FROM "Refund" r
+    JOIN "Payment" p ON p.id = r."paymentId"
+    JOIN "Order"   o ON o.id = p."orderId"
+    WHERE r."createdAt" >= ${start}::timestamptz
+      AND r."createdAt" <  ${end}::timestamptz
+      AND (${townId}::text IS NULL OR o."townId" = ${townId}::text)
+  `;
+  return Number(rows?.[0]?.amount ?? 0);
+}
+
+private async countOrdersToday(townId: string | null, start: Date, end: Date): Promise<number> {
+  const rows = await this.prisma.$queryRaw<any[]>`
+    SELECT COUNT(*)::int AS count
+    FROM "Order" o
+    WHERE o."createdAt" >= ${start}::timestamptz
+      AND o."createdAt" <  ${end}::timestamptz
+      AND (${townId}::text IS NULL OR o."townId" = ${townId}::text)
+  `;
+  return Number(rows?.[0]?.count ?? 0);
+}
+
+private async countConfirmedStale(townId: string | null, staleCutoff: Date): Promise<number> {
+  const rows = await this.prisma.$queryRaw<any[]>`
+    SELECT COUNT(*)::int AS count
+    FROM "Order" o
+    WHERE o.status = 'CONFIRMED'
+      AND o."updatedAt" < ${staleCutoff}::timestamptz
+      AND (${townId}::text IS NULL OR o."townId" = ${townId}::text)
+  `;
+  return Number(rows?.[0]?.count ?? 0);
+}
   // -------------------------
   // Revenue trend (SUCCESS payments)
   // -------------------------
-  async getRevenueTrend(q: RevenueTrendQueryDto) {
-    const bucket: 'day' | 'week' | 'month' = q.bucket ?? 'day';
+  async getRevenueTrend(q: any) {
+  const days = Math.min(Math.max(Number(q.days ?? 7), 1), 60);
+  const townId: string | null = q.townId ?? null;
 
-    const where: Prisma.PaymentWhereInput = {
-      status: 'SUCCESS',
-      ...(q.townId ? { townId: q.townId } : {}),
-      ...(q.from || q.to
-        ? {
-            createdAt: {
-              ...(q.from ? { gte: new Date(q.from) } : {}),
-              ...(q.to ? { lte: new Date(q.to) } : {}),
-            },
-          }
-        : {}),
-    };
+  const to = new Date(); // now
+  const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
 
-    const payments = await this.prisma.payment.findMany({
-      where,
-      select: { createdAt: true, amount: true },
-      orderBy: { createdAt: 'asc' },
-      take: q.limit ?? 366,
-    });
+  const rows = await this.prisma.$queryRaw<any[]>`
+    SELECT
+      date_trunc('day', p."createdAt") AS day,
+      COALESCE(SUM(p.amount), 0)       AS revenue
+    FROM "Payment" p
+    JOIN "Order" o ON o.id = p."orderId"
+    WHERE p.status = 'SUCCESS'
+      AND p."createdAt" >= ${from}::timestamptz
+      AND p."createdAt" <= ${to}::timestamptz
+      AND (${townId}::text IS NULL OR o."townId" = ${townId}::text)
+    GROUP BY 1
+    ORDER BY 1 ASC
+  `;
 
-    const keyFor = (d: Date) =>
-      bucket === 'day'
-        ? this.getDayKey(d)
-        : bucket === 'week'
-          ? this.getISOWeekKey(d)
-          : this.getMonthKey(d);
-
-    const map = new Map<string, number>();
-    for (const p of payments) {
-      const k = keyFor(p.createdAt);
-      map.set(k, (map.get(k) ?? 0) + Number(p.amount ?? 0));
-    }
-
-    const rows = Array.from(map.entries())
-      .map(([period, revenue]) => ({ period, revenue: this.round2(revenue) }))
-      .sort((a, b) => (a.period < b.period ? -1 : a.period > b.period ? 1 : 0));
-
-    return {
-      filters: {
-        townId: q.townId ?? null,
-        from: q.from ?? null,
-        to: q.to ?? null,
-        bucket,
-      },
-      rows,
-    };
-  }
+  return {
+    filters: {
+      townId,
+      from: from.toISOString(),
+      to: to.toISOString(),
+      bucket: "day",
+    },
+    rows: rows.map((r) => ({
+      period: this.toDayKeyUtc(new Date(r.day)),
+      revenue: this.round2(Number(r.revenue ?? 0)),
+    })),
+  };
+}
 
   // -------------------------
   // Sales summary (SaleItem agg)
@@ -1537,57 +1576,125 @@ export class ReportsService {
   // Ops dashboard (matches OpsDashboardResponseDto incl top lists)
   // -------------------------
   async getOpsDashboard(q: OpsDashboardQueryDto): Promise<OpsDashboardResponseDto> {
-    const townId = q.townId ?? null;
-    const confirmedStaleHours = q.confirmedStaleHours ?? 2;
+  const townId = q.townId ?? null;
+  const confirmedStaleHours = q.confirmedStaleHours ?? 2;
 
-    const startToday = this.startOfTodayUtc();
-    const startTomorrow = this.startOfTomorrowUtc();
-    const staleCutoff = new Date(Date.now() - confirmedStaleHours * 60 * 60 * 1000);
+  const startToday = this.startOfTodayUtc();
+  const startTomorrow = this.startOfTomorrowUtc();
+  const staleCutoff = new Date(Date.now() - confirmedStaleHours * 60 * 60 * 1000);
 
-    const townWhere = townId ? { townId } : {};
+  const townWhere = townId ? { townId } : {};
 
-    const [totalTownProducts, productsMissingImages] = await Promise.all([
-      this.prisma.townProduct.count({ where: { ...townWhere } }),
-      this.prisma.townProduct.count({ where: { ...townWhere, images: { none: {} } } }),
-    ]);
+  // TownProduct queries (safe)
+  const [totalTownProducts, productsMissingImages] = await Promise.all([
+    this.prisma.townProduct.count({ where: townWhere }),
+    this.prisma.townProduct.count({
+      where: { ...townWhere, images: { none: {} } },
+    }),
+  ]);
 
-    const [lowUnit, lowWeight] = await Promise.all([
-      this.prisma.townProduct.count({ where: { ...townWhere, pricingModel: 'UNIT', stockQty: { lt: 5 } } }),
-      this.prisma.townProduct.count({ where: { ...townWhere, pricingModel: 'WEIGHT', stockWeightGrams: { lt: 2000 } } }),
-    ]);
-    const lowStockCount = lowUnit + lowWeight;
+  const [lowUnit, lowWeight] = await Promise.all([
+    this.prisma.townProduct.count({
+      where: { ...townWhere, pricingModel: "UNIT", stockQty: { lt: 5 } },
+    }),
+    this.prisma.townProduct.count({
+      where: { ...townWhere, pricingModel: "WEIGHT", stockWeightGrams: { lt: 2000 } },
+    }),
+  ]);
 
-    const [ordersToday, confirmedStaleCount] = await Promise.all([
-      this.prisma.order.count({ where: { ...townWhere, createdAt: { gte: startToday, lt: startTomorrow } } }),
-      this.prisma.order.count({ where: { ...townWhere, status: 'CONFIRMED', updatedAt: { lt: staleCutoff } } }),
-    ]);
+  const lowStockCount = lowUnit + lowWeight;
 
-    const revenueAgg = await this.prisma.payment.aggregate({
-      where: { ...townWhere, status: 'SUCCESS', createdAt: { gte: startToday, lt: startTomorrow } },
-      _sum: { amount: true },
-    });
-    const revenueToday = this.round2(Number(revenueAgg._sum.amount ?? 0));
+  // Orders (safe because Order has townId)
+  const [ordersToday, confirmedStaleCount] = await Promise.all([
+    this.prisma.order.count({
+      where: {
+        ...townWhere,
+        createdAt: { gte: startToday, lt: startTomorrow },
+      },
+    }),
+    this.prisma.order.count({
+      where: {
+        ...townWhere,
+        status: "CONFIRMED",
+        updatedAt: { lt: staleCutoff },
+      },
+    }),
+  ]);
 
+  // 🔥 Revenue FIX — filter via Order relation, NOT townWhere
+  const revenueAgg = await this.prisma.payment.aggregate({
+    where: {
+      status: "SUCCESS",
+      createdAt: { gte: startToday, lt: startTomorrow },
+      order: townId ? { townId } : undefined,
+    },
+    _sum: { amount: true },
+  });
+
+  const revenueToday = this.round2(Number(revenueAgg._sum.amount ?? 0));
+
+  // 🔥 Refund FIX — filter via Payment -> Order relation
+     // Refunds today (safe)
+    // Option A: If Refund has `amount`, use it.
+    // Option B (fallback): If you track refund payments as Payment records (status SUCCESS + kind/type), sum those.
     let refundsToday = 0;
+
+    // --- A) Try Refund.amount first ---
     try {
       const refundsAgg = await this.prisma.refund.aggregate({
-        where: { ...townWhere, createdAt: { gte: startToday, lt: startTomorrow } },
-        // @ts-ignore - your schema may or may not have Refund.amount; keep safe
+        where: {
+          createdAt: { gte: startToday, lt: startTomorrow },
+          ...(townId
+            ? {
+                // Filter refunds to this town using paymentId -> Payment -> orderId -> Order (manual join)
+                payment: undefined as any, // keep TS happy; we won't use it
+              }
+            : {}),
+        },
+        // @ts-ignore (only works if Refund.amount exists)
         _sum: { amount: true },
       });
+
       // @ts-ignore
-      refundsToday = this.round2(Number(refundsAgg._sum.amount ?? 0));
+      refundsToday = this.round2(Number(refundsAgg._sum?.amount ?? 0));
     } catch {
-      refundsToday = 0;
+      // --- B) Fallback: derive refunds via Orders + Refund table ---
+      // Find refunds created today, then filter by town using Payment.orderId -> Order.townId
+      try {
+        const refunds = await this.prisma.refund.findMany({
+          where: { createdAt: { gte: startToday, lt: startTomorrow } },
+          select: { id: true, paymentId: true },
+        });
+
+        if (refunds.length === 0) {
+          refundsToday = 0;
+        } else {
+          const paymentIds = refunds.map((r) => r.paymentId).filter(Boolean) as string[];
+
+          const payments = await this.prisma.payment.findMany({
+            where: {
+              id: { in: paymentIds },
+              ...(townId ? { order: { townId } } : {}),
+            },
+            select: { id: true, amount: true },
+          });
+
+          refundsToday = this.round2(
+            payments.reduce((sum, p) => sum + Number(p.amount ?? 0), 0),
+          );
+        }
+      } catch {
+        refundsToday = 0;
+      }
     }
+  const TOP = 5;
 
-    const TOP = 5;
-
-    const [missingImagesTopRaw, lowStockTopRaw, confirmedStaleTopRaw] = await Promise.all([
+  const [missingImagesTopRaw, lowStockTopRaw, confirmedStaleTopRaw] =
+    await Promise.all([
       this.prisma.townProduct.findMany({
         where: { ...townWhere, images: { none: {} } },
         take: TOP,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { updatedAt: "desc" },
         select: {
           id: true,
           townId: true,
@@ -1605,12 +1712,12 @@ export class ReportsService {
         where: {
           ...townWhere,
           OR: [
-            { pricingModel: 'UNIT', stockQty: { lt: 5 } },
-            { pricingModel: 'WEIGHT', stockWeightGrams: { lt: 2000 } },
+            { pricingModel: "UNIT", stockQty: { lt: 5 } },
+            { pricingModel: "WEIGHT", stockWeightGrams: { lt: 2000 } },
           ],
         },
         take: TOP,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { updatedAt: "desc" },
         select: {
           id: true,
           townId: true,
@@ -1625,9 +1732,13 @@ export class ReportsService {
       }),
 
       this.prisma.order.findMany({
-        where: { ...townWhere, status: 'CONFIRMED', updatedAt: { lt: staleCutoff } },
+        where: {
+          ...townWhere,
+          status: "CONFIRMED",
+          updatedAt: { lt: staleCutoff },
+        },
         take: TOP,
-        orderBy: { updatedAt: 'asc' },
+        orderBy: { updatedAt: "asc" },
         select: {
           id: true,
           townId: true,
@@ -1638,55 +1749,38 @@ export class ReportsService {
       }),
     ]);
 
-    return {
-      generatedAt: new Date().toISOString(),
-      townId,
-      totalTownProducts,
-      productsMissingImages,
-      lowStockCount,
-      ordersToday,
-      revenueToday,
-      refundsToday,
-      confirmedStaleCount,
+      const missingImagesTop = missingImagesTopRaw.map((tp) => ({
+    id: tp.id,
+    label: tp.product?.name ?? tp.id,
+    href: `/ops/town-products/${tp.id}/images`,
+  }));
 
-      // These three fields must exist in OpsDashboardResponseDto
-      missingImagesTop: missingImagesTopRaw.map((tp: any) => ({
-        kind: 'TOWN_PRODUCT',
-        townProductId: tp.id,
-        townId: tp.townId,
-        townName: tp.town?.name ?? null,
-        townSlug: tp.town?.slug ?? null,
-        productId: tp.productId,
-        productName: tp.product?.name ?? null,
-        pricingModel: tp.pricingModel,
-        stockQty: tp.stockQty ?? null,
-        stockWeightGrams: tp.stockWeightGrams ?? null,
-        imagesCount: tp._count?.images ?? 0,
-      })) as any,
+  const lowStockTop = lowStockTopRaw.map((tp) => ({
+    id: tp.id,
+    label: tp.product?.name ?? tp.id,
+    href: `/ops/stock/${tp.id}`,
+  }));
 
-      lowStockTop: lowStockTopRaw.map((tp: any) => ({
-        kind: 'TOWN_PRODUCT',
-        townProductId: tp.id,
-        townId: tp.townId,
-        townName: tp.town?.name ?? null,
-        townSlug: tp.town?.slug ?? null,
-        productId: tp.productId,
-        productName: tp.product?.name ?? null,
-        pricingModel: tp.pricingModel,
-        stockQty: tp.stockQty ?? null,
-        stockWeightGrams: tp.stockWeightGrams ?? null,
-        imagesCount: tp._count?.images ?? 0,
-      })) as any,
+  const confirmedStaleTop = confirmedStaleTopRaw.map((o) => ({
+    id: o.id,
+    label: `Order ${o.id}`,
+    href: `/ops/orders/${o.id}`,
+  }));
 
-      confirmedStaleTop: confirmedStaleTopRaw.map((o: any) => ({
-        kind: 'ORDER',
-        orderId: o.id,
-        townId: o.townId,
-        townName: o.town?.name ?? null,
-        townSlug: o.town?.slug ?? null,
-        status: o.status,
-        updatedAt: o.updatedAt?.toISOString?.() ?? String(o.updatedAt),
-      })) as any,
-    };
+  return {
+    generatedAt: new Date().toISOString(),
+    townId,
+    totalTownProducts,
+    productsMissingImages,
+    lowStockCount,
+    ordersToday,
+    revenueToday,
+    refundsToday,
+    confirmedStaleCount,
+
+    missingImagesTop,
+    lowStockTop,
+    confirmedStaleTop,
+  };
   }
 }

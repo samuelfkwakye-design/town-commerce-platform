@@ -22,8 +22,10 @@ type OrderLite = {
   updatedAt?: string;
   status: string;
   townId?: string;
+  customerId?: string | null;
   customerPhone: string | null;
   customerEmail: string | null;
+  customerName?: string | null;
 
   subtotal?: string | number | null;
   total?: string | number | null;
@@ -31,6 +33,23 @@ type OrderLite = {
   payNowTotal?: string | number | null;
   payOnDeliveryTotal?: string | number | null;
   goodsPaymentMethod?: string | null;
+
+  deliveryRecipientName?: string | null;
+  deliveryPhone?: string | null;
+  deliveryTown?: string | null;
+  deliveryAddress?: {
+    recipientName?: string | null;
+    phone?: string | null;
+    town?: string | null;
+  } | null;
+
+  customer?: {
+    id?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    name?: string | null;
+    phone?: string | null;
+  } | null;
 
   town?: { name?: string | null; slug?: string | null } | null;
   payments?: PaymentLite[] | null;
@@ -55,6 +74,8 @@ const STATUSES = [
 
 type StatusFilter = (typeof STATUSES)[number];
 
+const LAST_TOWN_STORAGE_KEY = 'opsOrders:lastTownId';
+
 function badgeClass(status: string) {
   switch (status) {
     case 'DRAFT':
@@ -72,6 +93,12 @@ function badgeClass(status: string) {
     default:
       return 'bg-gray-100 border-gray-200 text-gray-800';
   }
+}
+
+function customerBadgeClass(isRegistered: boolean) {
+  return isRegistered
+    ? 'bg-green-50 border-green-200 text-green-800'
+    : 'bg-amber-50 border-amber-200 text-amber-800';
 }
 
 function toNumber(v: any): number | null {
@@ -121,42 +148,67 @@ function endOfDayISO(dateStr: string) {
   return d.toISOString();
 }
 
+function getCustomerName(order: OrderLite) {
+  const fullName =
+    [order.customer?.firstName, order.customer?.lastName].filter(Boolean).join(' ').trim() ||
+    order.customer?.name ||
+    order.customerName ||
+    order.deliveryAddress?.recipientName ||
+    order.deliveryRecipientName ||
+    '—';
+
+  return fullName;
+}
+
+function getCustomerPhone(order: OrderLite) {
+  return (
+    order.customerPhone ||
+    order.customer?.phone ||
+    order.deliveryAddress?.phone ||
+    order.deliveryPhone ||
+    '—'
+  );
+}
+
+function getDeliveryTown(order: OrderLite) {
+  return order.deliveryAddress?.town || order.deliveryTown || order.town?.name || '—';
+}
+
+function isRegisteredCustomer(order: OrderLite) {
+  return Boolean(order.customerId || order.customer?.id);
+}
+
 export default function OpsOrdersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // URL params (source of truth)
   const statusParam = (searchParams.get('status') ?? 'ALL') as StatusFilter;
   const qParam = searchParams.get('q') ?? '';
   const fromParam = searchParams.get('from') ?? '';
   const toParam = searchParams.get('to') ?? '';
   const townIdParam = searchParams.get('townId') ?? '';
   const limitParam = Number(searchParams.get('limit') ?? '20');
-  const cursorParam = searchParams.get('cursor'); // string | null
+  const cursorParam = searchParams.get('cursor');
 
-  // UI state (controlled inputs)
   const [qInput, setQInput] = useState(qParam);
   const [fromInput, setFromInput] = useState(fromParam);
   const [toInput, setToInput] = useState(toParam);
   const [townIdInput, setTownIdInput] = useState(townIdParam);
+  const [townSearchInput, setTownSearchInput] = useState('');
 
-  // keep inputs synced with URL when user navigates back/forward or links are shared
   useEffect(() => setQInput(qParam), [qParam]);
   useEffect(() => setFromInput(fromParam), [fromParam]);
   useEffect(() => setToInput(toParam), [toParam]);
   useEffect(() => setTownIdInput(townIdParam), [townIdParam]);
 
-  // debounce search
   const [debouncedQ, setDebouncedQ] = useState(qParam);
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(qInput.trim()), 400);
     return () => clearTimeout(t);
   }, [qInput]);
 
-  // Paging (cursor stack in memory, but also in URL)
   const [cursorStack, setCursorStack] = useState<(string | null)[]>([null]);
 
-  // Sync local cursor stack with URL cursor
   useEffect(() => {
     if (!cursorParam) {
       setCursorStack([null]);
@@ -172,11 +224,9 @@ export default function OpsOrdersPage() {
   const cursor = cursorStack[cursorStack.length - 1];
   const pageNumber = cursorStack.length;
 
-  // Towns
   const [towns, setTowns] = useState<TownLite[]>([]);
   const [townsLoading, setTownsLoading] = useState(false);
 
-  // Orders list
   const [items, setItems] = useState<OrderLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -189,7 +239,7 @@ export default function OpsOrdersPage() {
     from?: string;
     to?: string;
     townId?: string;
-    cursor?: string | null; // null/'' means delete
+    cursor?: string | null;
     limit?: number;
   }) {
     const sp = new URLSearchParams(searchParams.toString());
@@ -199,27 +249,26 @@ export default function OpsOrdersPage() {
       else sp.delete(key);
     };
 
-    apply("status", next.status);
-    apply("q", next.q);
-    apply("from", next.from);
-    apply("to", next.to);
-    apply("townId", next.townId);
+    apply('status', next.status);
+    apply('q', next.q);
+    apply('from', next.from);
+    apply('to', next.to);
+    apply('townId', next.townId);
 
-    if (typeof next.limit === "number" && Number.isFinite(next.limit)) {
-      sp.set("limit", String(next.limit));
+    if (typeof next.limit === 'number' && Number.isFinite(next.limit)) {
+      sp.set('limit', String(next.limit));
     }
 
     if (next.cursor !== undefined) {
       const c = next.cursor;
-      if (c && c.trim().length > 0) sp.set("cursor", c.trim());
-      else sp.delete("cursor");
+      if (c && c.trim().length > 0) sp.set('cursor', c.trim());
+      else sp.delete('cursor');
     }
 
     const qs = sp.toString();
-    router.replace(qs ? `?${qs}` : "?");
+    router.replace(qs ? `?${qs}` : '?');
   }
 
-  // Apply debounced search to URL and reset cursor
   useEffect(() => {
     if (debouncedQ !== qParam) {
       updateQuery({ q: debouncedQ, cursor: null });
@@ -227,13 +276,13 @@ export default function OpsOrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQ]);
 
-  // Fetch towns once
   useEffect(() => {
     (async () => {
       try {
         setTownsLoading(true);
-        const data = await apiFetch<TownLite[]>("/towns");
-        setTowns(Array.isArray(data) ? data : []);
+        const data = await apiFetch<TownLite[]>('/towns');
+        const rows = Array.isArray(data) ? data : [];
+        setTowns(rows);
       } catch {
         setTowns([]);
       } finally {
@@ -242,10 +291,46 @@ export default function OpsOrdersPage() {
     })();
   }, []);
 
-  // Apply town/date changes to URL and reset cursor
+  // Sync town search input from selected townId
   useEffect(() => {
-    const safeFrom = isValidDateInput(fromInput) ? fromInput : "";
-    const safeTo = isValidDateInput(toInput) ? toInput : "";
+    if (!townIdParam) {
+      setTownSearchInput('');
+      return;
+    }
+
+    const selected = towns.find((t) => t.id === townIdParam);
+    setTownSearchInput(selected?.name ?? '');
+  }, [townIdParam, towns]);
+
+  // Remember selected town
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (townIdParam) {
+      window.localStorage.setItem(LAST_TOWN_STORAGE_KEY, townIdParam);
+    }
+  }, [townIdParam]);
+
+  // Auto-restore last selected town when URL has no townId
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (townsLoading) return;
+    if (townIdParam) return;
+    if (towns.length === 0) return;
+
+    const savedTownId = window.localStorage.getItem(LAST_TOWN_STORAGE_KEY);
+    if (!savedTownId) return;
+
+    const exists = towns.some((t) => t.id === savedTownId && t.isActive !== false);
+    if (!exists) return;
+
+    updateQuery({ townId: savedTownId, cursor: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [townIdParam, townsLoading, towns]);
+
+  useEffect(() => {
+    const safeFrom = isValidDateInput(fromInput) ? fromInput : '';
+    const safeTo = isValidDateInput(toInput) ? toInput : '';
 
     const changed =
       safeFrom !== fromParam || safeTo !== toParam || townIdInput !== townIdParam;
@@ -261,34 +346,49 @@ export default function OpsOrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromInput, toInput, townIdInput]);
 
-  // Banner text (Showing results for…)
+  const activeTowns = useMemo(
+    () => towns.filter((t) => t.isActive !== false),
+    [towns],
+  );
+
+  const filteredTownSuggestions = useMemo(() => {
+    const term = townSearchInput.trim().toLowerCase();
+    if (!term) return activeTowns;
+
+    return activeTowns.filter(
+      (t) =>
+        t.name.toLowerCase().includes(term) ||
+        t.slug.toLowerCase().includes(term),
+    );
+  }, [activeTowns, townSearchInput]);
+
+  const selectedTown = useMemo(
+    () => towns.find((t) => t.id === townIdParam) ?? null,
+    [towns, townIdParam],
+  );
+
   const activeFiltersText = useMemo(() => {
     const bits: string[] = [];
 
-    if (statusParam && statusParam !== "ALL") bits.push(`Status: ${statusParam}`);
+    if (selectedTown) bits.push(`Town: ${selectedTown.name}`);
+    if (statusParam && statusParam !== 'ALL') bits.push(`Status: ${statusParam}`);
     if (qParam) bits.push(`Search: "${qParam}"`);
-
-    if (townIdParam) {
-      const townName = towns.find((t) => t.id === townIdParam)?.name;
-      bits.push(`Town: ${townName ?? townIdParam}`);
-    }
-
     if (fromParam) bits.push(`From: ${compactDate(fromParam)}`);
     if (toParam) bits.push(`To: ${compactDate(toParam)}`);
 
-    return bits.join(" • ");
-  }, [statusParam, qParam, townIdParam, fromParam, toParam, towns]);
+    return bits.join(' • ');
+  }, [selectedTown, statusParam, qParam, fromParam, toParam]);
 
   const listPath = useMemo(() => {
     const qs = new URLSearchParams();
-    qs.set("limit", String(Number.isFinite(limitParam) ? limitParam : 20));
+    qs.set('limit', String(Number.isFinite(limitParam) ? limitParam : 20));
 
-    if (statusParam && statusParam !== "ALL") qs.set("status", statusParam);
-    if (qParam) qs.set("q", qParam);
-    if (townIdParam) qs.set("townId", townIdParam);
-    if (fromParam) qs.set("from", startOfDayISO(fromParam));
-    if (toParam) qs.set("to", endOfDayISO(toParam));
-    if (cursor) qs.set("cursor", cursor);
+    if (statusParam && statusParam !== 'ALL') qs.set('status', statusParam);
+    if (qParam) qs.set('q', qParam);
+    if (townIdParam) qs.set('townId', townIdParam);
+    if (fromParam) qs.set('from', startOfDayISO(fromParam));
+    if (toParam) qs.set('to', endOfDayISO(toParam));
+    if (cursor) qs.set('cursor', cursor);
 
     return `/admin/orders?${qs.toString()}`;
   }, [limitParam, statusParam, qParam, townIdParam, fromParam, toParam, cursor]);
@@ -305,7 +405,7 @@ export default function OpsOrdersPage() {
         setNextCursor(data.pageInfo?.nextCursor ?? null);
         setHasNext(Boolean(data.pageInfo?.hasNextPage));
       } catch (e: any) {
-        setErr(e?.message ?? "Failed to load orders");
+        setErr(e?.message ?? 'Failed to load orders');
       } finally {
         setLoading(false);
       }
@@ -324,27 +424,125 @@ export default function OpsOrdersPage() {
             })[0]
           : null;
 
-      const currency = latestPayment?.currency ?? "GBP";
-      return { o, latestPayment, currency };
+      const currency = latestPayment?.currency ?? 'GBP';
+      const customerName = getCustomerName(o);
+      const customerPhone = getCustomerPhone(o);
+      const deliveryTown = getDeliveryTown(o);
+      const registeredCustomer = isRegisteredCustomer(o);
+
+      return {
+        o,
+        latestPayment,
+        currency,
+        customerName,
+        customerPhone,
+        deliveryTown,
+        registeredCustomer,
+      };
     });
   }, [items]);
 
   return (
     <div className="p-6 space-y-4">
-      
-      <div className="flex items-center justify-between">
-  <h1 className="text-xl font-semibold">Orders</h1>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-semibold">Orders</h1>
+          <div className="text-sm text-gray-600">
+            {selectedTown
+              ? `Focused on ${selectedTown.name}`
+              : 'Central view across all towns'}
+          </div>
+        </div>
 
-  <div className="flex items-center gap-3">
-    <ExportOrdersCsvButton />
-    <Link className="underline text-sm" href="/ops/login">
-      Change key
-    </Link>
-  </div>
-</div>
+        <div className="flex items-center gap-3">
+          <ExportOrdersCsvButton />
+          <Link className="underline text-sm" href="/ops/login">
+            Change key
+          </Link>
+        </div>
+      </div>
 
-      {/* Search + Date + Town */}
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
+      <div className="rounded-2xl border p-4 bg-white space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div className="font-semibold">Town filter</div>
+            <div className="text-sm text-gray-600">
+              Choose a town first so local teams can focus only on their market.
+            </div>
+          </div>
+
+          {selectedTown ? (
+            <button
+              className="rounded-xl border px-3 py-2 text-sm hover:bg-gray-50"
+              onClick={() => {
+                setTownSearchInput('');
+                setTownIdInput('');
+                setCursorStack([null]);
+                updateQuery({ townId: '', cursor: null });
+              }}
+            >
+              View all towns
+            </button>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="md:col-span-2">
+            <input
+              list="ops-order-town-options"
+              className="w-full rounded-xl border px-3 py-3 text-sm"
+              placeholder={townsLoading ? 'Loading towns…' : 'Type town name or slug…'}
+              value={townSearchInput}
+              onChange={(e) => {
+                const value = e.target.value;
+                setTownSearchInput(value);
+
+                const trimmed = value.trim();
+                if (!trimmed) {
+                  setTownIdInput('');
+                  return;
+                }
+
+                const exactMatch = activeTowns.find(
+                  (t) =>
+                    t.name.toLowerCase() === trimmed.toLowerCase() ||
+                    t.slug.toLowerCase() === trimmed.toLowerCase(),
+                );
+
+                setTownIdInput(exactMatch?.id ?? '');
+              }}
+              disabled={townsLoading}
+            />
+
+            <datalist id="ops-order-town-options">
+              {filteredTownSuggestions.map((t) => (
+                <option key={t.id} value={t.name}>
+                  {t.slug}
+                </option>
+              ))}
+            </datalist>
+
+            <div className="mt-2 text-xs text-gray-500">
+              Start typing a town name and choose from the suggestions.
+            </div>
+          </div>
+
+          <div className="rounded-xl border bg-gray-50 px-3 py-3 text-sm">
+            <div className="text-gray-500">Current scope</div>
+            <div className="font-semibold mt-1">
+              {selectedTown ? selectedTown.name : 'All towns'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {!selectedTown ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          You are viewing orders across all towns. For daily local operations, select a town first.
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
         <input
           className="w-full rounded-xl border px-3 py-2"
           placeholder="Search phone, email, order ID…"
@@ -366,38 +564,22 @@ export default function OpsOrdersPage() {
           onChange={(e) => setToInput(e.target.value)}
         />
 
-        <select
-          className="w-full rounded-xl border px-3 py-2"
-          value={townIdInput}
-          onChange={(e) => setTownIdInput(e.target.value)}
-          disabled={townsLoading}
-        >
-          <option value="">{townsLoading ? "Loading towns…" : "All towns"}</option>
-          {towns
-            .filter((t) => t.isActive !== false)
-            .map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-        </select>
-
         <button
           className="rounded-xl border px-3 py-2"
           onClick={() => {
-            setQInput("");
-            setFromInput("");
-            setToInput("");
-            setTownIdInput("");
+            setQInput('');
+            setFromInput('');
+            setToInput('');
+            setTownSearchInput('');
+            setTownIdInput('');
             setCursorStack([null]);
-            updateQuery({ q: "", from: "", to: "", townId: "", status: "ALL", cursor: null });
+            updateQuery({ q: '', from: '', to: '', townId: '', status: 'ALL', cursor: null });
           }}
         >
           Clear filters
         </button>
       </div>
 
-      {/* Status filters */}
       <div className="flex gap-2 flex-wrap">
         {STATUSES.map((s) => (
           <button
@@ -407,7 +589,7 @@ export default function OpsOrdersPage() {
               updateQuery({ status: s, cursor: null });
             }}
             className={`px-3 py-1 rounded-full border text-sm ${
-              statusParam === s ? "bg-black text-white" : "bg-white"
+              statusParam === s ? 'bg-black text-white' : 'bg-white'
             }`}
           >
             {s}
@@ -418,19 +600,19 @@ export default function OpsOrdersPage() {
       {loading ? <div>Loading…</div> : null}
       {err ? <div className="text-red-600 text-sm">{err}</div> : null}
 
-      {/* Filter summary banner */}
       {activeFiltersText ? (
         <div className="rounded-xl border bg-gray-50 px-3 py-2 text-sm text-gray-700 flex items-center justify-between gap-3">
           <div className="truncate">Showing results for: {activeFiltersText}</div>
           <button
             className="shrink-0 underline"
             onClick={() => {
-              setQInput("");
-              setFromInput("");
-              setToInput("");
-              setTownIdInput("");
+              setQInput('');
+              setFromInput('');
+              setToInput('');
+              setTownSearchInput('');
+              setTownIdInput('');
               setCursorStack([null]);
-              updateQuery({ q: "", from: "", to: "", townId: "", status: "ALL", cursor: null });
+              updateQuery({ q: '', from: '', to: '', townId: '', status: 'ALL', cursor: null });
             }}
           >
             Clear
@@ -438,13 +620,13 @@ export default function OpsOrdersPage() {
         </div>
       ) : null}
 
-      {/* Table */}
       <div className="border rounded-2xl overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
-              <th className="text-left p-3">Order ID</th>
-              <th className="text-left p-3">Town</th>
+              <th className="text-left p-3">Order</th>
+              <th className="text-left p-3">Customer</th>
+              <th className="text-left p-3">Delivery</th>
               <th className="text-left p-3">Status</th>
               <th className="text-left p-3">Total</th>
               <th className="text-left p-3">Latest Payment</th>
@@ -453,37 +635,75 @@ export default function OpsOrdersPage() {
           </thead>
 
           <tbody>
-            {rows.map(({ o, latestPayment, currency }) => (
-              <tr key={o.id} className="border-t">
-                <td className="p-3 font-mono text-xs">
-                  <Link className="underline" href={`/ops/orders/${o.id}`}>
-                    {o.id}
-                  </Link>
-                </td>
+            {rows.map(
+              ({
+                o,
+                latestPayment,
+                currency,
+                customerName,
+                customerPhone,
+                deliveryTown,
+                registeredCustomer,
+              }) => (
+                <tr key={o.id} className="border-t align-top">
+                  <td className="p-3">
+                    <div className="space-y-1">
+                      <div className="font-mono text-xs">
+                        <Link className="underline" href={`/ops/orders/${o.id}`}>
+                          {o.id}
+                        </Link>
+                      </div>
+                      <div className="text-xs text-gray-600">{o.town?.name ?? '—'}</div>
+                    </div>
+                  </td>
 
-                <td className="p-3">{o.town?.name ?? "—"}</td>
+                  <td className="p-3">
+                    <div className="space-y-1">
+                      <div className="font-medium">{customerName}</div>
+                      <div className="text-xs text-gray-600">{customerPhone}</div>
+                      <div>
+                        <span
+                          className={`inline-flex px-2 py-1 rounded-full text-xs border ${customerBadgeClass(
+                            registeredCustomer,
+                          )}`}
+                        >
+                          {registeredCustomer ? 'Registered' : 'Guest'}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
 
-                <td className="p-3">
-                  <span className={`px-2 py-1 rounded-full text-xs border ${badgeClass(o.status)}`}>
-                    {o.status}
-                  </span>
-                </td>
+                  <td className="p-3">
+                    <div className="space-y-1">
+                      <div className="font-medium">
+                        {o.deliveryAddress?.recipientName ?? o.deliveryRecipientName ?? '—'}
+                      </div>
+                      <div className="text-xs text-gray-600">{deliveryTown}</div>
+                    </div>
+                  </td>
 
-                <td className="p-3">
-                  {formatMoney(o.total ?? o.subtotal ?? o.payNowTotal ?? null, currency)}
-                </td>
+                  <td className="p-3">
+                    <span className={`px-2 py-1 rounded-full text-xs border ${badgeClass(o.status)}`}>
+                      {o.status}
+                    </span>
+                  </td>
 
-                <td className="p-3">
-                  {latestPayment ? `${latestPayment.method} • ${latestPayment.status}` : "—"}
-                </td>
+                  <td className="p-3">
+                    {formatMoney(o.total ?? o.subtotal ?? o.payNowTotal ?? null, currency)}
+                  </td>
 
-                <td className="p-3">{formatDate(o.createdAt)}</td>
-              </tr>
-            ))}
+                  <td className="p-3">
+                    {latestPayment ? `${latestPayment.method} • ${latestPayment.status}` : '—'}
+                  </td>
+
+                  <td className="p-3">{formatDate(o.createdAt)}</td>
+                </tr>
+              ),
+            )}
 
             {!loading && items.length === 0 ? (
               <tr>
-                <td className="p-3 text-gray-600" colSpan={6}>
+                <td className="p-3 text-gray-600" colSpan={7}>
                   No orders found.
                 </td>
               </tr>
@@ -492,9 +712,7 @@ export default function OpsOrdersPage() {
         </table>
       </div>
 
-      {/* Pagination (below table) */}
       <div className="flex items-center justify-end gap-4">
-        {/* Previous Button */}
         {cursorStack.length > 1 ? (
           <button
             onClick={() => {
@@ -513,10 +731,8 @@ export default function OpsOrdersPage() {
           <div />
         )}
 
-        {/* Page Indicator */}
         <div className="text-sm font-medium">Page {pageNumber}</div>
 
-        {/* Next Button */}
         {hasNext ? (
           <button
             onClick={() => {
