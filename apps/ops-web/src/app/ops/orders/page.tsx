@@ -29,6 +29,7 @@ type OrderLite = {
 
   subtotal?: string | number | null;
   total?: string | number | null;
+  currency?: string | null;
 
   payNowTotal?: string | number | null;
   payOnDeliveryTotal?: string | number | null;
@@ -110,7 +111,7 @@ function toNumber(v: any): number | null {
 function formatMoney(value: any, currency?: string | null) {
   const n = toNumber(value);
   if (n == null) return '—';
-  const cur = currency || 'GBP';
+  const cur = currency || 'GHS';
   try {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: cur }).format(n);
   } catch {
@@ -175,7 +176,13 @@ function getDeliveryTown(order: OrderLite) {
 }
 
 function isRegisteredCustomer(order: OrderLite) {
-  return Boolean(order.customerId || order.customer?.id);
+  return Boolean(
+    order.customerId ||
+      order.customer?.id ||
+      order.customer?.firstName ||
+      order.customer?.lastName ||
+      order.customer?.name,
+  );
 }
 
 export default function OpsOrdersPage() {
@@ -424,7 +431,7 @@ export default function OpsOrdersPage() {
             })[0]
           : null;
 
-      const currency = latestPayment?.currency ?? 'GBP';
+      const currency = o.currency ?? latestPayment?.currency ?? 'GHS';
       const customerName = getCustomerName(o);
       const customerPhone = getCustomerPhone(o);
       const deliveryTown = getDeliveryTown(o);
