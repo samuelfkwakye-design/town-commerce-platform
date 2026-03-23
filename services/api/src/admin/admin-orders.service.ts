@@ -45,14 +45,16 @@ export class AdminOrdersService {
       take: limit + 1,
       ...(q.cursor ? { skip: 1, cursor: { id: q.cursor } } : {}),
       orderBy: { createdAt: 'desc' },
-      select: {
+            select: {
         id: true,
         createdAt: true,
         updatedAt: true,
         status: true,
         townId: true,
+        customerId: true,
         customerPhone: true,
         customerEmail: true,
+       
 
         // totals
         subtotal: true,
@@ -64,6 +66,16 @@ export class AdminOrdersService {
 
         // attach town name/slug for UI
         town: { select: { name: true, slug: true } },
+
+        // include lightweight customer info for registered/guest label
+        customer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+          },
+        },
 
         // latest payment snapshot (if any)
         payments: {
