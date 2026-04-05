@@ -10,8 +10,8 @@ import MobileCategoryDrawerWrapper from "./page.mobile-drawer";
 
 function chipClass(active: boolean) {
   return active
-    ? "inline-flex items-center rounded-full border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white sm:px-4"
-    : "inline-flex items-center rounded-full border border-orange-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-orange-50 sm:px-4";
+    ? "inline-flex items-center rounded-full border border-[#0f172a] bg-[#0f172a] px-3 py-2 text-sm font-medium text-white sm:px-4"
+    : "inline-flex items-center rounded-full border border-orange-100 bg-orange-50 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-orange-100 sm:px-4";
 }
 
 function getCategoryEmoji(name: string) {
@@ -171,7 +171,7 @@ export default async function TownCatalogPage({
   const isSearchMode = !!search;
 
   return (
-    <div className="space-y-5 pt-3 sm:space-y-6 sm:pt-4">
+    <div className="min-h-screen space-y-5 bg-[#fffaf5] pt-3 sm:space-y-6 sm:pt-4">
       <DeliveryBar />
 
       <section className="-mx-4 hidden border-y border-orange-100 bg-[#fffaf5]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 md:block">
@@ -294,10 +294,10 @@ export default async function TownCatalogPage({
               </div>
             </section>
           ) : (
-            <section className="overflow-hidden rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-500 via-orange-400 to-amber-300 text-white shadow-sm sm:rounded-3xl">
-              <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[1.25fr_0.75fr] lg:p-8">
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-[#0f172a] text-white shadow-sm sm:rounded-3xl">
+              <div className="grid gap-6 bg-gradient-to-r from-[#0f172a] to-[#1e293b] p-4 sm:p-6 lg:grid-cols-[1.25fr_0.75fr] lg:p-8">
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/80 sm:text-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-200 sm:text-sm">
                     Town Commerce
                   </p>
 
@@ -305,19 +305,19 @@ export default async function TownCatalogPage({
                     {(data?.town?.name ?? townSlug) + " Market"}
                   </h1>
 
-                  <p className="mt-4 max-w-2xl text-sm text-white/90 sm:text-base md:text-lg">
+                  <p className="mt-4 max-w-2xl text-sm text-slate-200 sm:text-base md:text-lg">
                     Fresh groceries and essentials from local sellers, delivered
                     fast in your town.
                   </p>
 
                   <div className="mt-5 flex flex-wrap gap-2 sm:gap-3">
-                    <div className="rounded-full bg-white/20 px-3 py-2 text-xs font-medium sm:px-4 sm:text-sm">
+                    <div className="rounded-full bg-white/10 px-3 py-2 text-xs font-medium text-white sm:px-4 sm:text-sm">
                       {totalProducts} products
                     </div>
-                    <div className="rounded-full bg-white/20 px-3 py-2 text-xs font-medium sm:px-4 sm:text-sm">
+                    <div className="rounded-full bg-white/10 px-3 py-2 text-xs font-medium text-white sm:px-4 sm:text-sm">
                       {allCategories.length} categories
                     </div>
-                    <div className="rounded-full bg-white/20 px-3 py-2 text-xs font-medium sm:px-4 sm:text-sm">
+                    <div className="rounded-full bg-white/10 px-3 py-2 text-xs font-medium text-white sm:px-4 sm:text-sm">
                       Fast local delivery
                     </div>
                   </div>
@@ -325,7 +325,7 @@ export default async function TownCatalogPage({
                   <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                     <Link
                       href={`/${townSlug}`}
-                      className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-black sm:w-auto"
+                      className="inline-flex w-full items-center justify-center rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white hover:bg-orange-600 sm:w-auto"
                     >
                       Shop all
                     </Link>
@@ -344,7 +344,7 @@ export default async function TownCatalogPage({
                         href={`/${townSlug}?categorySlug=${encodeURIComponent(
                           featuredCategories[0].slug
                         )}`}
-                        className="hidden rounded-full border border-white/40 bg-white/15 px-5 py-3 text-sm font-semibold text-white hover:bg-white/20 md:inline-flex md:items-center md:justify-center"
+                        className="hidden rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100 md:inline-flex md:items-center md:justify-center"
                       >
                         Browse {featuredCategories[0].name}
                       </Link>
@@ -352,7 +352,7 @@ export default async function TownCatalogPage({
 
                     <Link
                       href={`/auth/login?redirect=${encodeURIComponent("/account/addresses")}`}
-                      className="inline-flex w-full items-center justify-center rounded-full border border-white/40 bg-white/15 px-5 py-3 text-sm font-semibold text-white hover:bg-white/20 sm:w-auto"
+                      className="inline-flex w-full items-center justify-center rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white hover:bg-white/15 sm:w-auto"
                     >
                       My Account
                     </Link>
@@ -364,13 +364,13 @@ export default async function TownCatalogPage({
                     <Link
                       key={cat.id ?? cat.name}
                       href={`/${townSlug}?categorySlug=${encodeURIComponent(cat.slug ?? "")}`}
-                      className="rounded-2xl border border-white/20 bg-white/15 p-4 backdrop-blur transition hover:bg-white/20"
+                      className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur transition hover:bg-white/15"
                     >
                       <div className="text-3xl">{getCategoryEmoji(cat.name)}</div>
                       <div className="mt-3 break-words text-base font-semibold text-white sm:text-lg">
                         {cat.name}
                       </div>
-                      <div className="mt-1 text-sm text-white/80">
+                      <div className="mt-1 text-sm text-slate-200">
                         {cat.products.length} items
                       </div>
                     </Link>

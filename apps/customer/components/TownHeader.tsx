@@ -330,7 +330,7 @@ export default function TownHeader({
   }, [towns, townQuery, townSlug]);
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-black/10 bg-gradient-to-r from-[#111827] to-[#020617] text-white shadow-sm">
+    <nav className="sticky top-0 z-40 border-b border-black/10 bg-gradient-to-r from-[#0f172a] to-[#020617] text-white shadow-sm">
       <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
           <div className="flex items-start justify-between gap-3 sm:items-center lg:shrink-0">
