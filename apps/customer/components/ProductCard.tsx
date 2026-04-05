@@ -417,12 +417,6 @@ export default function ProductCard({
                 {availability.urgency}
               </div>
             ) : null}
-
-            {product.pricingModel === "WEIGHT" ? (
-              <div className="text-[11px] text-slate-400">
-                Quick add {getDefaultWeight(product.name)}g
-              </div>
-            ) : null}
           </div>
 
           <div className="mt-auto space-y-2 pt-1.5">
@@ -443,27 +437,37 @@ export default function ProductCard({
               </button>
             </div>
 
-            {product.pricingModel === "UNIT" ? (
-              <div className="inline-flex h-10 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
-                <button
-                  type="button"
-                  onClick={() => setQty((q) => Math.max(1, q - 1))}
-                  className="flex h-full w-10 items-center justify-center text-sm text-slate-700 hover:bg-slate-100"
-                >
-                  −
-                </button>
-                <div className="flex-1 px-2 text-center text-xs font-semibold text-slate-900 sm:text-[13px]">
-                  {qty}
+            <div className="h-10">
+              {product.pricingModel === "UNIT" ? (
+                <div className="inline-flex h-10 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setQty((q) => Math.max(1, q - 1))}
+                    className="flex h-full w-10 items-center justify-center text-sm text-slate-700 hover:bg-slate-100"
+                  >
+                    −
+                  </button>
+                  <div className="flex-1 px-2 text-center text-xs font-semibold text-slate-900 sm:text-[13px]">
+                    {qty}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setQty((q) => q + 1)}
+                    className="flex h-full w-10 items-center justify-center text-sm text-slate-700 hover:bg-slate-100"
+                  >
+                    +
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setQty((q) => q + 1)}
-                  className="flex h-full w-10 items-center justify-center text-sm text-slate-700 hover:bg-slate-100"
-                >
-                  +
-                </button>
-              </div>
-            ) : null}
+              ) : product.pricingModel === "WEIGHT" ? (
+                <div className="flex h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-500 sm:text-[13px]">
+                  Quick add {getDefaultWeight(product.name)}g
+                </div>
+              ) : (
+                <div className="flex h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-500 sm:text-[13px]">
+                  Select options
+                </div>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
               <button
