@@ -30,6 +30,84 @@ function money(n: number) {
   return n.toFixed(2);
 }
 
+function QtyStepper({
+  value,
+  onDecrease,
+  onIncrease,
+}: {
+  value: number;
+  onDecrease: () => void;
+  onIncrease: () => void;
+}) {
+  return (
+    <div className="inline-flex h-11 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white sm:w-auto">
+      <button
+        type="button"
+        onClick={onDecrease}
+        className="flex h-full w-11 items-center justify-center text-lg text-slate-700 hover:bg-slate-100"
+        aria-label="Decrease quantity"
+      >
+        −
+      </button>
+      <div className="flex-1 px-3 text-center text-sm font-semibold text-slate-900 sm:min-w-[3rem] sm:flex-none">
+        {value}
+      </div>
+      <button
+        type="button"
+        onClick={onIncrease}
+        className="flex h-full w-11 items-center justify-center text-lg text-slate-700 hover:bg-slate-100"
+        aria-label="Increase quantity"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+type WeightStepperProps = {
+  value: number;
+  onDecrease: () => void;
+  onIncrease: () => void;
+  onChange: (next: number) => void;
+};
+
+function WeightStepper({
+  value,
+  onDecrease,
+  onIncrease,
+  onChange,
+}: WeightStepperProps) {
+  return (
+    <div className="flex w-full items-center gap-2 sm:w-auto">
+      <button
+        type="button"
+        onClick={onDecrease}
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg text-slate-700 hover:bg-slate-100"
+        aria-label="Decrease weight"
+      >
+        −
+      </button>
+
+      <input
+        type="number"
+        min={1}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm outline-none focus:border-primary sm:w-28"
+      />
+
+      <button
+        type="button"
+        onClick={onIncrease}
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg text-slate-700 hover:bg-slate-100"
+        aria-label="Increase weight"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
 export default function CartPage() {
   const params = useParams<{ townSlug: string }>();
   const townSlug = params?.townSlug;
@@ -214,12 +292,15 @@ export default function CartPage() {
                   <div className="flex flex-col gap-3 sm:gap-2">
                     <div className="text-sm font-medium">Weight (g)</div>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <input
-                        type="number"
-                        min={1}
-                        value={it.weightGrams}
-                        onChange={(e) => changeGrams(idx, Number(e.target.value))}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary sm:w-40"
+                      <WeightStepper
+                        value={Number(it.weightGrams)}
+                        onDecrease={() =>
+                          changeGrams(idx, Math.max(1, Number(it.weightGrams) - 100))
+                        }
+                        onIncrease={() =>
+                          changeGrams(idx, Number(it.weightGrams) + 100)
+                        }
+                        onChange={(next) => changeGrams(idx, next)}
                       />
                       <div className="text-sm text-slate-600">
                         {it.pricePerKg}{" "}
@@ -231,12 +312,12 @@ export default function CartPage() {
                   <div className="flex flex-col gap-3 sm:gap-2">
                     <div className="text-sm font-medium">Quantity</div>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <input
-                        type="number"
-                        min={1}
-                        value={it.quantity}
-                        onChange={(e) => changeQty(idx, Number(e.target.value))}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary sm:w-32"
+                      <QtyStepper
+                        value={Number(it.quantity)}
+                        onDecrease={() =>
+                          changeQty(idx, Math.max(1, Number(it.quantity) - 1))
+                        }
+                        onIncrease={() => changeQty(idx, Number(it.quantity) + 1)}
                       />
                       <div className="text-sm text-slate-600">
                         {it.unitPrice}{" "}
