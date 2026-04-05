@@ -217,27 +217,27 @@ export default function Page() {
     null;
 
   return (
-    <main className="min-h-screen bg-white text-slate-900">
-      <section className="relative overflow-hidden border-b border-orange-100 bg-gradient-to-b from-orange-50 via-white to-white">
-        <div className="absolute -left-20 top-10 h-64 w-64 rounded-full bg-orange-100 blur-3xl" />
-        <div className="absolute right-0 top-0 h-72 w-72 rounded-full bg-orange-200/40 blur-3xl" />
+    <main className="min-h-screen bg-[#fffaf5] text-slate-900">
+      <section className="relative overflow-hidden border-b border-orange-100 bg-gradient-to-b from-[#fff7ed] via-[#fffaf5] to-white">
+        <div className="absolute -left-20 top-10 h-64 w-64 rounded-full bg-orange-100/70 blur-3xl" />
+        <div className="absolute right-0 top-0 h-72 w-72 rounded-full bg-orange-200/30 blur-3xl" />
 
-        <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14 md:px-8 md:py-24">
+        <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14 md:px-8 md:py-20">
           <div className="grid items-center gap-8 sm:gap-10 lg:grid-cols-2 lg:gap-12">
             <div>
               <div className="mb-4 inline-flex items-center rounded-full border border-orange-200 bg-white px-4 py-2 text-xs font-medium text-orange-700 shadow-sm sm:text-sm">
                 Local market delivery, reimagined
               </div>
 
-              <h1 className="max-w-2xl text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
+              <h1 className="max-w-2xl text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl">
                 <span className="text-orange-500">Somame</span>
               </h1>
 
-              <p className="mt-3 text-base font-medium text-slate-700 sm:text-lg md:text-xl">
+              <p className="mt-3 text-base font-medium text-[#0f172a] sm:text-lg md:text-xl">
                 Send for it. Shop your town with ease.
               </p>
 
-              <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base md:text-lg">
+              <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-700 sm:text-base md:text-lg">
                 Somame connects customers to local town markets in a fast, simple
                 and trusted way. Search for your town, browse available products,
                 and get essentials delivered with convenience.
@@ -253,7 +253,7 @@ export default function Page() {
                 <a href="#how-it-works" className="w-full sm:w-auto">
                   <Button
                     variant="outline"
-                    className="h-12 w-full rounded-2xl border-orange-200 px-6 text-base font-semibold text-orange-600 hover:bg-orange-50 sm:w-auto"
+                    className="h-12 w-full rounded-2xl border-[#0f172a]/15 bg-white px-6 text-base font-semibold text-[#0f172a] hover:bg-slate-50 sm:w-auto"
                   >
                     Learn More
                   </Button>
@@ -270,7 +270,7 @@ export default function Page() {
                       : "Continue where you left off"}
                   </div>
 
-                  <div className="mt-1 break-words text-xl font-bold text-slate-900">
+                  <div className="mt-1 break-words text-xl font-bold text-[#0f172a]">
                     {preferredTown.name}
                   </div>
 
@@ -285,7 +285,7 @@ export default function Page() {
                     <a href="#towns" className="w-full sm:w-auto">
                       <Button
                         variant="outline"
-                        className="h-11 w-full rounded-2xl border-orange-200 px-5 font-semibold text-orange-600 hover:bg-orange-50 sm:w-auto"
+                        className="h-11 w-full rounded-2xl border-orange-200 bg-white px-5 font-semibold text-[#0f172a] hover:bg-orange-50 sm:w-auto"
                       >
                         Choose another town
                       </Button>
@@ -317,9 +317,9 @@ export default function Page() {
             </div>
 
             <div className="lg:justify-self-end">
-              <div className="rounded-3xl border border-orange-100 bg-white p-4 shadow-xl shadow-orange-100/40 sm:rounded-[32px] sm:p-6">
-                <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-orange-400 p-5 text-white sm:rounded-[24px] sm:p-6">
-                  <div className="text-xs font-medium uppercase tracking-[0.2em] text-orange-100 sm:text-sm">
+              <div className="rounded-3xl border border-orange-100 bg-white p-4 shadow-xl shadow-orange-100/30 sm:rounded-[32px] sm:p-6">
+                <div className="rounded-3xl bg-gradient-to-r from-[#0f172a] to-[#1e293b] p-5 text-white sm:rounded-[24px] sm:p-6">
+                  <div className="text-xs font-medium uppercase tracking-[0.2em] text-orange-200 sm:text-sm">
                     Somame
                   </div>
                   <div className="mt-3 text-2xl font-bold leading-tight sm:text-3xl">
@@ -327,18 +327,18 @@ export default function Page() {
                     <br />
                     delivered simply.
                   </div>
-                  <p className="mt-4 max-w-md text-sm leading-6 text-orange-50">
+                  <p className="mt-4 max-w-md text-sm leading-6 text-slate-200">
                     Search your town, enter the local market, and shop in a cleaner,
                     smarter, more trusted way.
                   </p>
                 </div>
 
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-100 p-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
                     <div className="mb-2 inline-flex rounded-xl bg-orange-50 p-2 text-orange-500">
                       <Store className="h-5 w-5" />
                     </div>
-                    <div className="font-semibold text-slate-900">
+                    <div className="font-semibold text-[#0f172a]">
                       Trusted local supply
                     </div>
                     <div className="mt-1 text-sm text-slate-600">
@@ -346,11 +346,11 @@ export default function Page() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-100 p-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
                     <div className="mb-2 inline-flex rounded-xl bg-orange-50 p-2 text-orange-500">
                       <Truck className="h-5 w-5" />
                     </div>
-                    <div className="font-semibold text-slate-900">
+                    <div className="font-semibold text-[#0f172a]">
                       Efficient fulfilment
                     </div>
                     <div className="mt-1 text-sm text-slate-600">
@@ -372,7 +372,7 @@ export default function Page() {
           <div className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-orange-500">
             Why Somame
           </div>
-          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
+          <h2 className="text-2xl font-bold tracking-tight text-[#0f172a] sm:text-3xl md:text-4xl">
             A modern way to shop your local market
           </h2>
           <p className="mt-4 text-sm text-slate-600 sm:text-base">
@@ -388,13 +388,15 @@ export default function Page() {
             return (
               <Card
                 key={feature.title}
-                className="rounded-3xl border-orange-100 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                className="rounded-3xl border-orange-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md"
               >
                 <CardContent className="p-5 sm:p-6">
                   <div className="mb-4 inline-flex rounded-2xl bg-orange-50 p-3 text-orange-500">
                     <Icon className="h-6 w-6" />
                   </div>
-                  <h3 className="text-lg font-semibold">{feature.title}</h3>
+                  <h3 className="text-lg font-semibold text-[#0f172a]">
+                    {feature.title}
+                  </h3>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
                     {feature.description}
                   </p>
@@ -407,14 +409,14 @@ export default function Page() {
 
       <section
         id="towns"
-        className="border-t border-orange-100 bg-orange-50/40 px-4 py-12 sm:px-6 sm:py-16 md:px-8"
+        className="border-t border-orange-100 bg-[#fff7ed]/50 px-4 py-12 sm:px-6 sm:py-16 md:px-8"
       >
         <div className="mx-auto max-w-7xl">
           <div className="mb-8 max-w-2xl sm:mb-10">
             <div className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-orange-500">
               Choose your town
             </div>
-            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
+            <h2 className="text-2xl font-bold tracking-tight text-[#0f172a] sm:text-3xl md:text-4xl">
               Enter your local market
             </h2>
             <p className="mt-4 text-sm text-slate-600 sm:text-base">
@@ -453,7 +455,7 @@ export default function Page() {
                         <MapPin className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="truncate font-medium text-slate-900">
+                        <div className="truncate font-medium text-[#0f172a]">
                           {town.name}
                         </div>
                         <div className="text-xs text-slate-500">/{town.slug}</div>
@@ -488,14 +490,14 @@ export default function Page() {
                   key={town.id}
                   className="overflow-hidden rounded-3xl border border-orange-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
                 >
-                  <div className="h-2 w-full bg-gradient-to-r from-orange-400 to-orange-500" />
+                  <div className="h-2 w-full bg-gradient-to-r from-[#0f172a] to-orange-500" />
 
                   <CardContent className="p-5 sm:p-6">
                     <div className="mb-4 inline-flex rounded-2xl bg-orange-50 p-3 text-orange-500">
                       <MapPin className="h-5 w-5" />
                     </div>
 
-                    <h3 className="break-words text-xl font-bold text-slate-900 sm:text-2xl">
+                    <h3 className="break-words text-xl font-bold text-[#0f172a] sm:text-2xl">
                       {town.name}
                     </h3>
 
@@ -520,7 +522,7 @@ export default function Page() {
         <div className="mx-auto flex max-w-7xl flex-col gap-3 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
           <div>
             <span className="font-semibold text-orange-500">Somame</span>{" "}
-            <span>— Send for it.</span>
+            <span className="text-[#0f172a]">— Send for it.</span>
           </div>
           <div>Local shopping made simple.</div>
         </div>
