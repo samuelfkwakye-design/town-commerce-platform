@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api";
 import type { CatalogResponse } from "@/lib/types";
 import TrustSignals from "@/components/TrustSignals";
 import DeliveryBar from "@/components/DeliveryBar";
+import MobileCategoryDrawerWrapper from "./page.mobile-drawer";
 
 function chipClass(active: boolean) {
   return active
@@ -158,13 +159,22 @@ export default async function TownCatalogPage({
       slug: String(cat.slug),
     }));
 
+  const drawerCategories = allCategories
+    .filter((cat: any) => cat.slug)
+    .map((cat: any) => ({
+      id: String(cat.id ?? cat.name),
+      name: String(cat.name),
+      slug: String(cat.slug),
+      productCount: Number(cat.products?.length ?? 0),
+    }));
+
   const isSearchMode = !!search;
 
   return (
     <div className="space-y-5 pt-3 sm:space-y-6 sm:pt-4">
       <DeliveryBar />
 
-      <section className="-mx-4 border-y border-orange-100 bg-[#fffaf5]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+      <section className="-mx-4 hidden border-y border-orange-100 bg-[#fffaf5]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 md:block">
         <div className="flex flex-wrap gap-2 sm:gap-3">
           <Link
             href={`/${townSlug}${search ? `?search=${encodeURIComponent(search)}` : ""}`}
@@ -320,12 +330,21 @@ export default async function TownCatalogPage({
                       Shop all
                     </Link>
 
+                    <div className="md:hidden">
+                      <MobileCategoryDrawerWrapper
+                        townSlug={townSlug}
+                        search={search}
+                        currentCategorySlug={categorySlug}
+                        categories={drawerCategories}
+                      />
+                    </div>
+
                     {featuredCategories[0]?.slug ? (
                       <Link
                         href={`/${townSlug}?categorySlug=${encodeURIComponent(
                           featuredCategories[0].slug
                         )}`}
-                        className="inline-flex w-full items-center justify-center rounded-full border border-white/40 bg-white/15 px-5 py-3 text-sm font-semibold text-white hover:bg-white/20 sm:w-auto"
+                        className="hidden rounded-full border border-white/40 bg-white/15 px-5 py-3 text-sm font-semibold text-white hover:bg-white/20 md:inline-flex md:items-center md:justify-center"
                       >
                         Browse {featuredCategories[0].name}
                       </Link>
@@ -340,7 +359,7 @@ export default async function TownCatalogPage({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-2">
+                <div className="hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-2">
                   {featuredCategories.slice(0, 4).map((cat: any) => (
                     <Link
                       key={cat.id ?? cat.name}
@@ -380,7 +399,7 @@ export default async function TownCatalogPage({
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="hidden grid-cols-1 gap-4 sm:grid sm:grid-cols-2 xl:grid-cols-4">
                 {featuredCategories.map((cat: any) => (
                   <Link
                     key={cat.id ?? cat.name}
