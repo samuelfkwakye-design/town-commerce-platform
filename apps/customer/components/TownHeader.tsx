@@ -331,184 +331,245 @@ export default function TownHeader({
 
   return (
     <nav className="sticky top-0 z-40 border-b border-black/10 bg-gradient-to-r from-[#111827] to-[#020617] text-white shadow-sm">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-6 py-4">
-        <div className="shrink-0">
-          <Link href={`/${townSlug}`}>
-            <div className="text-2xl font-extrabold tracking-tight text-orange-500">
-              Somame
-            </div>
-          </Link>
-
-          <div ref={townMenuRef} className="relative mt-1">
-            <button
-              type="button"
-              onClick={() => {
-                setTownsOpen((v) => !v);
-                setTownQuery("");
-              }}
-              className="text-sm text-slate-300 transition hover:text-white"
-            >
-              {townLabel === "Market" ? "Market" : `${townLabel} Market`} ▼
-            </button>
-
-            {townsOpen ? (
-              <div className="absolute left-0 mt-2 w-72 rounded-2xl border border-slate-700 bg-slate-900 p-3 shadow-xl">
-                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-                  Switch town
+      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+          <div className="flex items-start justify-between gap-3 sm:items-center lg:shrink-0">
+            <div className="min-w-0">
+              <Link href={`/${townSlug}`}>
+                <div className="text-2xl font-extrabold tracking-tight text-orange-500">
+                  Somame
                 </div>
+              </Link>
 
-                <input
-                  type="text"
-                  value={townQuery}
-                  onChange={(e) => setTownQuery(e.target.value)}
-                  placeholder="Search town..."
-                  className="mb-3 w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-400 focus:border-orange-400"
-                />
+              <div ref={townMenuRef} className="relative mt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTownsOpen((v) => !v);
+                    setTownQuery("");
+                  }}
+                  className="max-w-full truncate text-left text-sm text-slate-300 transition hover:text-white"
+                >
+                  {townLabel === "Market" ? "Market" : `${townLabel} Market`} ▼
+                </button>
 
-                <div className="mb-2 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2">
-                  <div className="text-xs text-slate-400">Current town</div>
-                  <div className="text-sm font-medium text-orange-400">
-                    {townLabel === "Market" ? "Market" : `${townLabel} Market`}
-                  </div>
-                </div>
-
-                <div className="max-h-72 overflow-y-auto rounded-xl">
-                  {filteredTowns.length > 0 ? (
-                    filteredTowns.map((town) => (
-                      <button
-                        key={town.id}
-                        type="button"
-                        onClick={() => handleTownSwitch(town)}
-                        className="block w-full rounded-xl px-3 py-2 text-left text-sm text-slate-200 transition hover:bg-slate-800"
-                      >
-                        <div className="font-medium">{town.name}</div>
-                        <div className="text-xs text-slate-400">/{town.slug}</div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="rounded-xl px-3 py-3 text-sm text-slate-400">
-                      No matching towns found.
+                {townsOpen ? (
+                  <div className="absolute left-0 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-slate-700 bg-slate-900 p-3 shadow-xl sm:w-72">
+                    <div className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+                      Switch town
                     </div>
-                  )}
-                </div>
+
+                    <input
+                      type="text"
+                      value={townQuery}
+                      onChange={(e) => setTownQuery(e.target.value)}
+                      placeholder="Search town..."
+                      className="mb-3 w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-400 focus:border-orange-400"
+                    />
+
+                    <div className="mb-2 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2">
+                      <div className="text-xs text-slate-400">Current town</div>
+                      <div className="text-sm font-medium text-orange-400">
+                        {townLabel === "Market" ? "Market" : `${townLabel} Market`}
+                      </div>
+                    </div>
+
+                    <div className="max-h-72 overflow-y-auto rounded-xl">
+                      {filteredTowns.length > 0 ? (
+                        filteredTowns.map((town) => (
+                          <button
+                            key={town.id}
+                            type="button"
+                            onClick={() => handleTownSwitch(town)}
+                            className="block w-full rounded-xl px-3 py-2 text-left text-sm text-slate-200 transition hover:bg-slate-800"
+                          >
+                            <div className="font-medium">{town.name}</div>
+                            <div className="text-xs text-slate-400">/{town.slug}</div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="rounded-xl px-3 py-3 text-sm text-slate-400">
+                          No matching towns found.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        </div>
+            </div>
 
-        <form
-          onSubmit={onSubmit}
-          className="relative mx-auto flex w-full max-w-3xl items-center gap-2"
-          role="search"
-        >
-          <div ref={searchWrapperRef} className="relative flex-1">
-            <input
-              name="search"
-              value={search}
-              onChange={(e) => {
-                const value = e.target.value;
-                setSearch(value);
-
-                if (value.trim().length > 0) {
-                  setOpen(true);
-                } else {
-                  setOpen(false);
-                }
-              }}
-              onFocus={() => {
-                if (search.trim()) setOpen(true);
-              }}
-              placeholder="Search groceries, drinks, snacks..."
-              className="w-full rounded-2xl border border-slate-600 bg-white px-5 py-3 text-slate-900 outline-none transition focus:border-orange-400"
-              autoComplete="off"
-            />
-
-            {open && hasInstantResults ? (
-              <InstantSearchResults
-                townSlug={townSlug}
-                query={search}
-                products={products}
-                categories={categories}
-                onSelect={() => setOpen(false)}
-              />
-            ) : null}
+            <div className="shrink-0 lg:hidden">
+              {onCartClick ? (
+                <Button
+                  type="button"
+                  onClick={onCartClick}
+                  className="rounded-2xl bg-orange-500 px-4 py-2 text-white transition hover:bg-orange-600"
+                >
+                  Cart ({cartCount})
+                </Button>
+              ) : (
+                <Link href={`/${townSlug}/cart`}>
+                  <Button className="rounded-2xl bg-orange-500 px-4 py-2 text-white transition hover:bg-orange-600">
+                    Cart ({cartCount})
+                  </Button>
+                </Link>
+              )}
+            </div>
           </div>
 
-          <Button
-            type="submit"
-            className="rounded-2xl bg-orange-500 px-6 py-3 text-white transition hover:bg-orange-600"
+          <form
+            onSubmit={onSubmit}
+            className="relative flex w-full flex-col gap-2 sm:flex-row lg:mx-auto lg:max-w-3xl lg:flex-1"
+            role="search"
           >
-            Search
-          </Button>
+            <div ref={searchWrapperRef} className="relative flex-1">
+              <input
+                name="search"
+                value={search}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSearch(value);
 
-          {currentSearch ? (
-            <button
-              type="button"
-              onClick={clearSearch}
-              className="rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-slate-700"
-            >
-              Clear
-            </button>
-          ) : null}
-        </form>
+                  if (value.trim().length > 0) {
+                    setOpen(true);
+                  } else {
+                    setOpen(false);
+                  }
+                }}
+                onFocus={() => {
+                  if (search.trim()) setOpen(true);
+                }}
+                placeholder="Search groceries, drinks, snacks..."
+                className="w-full rounded-2xl border border-slate-600 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-orange-400 sm:px-5"
+                autoComplete="off"
+              />
 
-        <div className="flex shrink-0 items-center gap-2">
-          {customerLoading ? null : customer ? (
-            <>
-              <div className="hidden rounded-2xl border border-slate-700 bg-slate-800/80 px-4 py-3 text-sm text-slate-100 md:block">
-                Hello{" "}
-                <span className="font-semibold text-orange-400">
-                  {displayName}
-                </span>{" "}
-                👋
-              </div>
+              {open && hasInstantResults ? (
+                <InstantSearchResults
+                  townSlug={townSlug}
+                  query={search}
+                  products={products}
+                  categories={categories}
+                  onSelect={() => setOpen(false)}
+                />
+              ) : null}
+            </div>
 
-              <button
+            <div className="flex gap-2 sm:shrink-0">
+              <Button
+                type="submit"
+                className="flex-1 rounded-2xl bg-orange-500 px-5 py-3 text-white transition hover:bg-orange-600 sm:flex-none sm:px-6"
+              >
+                Search
+              </Button>
+
+              {currentSearch ? (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-slate-700"
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+          </form>
+
+          <div className="hidden shrink-0 items-center gap-2 lg:flex">
+            {customerLoading ? null : customer ? (
+              <>
+                <div className="max-w-[220px] truncate rounded-2xl border border-slate-700 bg-slate-800/80 px-4 py-3 text-sm text-slate-100">
+                  Hello{" "}
+                  <span className="font-semibold text-orange-400">
+                    {displayName}
+                  </span>{" "}
+                  👋
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={logoutLoading}
+                  className="rounded-2xl border border-slate-600 bg-slate-800 px-5 py-3 text-sm font-medium text-slate-200 transition hover:bg-slate-700"
+                >
+                  {logoutLoading ? "Logging out..." : "Logout"}
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href={`/auth/login?redirect=/${townSlug}`}
+                  className="inline"
+                >
+                  <Button variant="secondary" className="rounded-2xl px-5 py-3">
+                    Login
+                  </Button>
+                </Link>
+
+                <Link
+                  href={`/auth/register?redirect=/${townSlug}`}
+                  className="inline"
+                >
+                  <Button variant="secondary" className="rounded-2xl px-5 py-3">
+                    Register
+                  </Button>
+                </Link>
+              </>
+            )}
+
+            {onCartClick ? (
+              <Button
                 type="button"
-                onClick={handleLogout}
-                disabled={logoutLoading}
-                className="hidden rounded-2xl border border-slate-600 bg-slate-800 px-5 py-3 text-sm font-medium text-slate-200 transition hover:bg-slate-700 sm:inline"
+                onClick={onCartClick}
+                className="rounded-2xl bg-orange-500 px-6 py-3 text-white transition hover:bg-orange-600"
               >
-                {logoutLoading ? "Logging out..." : "Logout"}
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                href={`/auth/login?redirect=/${townSlug}`}
-                className="hidden sm:inline"
-              >
-                <Button variant="secondary" className="rounded-2xl px-5 py-3">
-                  Login
-                </Button>
-              </Link>
-
-              <Link
-                href={`/auth/register?redirect=/${townSlug}`}
-                className="hidden sm:inline"
-              >
-                <Button variant="secondary" className="rounded-2xl px-5 py-3">
-                  Register
-                </Button>
-              </Link>
-            </>
-          )}
-
-          {onCartClick ? (
-            <Button
-              type="button"
-              onClick={onCartClick}
-              className="rounded-2xl bg-orange-500 px-6 py-3 text-white transition hover:bg-orange-600"
-            >
-              Cart ({cartCount})
-            </Button>
-          ) : (
-            <Link href={`/${townSlug}/cart`}>
-              <Button className="rounded-2xl bg-orange-500 px-6 py-3 text-white transition hover:bg-orange-600">
                 Cart ({cartCount})
               </Button>
-            </Link>
-          )}
+            ) : (
+              <Link href={`/${townSlug}/cart`}>
+                <Button className="rounded-2xl bg-orange-500 px-6 py-3 text-white transition hover:bg-orange-600">
+                  Cart ({cartCount})
+                </Button>
+              </Link>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 lg:hidden">
+            {customerLoading ? null : customer ? (
+              <>
+                <div className="min-w-0 rounded-2xl border border-slate-700 bg-slate-800/80 px-3 py-2 text-sm text-slate-100">
+                  Hello{" "}
+                  <span className="font-semibold text-orange-400">
+                    {displayName}
+                  </span>{" "}
+                  👋
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={logoutLoading}
+                  className="rounded-2xl border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-700"
+                >
+                  {logoutLoading ? "Logging out..." : "Logout"}
+                </button>
+              </>
+            ) : (
+              <>
+                <Link href={`/auth/login?redirect=/${townSlug}`}>
+                  <Button variant="secondary" className="rounded-2xl px-4 py-2">
+                    Login
+                  </Button>
+                </Link>
+
+                <Link href={`/auth/register?redirect=/${townSlug}`}>
+                  <Button variant="secondary" className="rounded-2xl px-4 py-2">
+                    Register
+                  </Button>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </nav>

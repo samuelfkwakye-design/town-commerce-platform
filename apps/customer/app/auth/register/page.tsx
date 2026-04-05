@@ -42,8 +42,9 @@ function RegisterPageInner() {
         setTownsLoading(true);
 
         const data: any = await apiFetch("/towns", {
-  cache: "no-store",
-});
+          cache: "no-store",
+        });
+
         const rows = Array.isArray(data)
           ? data
           : Array.isArray(data?.rows)
@@ -59,7 +60,7 @@ function RegisterPageInner() {
 
           const redirectSlug = redirect.replace(/^\//, "");
           const matchedTown = activeTowns.find(
-            (town: Town) => town.slug === redirectSlug,
+            (town: Town) => town.slug === redirectSlug
           );
 
           if (matchedTown) {
@@ -115,8 +116,8 @@ function RegisterPageInner() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-white px-6 py-10">
-      <div className="mx-auto grid min-h-[80vh] max-w-6xl items-center gap-8 lg:grid-cols-2">
+    <main className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-white px-4 py-6 sm:px-6 sm:py-10">
+      <div className="mx-auto grid min-h-[80vh] max-w-6xl items-center gap-6 sm:gap-8 lg:grid-cols-2">
         <div className="hidden lg:block">
           <div className="max-w-xl">
             <div className="mb-4 inline-flex items-center rounded-full border border-orange-200 bg-white px-4 py-2 text-sm font-medium text-orange-700 shadow-sm">
@@ -162,26 +163,28 @@ function RegisterPageInner() {
           </div>
         </div>
 
-        <Card className="overflow-hidden rounded-[32px] border-orange-100 shadow-xl shadow-orange-100/40">
+        <Card className="overflow-hidden rounded-3xl border-orange-100 shadow-xl shadow-orange-100/40 sm:rounded-[32px]">
           <CardContent className="p-0">
-            <div className="bg-gradient-to-r from-orange-500 to-orange-400 px-8 py-8 text-white">
-              <div className="text-sm font-medium uppercase tracking-[0.2em] text-orange-100">
+            <div className="bg-gradient-to-r from-orange-500 to-orange-400 px-5 py-6 text-white sm:px-8 sm:py-8">
+              <div className="text-xs font-medium uppercase tracking-[0.2em] text-orange-100 sm:text-sm">
                 Somame
               </div>
-              <h2 className="mt-3 text-3xl font-bold">Create Account</h2>
+              <h2 className="mt-3 text-2xl font-bold sm:text-3xl">
+                Create Account
+              </h2>
               <p className="mt-2 text-sm text-orange-50">
                 Register and start shopping in your local market.
               </p>
             </div>
 
-            <div className="px-8 py-8">
+            <div className="px-5 py-6 sm:px-8 sm:py-8">
               <form onSubmit={handleSubmit} className="grid gap-5">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Phone
                   </label>
                   <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
-                    <Phone className="h-5 w-5 text-orange-500" />
+                    <Phone className="h-5 w-5 shrink-0 text-orange-500" />
                     <input
                       type="text"
                       placeholder="Enter phone number"
@@ -198,7 +201,7 @@ function RegisterPageInner() {
                     First name
                   </label>
                   <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
-                    <User className="h-5 w-5 text-orange-500" />
+                    <User className="h-5 w-5 shrink-0 text-orange-500" />
                     <input
                       type="text"
                       placeholder="Enter first name"
@@ -215,7 +218,7 @@ function RegisterPageInner() {
                     Last name
                   </label>
                   <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
-                    <User className="h-5 w-5 text-orange-500" />
+                    <User className="h-5 w-5 shrink-0 text-orange-500" />
                     <input
                       type="text"
                       placeholder="Enter last name (optional)"
@@ -231,7 +234,7 @@ function RegisterPageInner() {
                     Email
                   </label>
                   <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
-                    <Mail className="h-5 w-5 text-orange-500" />
+                    <Mail className="h-5 w-5 shrink-0 text-orange-500" />
                     <input
                       type="email"
                       placeholder="Enter email (optional)"
@@ -247,11 +250,11 @@ function RegisterPageInner() {
                     Default town
                   </label>
                   <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
-                    <MapPin className="h-5 w-5 text-orange-500" />
+                    <MapPin className="h-5 w-5 shrink-0 text-orange-500" />
                     <select
                       value={defaultTownId}
                       onChange={(e) => setDefaultTownId(e.target.value)}
-                      className="w-full border-none bg-transparent text-base outline-none"
+                      className="w-full border-none bg-transparent pr-6 text-base outline-none"
                     >
                       <option value="">
                         {townsLoading ? "Loading towns..." : "Select your default town"}
@@ -270,7 +273,7 @@ function RegisterPageInner() {
                     Password
                   </label>
                   <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
-                    <Lock className="h-5 w-5 text-orange-500" />
+                    <Lock className="h-5 w-5 shrink-0 text-orange-500" />
                     <input
                       type="password"
                       placeholder="Create password"
@@ -319,8 +322,8 @@ export default function RegisterPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-white px-6 py-10">
-          <div className="mx-auto max-w-6xl rounded-[32px] border-orange-100 bg-white p-8 shadow-xl shadow-orange-100/40">
+        <main className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-white px-4 py-6 sm:px-6 sm:py-10">
+          <div className="mx-auto max-w-6xl rounded-3xl border-orange-100 bg-white p-6 shadow-xl shadow-orange-100/40 sm:rounded-[32px] sm:p-8">
             Loading...
           </div>
         </main>

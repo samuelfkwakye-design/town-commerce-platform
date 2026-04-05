@@ -17,7 +17,9 @@ export default function StickyCategoryNav({
   categories,
   topClassName = "top-[72px]",
 }: Props) {
-  const [activeSlug, setActiveSlug] = useState<string | null>(categories[0]?.slug ?? null);
+  const [activeSlug, setActiveSlug] = useState<string | null>(
+    categories[0]?.slug ?? null
+  );
 
   useEffect(() => {
     const sections = categories
@@ -38,7 +40,7 @@ export default function StickyCategoryNav({
         }
       },
       {
-        rootMargin: "-120px 0px -55% 0px",
+        rootMargin: "-110px 0px -55% 0px",
         threshold: [0.1, 0.25, 0.4, 0.6],
       }
     );
@@ -61,9 +63,11 @@ export default function StickyCategoryNav({
   if (!categories.length) return null;
 
   return (
-    <div className={`sticky z-30 ${topClassName} border-b bg-white/95 backdrop-blur`}>
+    <div
+      className={`sticky z-30 ${topClassName} border-b border-orange-100 bg-white/95 backdrop-blur`}
+    >
       <div className="no-scrollbar overflow-x-auto">
-        <div className="flex min-w-max gap-2 px-4 py-3">
+        <div className="flex min-w-max gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
           {categories.map((category) => {
             const active = activeSlug === category.slug;
 
@@ -73,11 +77,12 @@ export default function StickyCategoryNav({
                 type="button"
                 onClick={() => scrollToCategory(category.slug)}
                 className={[
-                  "whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium transition",
+                  "max-w-[70vw] truncate whitespace-nowrap rounded-full border px-3 py-2 text-xs font-medium transition sm:max-w-none sm:px-4 sm:text-sm",
                   active
                     ? "border-black bg-black text-white"
-                    : "border-border bg-white text-foreground hover:bg-muted",
+                    : "border-orange-200 bg-white text-slate-700 hover:bg-orange-50",
                 ].join(" ")}
+                title={category.name}
               >
                 {category.name}
               </button>

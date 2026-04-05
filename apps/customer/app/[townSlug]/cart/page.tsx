@@ -51,7 +51,7 @@ export default function CartPage() {
       try {
         const json: TownSettingsResponse = await apiFetch(
           `/town-settings/by-slug/${encodeURIComponent(townSlug)}`,
-          { cache: "no-store" },
+          { cache: "no-store" }
         );
 
         setDeliveryFee(Number(json?.settings?.deliveryFee ?? 0));
@@ -132,10 +132,10 @@ export default function CartPage() {
   }
 
   return (
-    <div className="pt-6">
+    <div className="pt-4 sm:pt-6">
       <CheckoutProgress step="cart" />
 
-      <div className="mt-6 flex items-center justify-between gap-3">
+      <div className="mt-5 flex flex-col gap-3 sm:mt-6 sm:flex-row sm:items-center sm:justify-between">
         <Link
           href={townSlug ? `/${townSlug}` : "/"}
           className="text-sm text-slate-600 hover:text-slate-900"
@@ -146,57 +146,63 @@ export default function CartPage() {
         <Button
           variant="outline"
           onClick={wipe}
-          className="transition active:scale-[0.98]"
+          className="w-full transition active:scale-[0.98] sm:w-auto"
         >
           Clear cart
         </Button>
       </div>
 
-      <h1 className="mt-4 text-2xl font-extrabold tracking-tight">Cart</h1>
+      <h1 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl">
+        Cart
+      </h1>
 
       {items.length === 0 ? (
-        <Card className="mt-6 rounded-2xl p-6">
+        <Card className="mt-6 rounded-2xl p-5 sm:p-6">
           <div className="text-slate-700">Your cart is empty.</div>
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link
               href={townSlug ? `/${townSlug}` : "/"}
-              className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98]"
+              className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] sm:w-auto"
             >
               Browse products →
             </Link>
 
             <Link
               href={townSlug ? `/${townSlug}` : "/"}
-              className="inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm transition hover:bg-slate-50 active:scale-[0.98]"
+              className="inline-flex w-full items-center justify-center rounded-lg border px-4 py-2 text-sm transition hover:bg-slate-50 active:scale-[0.98] sm:w-auto"
             >
               Continue shopping
             </Link>
           </div>
         </Card>
       ) : (
-        <div className="mt-6 grid gap-6 lg:grid-cols-3">
+        <div className="mt-6 grid gap-5 sm:gap-6 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-2">
             {items.map((it, idx) => (
-              <Card key={idx} className="rounded-2xl p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-lg font-semibold">{it.name}</div>
+              <Card key={idx} className="rounded-2xl p-4 sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                  <div className="min-w-0">
+                    <div className="break-words text-base font-semibold sm:text-lg">
+                      {it.name}
+                    </div>
 
                     {it.pricingModel === "VARIANT" ? (
                       <div className="mt-1 text-sm text-slate-600">
-                        Variant: <span className="font-medium">{it.variantLabel}</span>
+                        Variant:{" "}
+                        <span className="font-medium">{it.variantLabel}</span>
                       </div>
                     ) : null}
 
                     <div className="mt-1 text-sm text-slate-500">
-                      Pricing: <span className="font-medium">{it.pricingModel}</span>
+                      Pricing:{" "}
+                      <span className="font-medium">{it.pricingModel}</span>
                     </div>
                   </div>
 
                   <Button
                     variant="outline"
                     onClick={() => removeAt(idx)}
-                    className="transition active:scale-[0.98]"
+                    className="w-full transition active:scale-[0.98] sm:w-auto"
                   >
                     Remove
                   </Button>
@@ -205,34 +211,36 @@ export default function CartPage() {
                 <Separator className="my-4" />
 
                 {it.pricingModel === "WEIGHT" ? (
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-3 sm:gap-2">
                     <div className="text-sm font-medium">Weight (g)</div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <input
                         type="number"
                         min={1}
                         value={it.weightGrams}
                         onChange={(e) => changeGrams(idx, Number(e.target.value))}
-                        className="w-40 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary sm:w-40"
                       />
                       <div className="text-sm text-slate-600">
-                        {it.pricePerKg} <span className="text-slate-500">{currency}/kg</span>
+                        {it.pricePerKg}{" "}
+                        <span className="text-slate-500">{currency}/kg</span>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-3 sm:gap-2">
                     <div className="text-sm font-medium">Quantity</div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <input
                         type="number"
                         min={1}
                         value={it.quantity}
                         onChange={(e) => changeQty(idx, Number(e.target.value))}
-                        className="w-32 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary sm:w-32"
                       />
                       <div className="text-sm text-slate-600">
-                        {it.unitPrice} <span className="text-slate-500">{currency} each</span>
+                        {it.unitPrice}{" "}
+                        <span className="text-slate-500">{currency} each</span>
                       </div>
                     </div>
                   </div>
@@ -242,7 +250,7 @@ export default function CartPage() {
           </div>
 
           <div className="lg:col-span-1">
-            <Card className="sticky top-6 rounded-2xl p-5">
+            <Card className="rounded-2xl p-4 sm:p-5 lg:sticky lg:top-6">
               <div className="text-lg font-semibold">Order summary</div>
               <Separator className="my-4" />
 
@@ -251,33 +259,34 @@ export default function CartPage() {
                 <div>{items.length}</div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
+              <div className="mt-3 flex items-center justify-between gap-3 text-sm text-slate-600">
                 <div>Subtotal</div>
-                <div>
+                <div className="text-right">
                   {money(totals.subtotal)} {currency}
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
+              <div className="mt-3 flex items-center justify-between gap-3 text-sm text-slate-600">
                 <div>Service fee</div>
-                <div>
+                <div className="text-right">
                   {money(totals.serviceFee)} {currency}
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
+              <div className="mt-3 flex items-center justify-between gap-3 text-sm text-slate-600">
                 <div>Delivery fee</div>
-                <div>
+                <div className="text-right">
                   {money(totals.deliveryFee)} {currency}
                 </div>
               </div>
 
               <Separator className="my-4" />
 
-              <div className="mt-3 flex items-center justify-between text-base">
+              <div className="mt-3 flex items-center justify-between gap-3 text-base">
                 <div className="font-medium">Total</div>
-                <div className="text-xl font-extrabold">
-                  {money(totals.total)} <span className="text-base font-semibold">{currency}</span>
+                <div className="text-right text-xl font-extrabold">
+                  {money(totals.total)}{" "}
+                  <span className="text-base font-semibold">{currency}</span>
                 </div>
               </div>
 

@@ -114,7 +114,6 @@ export default async function OrderPage({
 
   return (
     <main
-
       style={{
         maxWidth: 980,
         margin: "0 auto",
@@ -122,9 +121,10 @@ export default async function OrderPage({
         paddingBottom: 40,
       }}
     >
-            <div style={{ marginBottom: 18 }}>
+      <div style={{ marginBottom: 18 }}>
         <CheckoutProgress step="confirmation" />
       </div>
+
       <style>{`
         @keyframes tc-pop-in {
           0% { opacity: 0; transform: scale(0.82); }
@@ -141,17 +141,349 @@ export default async function OrderPage({
           0% { opacity: 0; transform: translateY(10px); }
           100% { opacity: 1; transform: translateY(0); }
         }
+
+        .tc-order-topbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .tc-hero {
+          margin-top: 20px;
+          border: 1px solid #fed7aa;
+          border-radius: 24px;
+          padding: 20px;
+          background: linear-gradient(135deg, #fff7ed 0%, #ffffff 55%, #fffbeb 100%);
+          box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+          animation: tc-fade-up 0.45s ease-out;
+        }
+
+        .tc-hero-row {
+          display: flex;
+          gap: 18px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+
+        .tc-badge-circle-wrap {
+          position: relative;
+          width: 64px;
+          height: 64px;
+          flex-shrink: 0;
+        }
+
+        .tc-badge-ring {
+          position: absolute;
+          inset: 0;
+          border-radius: 999px;
+          background: rgba(34,197,94,0.18);
+          animation: tc-pulse-ring 1.6s ease-out infinite;
+        }
+
+        .tc-badge-circle {
+          position: absolute;
+          inset: 0;
+          border-radius: 999px;
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 30px;
+          font-weight: 900;
+          animation: tc-pop-in 0.45s ease-out;
+        }
+
+        .tc-hero-copy {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .tc-hero-kicker {
+          font-size: 12px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          font-weight: 700;
+        }
+
+        .tc-hero-title {
+          margin-top: 6px;
+          margin-bottom: 0;
+          font-size: 28px;
+          line-height: 1.1;
+          color: #0f172a;
+          word-break: break-word;
+        }
+
+        .tc-hero-text {
+          margin-top: 10px;
+          margin-bottom: 0;
+          color: #475569;
+          font-size: 15px;
+          line-height: 1.6;
+          max-width: 700px;
+        }
+
+        .tc-grid-cards {
+          margin-top: 18px;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 14px;
+          animation: tc-fade-up 0.5s ease-out;
+        }
+
+        .tc-card {
+          border: 1px solid #e5e7eb;
+          border-radius: 18px;
+          padding: 16px;
+          background: white;
+        }
+
+        .tc-card-title {
+          color: #64748b;
+          font-size: 13px;
+          margin-bottom: 6px;
+        }
+
+        .tc-status-pill {
+          display: inline-flex;
+          align-items: center;
+          border-radius: 999px;
+          padding: 8px 12px;
+          font-weight: 800;
+          font-size: 14px;
+        }
+
+        .tc-amount {
+          font-size: 24px;
+          font-weight: 900;
+          color: #0f172a;
+          word-break: break-word;
+        }
+
+        .tc-section {
+          margin-top: 18px;
+          border: 1px solid #e5e7eb;
+          border-radius: 18px;
+          padding: 16px;
+          background: white;
+          animation: tc-fade-up 0.55s ease-out;
+        }
+
+        .tc-section h2 {
+          margin: 0;
+          font-size: 18px;
+          color: #0f172a;
+        }
+
+        .tc-progress-grid {
+          margin-top: 16px;
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 14px;
+        }
+
+        .tc-progress-item {
+          min-width: 0;
+        }
+
+        .tc-progress-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+
+        .tc-progress-dot {
+          width: 28px;
+          height: 28px;
+          border-radius: 999px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          font-weight: 800;
+          flex-shrink: 0;
+        }
+
+        .tc-progress-line {
+          height: 3px;
+          flex: 1;
+          border-radius: 999px;
+        }
+
+        .tc-next-grid {
+          margin-top: 14px;
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        .tc-next-card {
+          border: 1px solid #f1f5f9;
+          border-radius: 16px;
+          padding: 14px;
+          background: #fafaf9;
+        }
+
+        .tc-next-card-title {
+          font-weight: 800;
+          color: #0f172a;
+          margin-bottom: 6px;
+        }
+
+        .tc-next-card-text {
+          color: #64748b;
+          font-size: 14px;
+          line-height: 1.5;
+        }
+
+        .tc-address-block {
+          border: 1px solid #e5e7eb;
+          border-radius: 18px;
+          padding: 16px;
+          background: white;
+        }
+
+        .tc-address-grid {
+          display: grid;
+          gap: 6px;
+          color: #0f172a;
+          word-break: break-word;
+        }
+
+        .tc-items-grid {
+          display: grid;
+          gap: 12px;
+        }
+
+        .tc-item-name {
+          font-weight: 900;
+          font-size: 17px;
+          color: #0f172a;
+          word-break: break-word;
+        }
+
+        .tc-summary-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          color: #0f172a;
+        }
+
+        .tc-summary-row > div:last-child {
+          text-align: right;
+        }
+
+        .tc-summary-total {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          align-items: baseline;
+        }
+
+        .tc-summary-total-label {
+          font-size: 18px;
+          font-weight: 800;
+          color: #0f172a;
+        }
+
+        .tc-summary-total-value {
+          font-size: 24px;
+          font-weight: 900;
+          color: #0f172a;
+          text-align: right;
+          word-break: break-word;
+        }
+
+        .tc-guest-box {
+          margin-top: 18px;
+          border: 1px solid #fed7aa;
+          border-radius: 18px;
+          padding: 18px;
+          background: #fff7ed;
+        }
+
+        .tc-actions {
+          margin-top: 18px;
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .tc-btn-primary,
+        .tc-btn-secondary {
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 12px;
+          padding: 12px 16px;
+          font-weight: 700;
+        }
+
+        .tc-btn-primary {
+          background: #f97316;
+          color: white;
+        }
+
+        .tc-btn-secondary {
+          border: 1px solid #cbd5e1;
+          color: #0f172a;
+          background: white;
+        }
+
+        @media (min-width: 640px) {
+          .tc-hero {
+            padding: 24px;
+          }
+
+          .tc-badge-circle-wrap {
+            width: 72px;
+            height: 72px;
+          }
+
+          .tc-badge-circle {
+            font-size: 34px;
+          }
+
+          .tc-hero-title {
+            font-size: 34px;
+          }
+
+          .tc-amount {
+            font-size: 28px;
+          }
+
+          .tc-section {
+            padding: 18px;
+          }
+
+          .tc-section h2 {
+            font-size: 20px;
+          }
+
+          .tc-progress-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+          }
+
+          .tc-next-grid {
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          }
+
+          .tc-summary-total-value {
+            font-size: 28px;
+          }
+
+          .tc-grid-cards {
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          }
+        }
       `}</style>
 
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
+      <header className="tc-order-topbar">
         <Link
           href={`/${townSlug}`}
           style={{ textDecoration: "none", color: "#0f172a", fontWeight: 500 }}
@@ -167,61 +499,23 @@ export default async function OrderPage({
         </Link>
       </header>
 
-      <section
-        style={{
-          marginTop: 20,
-          border: "1px solid #fed7aa",
-          borderRadius: 24,
-          padding: 24,
-          background:
-            "linear-gradient(135deg, #fff7ed 0%, #ffffff 55%, #fffbeb 100%)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.04)",
-          animation: "tc-fade-up 0.45s ease-out",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            gap: 18,
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <div
-            style={{
-              position: "relative",
-              width: 72,
-              height: 72,
-              flexShrink: 0,
-            }}
-          >
+      <section className="tc-hero">
+        <div className="tc-hero-row">
+          <div className="tc-badge-circle-wrap">
+            <div className="tc-badge-ring" />
             <div
+              className="tc-badge-circle"
               style={{
-                position: "absolute",
-                inset: 0,
-                borderRadius: "999px",
-                background: "rgba(34,197,94,0.18)",
-                animation: "tc-pulse-ring 1.6s ease-out infinite",
-              }}
-            />
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                borderRadius: "999px",
                 background:
                   normalizeStatus(order?.status) === "CANCELLED" ||
                   normalizeStatus(order?.status).includes("REFUND")
                     ? "#dc2626"
                     : "#16a34a",
-                color: "white",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 34,
-                fontWeight: 900,
-                boxShadow: "0 8px 20px rgba(22,163,74,0.28)",
-                animation: "tc-pop-in 0.45s ease-out",
+                boxShadow:
+                  normalizeStatus(order?.status) === "CANCELLED" ||
+                  normalizeStatus(order?.status).includes("REFUND")
+                    ? "0 8px 20px rgba(220,38,38,0.28)"
+                    : "0 8px 20px rgba(22,163,74,0.28)",
               }}
             >
               {normalizeStatus(order?.status) === "CANCELLED" ||
@@ -231,72 +525,26 @@ export default async function OrderPage({
             </div>
           </div>
 
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <div
-              style={{
-                fontSize: 13,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: tone.text,
-                fontWeight: 700,
-              }}
-            >
+          <div className="tc-hero-copy">
+            <div className="tc-hero-kicker" style={{ color: tone.text }}>
               Order update
             </div>
 
-            <h1
-              style={{
-                marginTop: 6,
-                marginBottom: 0,
-                fontSize: 34,
-                lineHeight: 1.1,
-                color: "#0f172a",
-              }}
-            >
-              {customer.label}
-            </h1>
+            <h1 className="tc-hero-title">{customer.label}</h1>
 
-            <p
-              style={{
-                marginTop: 10,
-                marginBottom: 0,
-                color: "#475569",
-                fontSize: 16,
-                lineHeight: 1.6,
-                maxWidth: 700,
-              }}
-            >
-              {customer.description}
-            </p>
+            <p className="tc-hero-text">{customer.description}</p>
           </div>
         </div>
       </section>
 
-      <section
-        style={{
-          marginTop: 18,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-          gap: 14,
-          animation: "tc-fade-up 0.5s ease-out",
-        }}
-      >
-        <div
-          style={{
-            border: "1px solid #e5e7eb",
-            borderRadius: 18,
-            padding: 16,
-            background: "white",
-          }}
-        >
-          <div style={{ color: "#64748b", fontSize: 13, marginBottom: 6 }}>
-            Order ID
-          </div>
+      <section className="tc-grid-cards">
+        <div className="tc-card">
+          <div className="tc-card-title">Order ID</div>
           <div
             style={{
               fontFamily:
                 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: 700,
               color: "#0f172a",
               wordBreak: "break-all",
@@ -306,25 +554,11 @@ export default async function OrderPage({
           </div>
         </div>
 
-        <div
-          style={{
-            border: "1px solid #e5e7eb",
-            borderRadius: 18,
-            padding: 16,
-            background: "white",
-          }}
-        >
-          <div style={{ color: "#64748b", fontSize: 13, marginBottom: 6 }}>
-            Current status
-          </div>
+        <div className="tc-card">
+          <div className="tc-card-title">Current status</div>
           <div
+            className="tc-status-pill"
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              borderRadius: 999,
-              padding: "8px 12px",
-              fontWeight: 800,
-              fontSize: 14,
               background: tone.bg,
               border: `1px solid ${tone.border}`,
               color: tone.text,
@@ -334,100 +568,49 @@ export default async function OrderPage({
           </div>
         </div>
 
-        <div
-          style={{
-            border: "1px solid #e5e7eb",
-            borderRadius: 18,
-            padding: 16,
-            background: "white",
-          }}
-        >
-          <div style={{ color: "#64748b", fontSize: 13, marginBottom: 6 }}>
-            Amount to pay
-          </div>
-          <div
-            style={{
-              fontSize: 28,
-              fontWeight: 900,
-              color: "#0f172a",
-            }}
-          >
-            {money(order.total)} GHS
-          </div>
+        <div className="tc-card">
+          <div className="tc-card-title">Amount to pay</div>
+          <div className="tc-amount">{money(order.total)} GHS</div>
           <div style={{ marginTop: 6, color: "#64748b", fontSize: 13 }}>
             Payment method:{" "}
             <b style={{ color: "#0f172a" }}>
               {order.goodsPaymentMethod === "COD"
-  ? "Cash on delivery"
-  : order.goodsPaymentMethod === "MOMO"
-  ? "MoMo on delivery"
-  : order.goodsPaymentMethod}
+                ? "Cash on delivery"
+                : order.goodsPaymentMethod === "MOMO"
+                  ? "MoMo on delivery"
+                  : order.goodsPaymentMethod}
             </b>
           </div>
         </div>
       </section>
 
       {showProgress ? (
-        <section
-          style={{
-            marginTop: 18,
-            border: "1px solid #e5e7eb",
-            borderRadius: 18,
-            padding: 18,
-            background: "white",
-            animation: "tc-fade-up 0.55s ease-out",
-          }}
-        >
-          <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a" }}>
-            Order progress
-          </h2>
+        <section className="tc-section">
+          <h2>Order progress</h2>
 
-          <div
-            style={{
-              marginTop: 16,
-              display: "grid",
-              gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-              gap: 12,
-            }}
-          >
+          <div className="tc-progress-grid">
             {progressSteps.map((step, index) => {
               const active = customer.step >= index + 1;
 
               return (
-                <div key={step} style={{ minWidth: 0 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 8,
-                    }}
-                  >
+                <div key={step} className="tc-progress-item">
+                  <div className="tc-progress-row">
                     <div
+                      className="tc-progress-dot"
                       style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 999,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 13,
-                        fontWeight: 800,
                         background: active ? "#16a34a" : "#e2e8f0",
                         color: active ? "white" : "#475569",
-                        flexShrink: 0,
                       }}
                     >
                       {index + 1}
                     </div>
 
                     <div
+                      className="tc-progress-line"
                       style={{
-                        height: 3,
-                        flex: 1,
                         background: active ? "#86efac" : "#e2e8f0",
-                        borderRadius: 999,
-                        display: index === progressSteps.length - 1 ? "none" : "block",
+                        display:
+                          index === progressSteps.length - 1 ? "none" : "block",
                       }}
                     />
                   </div>
@@ -449,28 +632,10 @@ export default async function OrderPage({
         </section>
       ) : null}
 
-      <section
-        style={{
-          marginTop: 18,
-          border: "1px solid #e5e7eb",
-          borderRadius: 18,
-          padding: 18,
-          background: "white",
-          animation: "tc-fade-up 0.55s ease-out",
-        }}
-      >
-        <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a" }}>
-          What happens next
-        </h2>
+      <section className="tc-section">
+        <h2>What happens next</h2>
 
-        <div
-          style={{
-            marginTop: 14,
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: 12,
-          }}
-        >
+        <div className="tc-next-grid">
           {[
             {
               title: "1. Order review",
@@ -489,33 +654,9 @@ export default async function OrderPage({
               text: "Your order is delivered and payment is collected if applicable.",
             },
           ].map((step) => (
-            <div
-              key={step.title}
-              style={{
-                border: "1px solid #f1f5f9",
-                borderRadius: 16,
-                padding: 14,
-                background: "#fafaf9",
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 800,
-                  color: "#0f172a",
-                  marginBottom: 6,
-                }}
-              >
-                {step.title}
-              </div>
-              <div
-                style={{
-                  color: "#64748b",
-                  fontSize: 14,
-                  lineHeight: 1.5,
-                }}
-              >
-                {step.text}
-              </div>
+            <div key={step.title} className="tc-next-card">
+              <div className="tc-next-card-title">{step.title}</div>
+              <div className="tc-next-card-text">{step.text}</div>
             </div>
           ))}
         </div>
@@ -531,62 +672,60 @@ export default async function OrderPage({
           You can refresh this page any time to see the latest order status.
         </div>
       </section>
+
       <h2 style={{ marginTop: 22, marginBottom: 10, color: "#0f172a" }}>
-  Delivery address
-</h2>
+        Delivery address
+      </h2>
 
-<div
-  style={{
-    border: "1px solid #e5e7eb",
-    borderRadius: 18,
-    padding: 18,
-    background: "white",
-  }}
->
-  {order.deliveryAddress ? (
-    <div style={{ display: "grid", gap: 6, color: "#0f172a" }}>
-      <div style={{ fontWeight: 800 }}>
-        {order.deliveryAddress.recipientName || "Recipient"}
+      <div className="tc-address-block">
+        {order.deliveryAddress ? (
+          <div className="tc-address-grid">
+            <div style={{ fontWeight: 800 }}>
+              {order.deliveryAddress.recipientName || "Recipient"}
+            </div>
+
+            {order.deliveryAddress.phone ? (
+              <div style={{ color: "#475569" }}>{order.deliveryAddress.phone}</div>
+            ) : null}
+
+            <div>{order.deliveryAddress.line1}</div>
+
+            {order.deliveryAddress.line2 ? (
+              <div>{order.deliveryAddress.line2}</div>
+            ) : null}
+
+            {order.deliveryAddress.area ? (
+              <div>{order.deliveryAddress.area}</div>
+            ) : null}
+
+            {order.deliveryAddress.town ? (
+              <div style={{ fontWeight: 600 }}>{order.deliveryAddress.town}</div>
+            ) : null}
+
+            {order.deliveryAddress.landmark ? (
+              <div style={{ color: "#475569" }}>
+                Landmark: {order.deliveryAddress.landmark}
+              </div>
+            ) : null}
+
+            {order.deliveryAddress.notes ? (
+              <div style={{ color: "#475569" }}>
+                Notes: {order.deliveryAddress.notes}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div style={{ color: "#64748b", fontSize: 14 }}>
+            Delivery address will appear here once available.
+          </div>
+        )}
       </div>
-
-      {order.deliveryAddress.phone ? (
-        <div style={{ color: "#475569" }}>{order.deliveryAddress.phone}</div>
-      ) : null}
-
-      <div>{order.deliveryAddress.line1}</div>
-
-      {order.deliveryAddress.line2 ? <div>{order.deliveryAddress.line2}</div> : null}
-
-      {order.deliveryAddress.area ? <div>{order.deliveryAddress.area}</div> : null}
-
-      {order.deliveryAddress.town ? (
-        <div style={{ fontWeight: 600 }}>{order.deliveryAddress.town}</div>
-      ) : null}
-
-      {order.deliveryAddress.landmark ? (
-        <div style={{ color: "#475569" }}>
-          Landmark: {order.deliveryAddress.landmark}
-        </div>
-      ) : null}
-
-      {order.deliveryAddress.notes ? (
-        <div style={{ color: "#475569" }}>
-          Notes: {order.deliveryAddress.notes}
-        </div>
-      ) : null}
-    </div>
-  ) : (
-    <div style={{ color: "#64748b", fontSize: 14 }}>
-      Delivery address will appear here once available.
-    </div>
-  )}
-</div>
 
       <h2 style={{ marginTop: 22, marginBottom: 10, color: "#0f172a" }}>
         Items
       </h2>
 
-      <div style={{ display: "grid", gap: 12 }}>
+      <div className="tc-items-grid">
         {(order.items ?? []).map((it: any) => (
           <div
             key={it.id}
@@ -597,13 +736,7 @@ export default async function OrderPage({
               background: "white",
             }}
           >
-            <div
-              style={{
-                fontWeight: 900,
-                fontSize: 18,
-                color: "#0f172a",
-              }}
-            >
+            <div className="tc-item-name">
               {it.townProduct?.product?.name ?? "Item"}
             </div>
 
@@ -658,38 +791,17 @@ export default async function OrderPage({
         }}
       >
         <div style={{ display: "grid", gap: 10 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 16,
-              color: "#0f172a",
-            }}
-          >
+          <div className="tc-summary-row">
             <div>Items subtotal</div>
             <div>{money(order.itemsSubtotal)} GHS</div>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 16,
-              color: "#0f172a",
-            }}
-          >
+          <div className="tc-summary-row">
             <div>Delivery fee</div>
             <div>{money(order.deliveryFee)} GHS</div>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 16,
-              color: "#0f172a",
-            }}
-          >
+          <div className="tc-summary-row">
             <div>Service fee</div>
             <div>{money(order.serviceFee)} GHS</div>
           </div>
@@ -703,20 +815,9 @@ export default async function OrderPage({
           }}
         />
 
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 16,
-            alignItems: "baseline",
-          }}
-        >
-          <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>
-            Total
-          </div>
-          <div style={{ fontSize: 28, fontWeight: 900, color: "#0f172a" }}>
-            {money(order.total)} GHS
-          </div>
+        <div className="tc-summary-total">
+          <div className="tc-summary-total-label">Total</div>
+          <div className="tc-summary-total-value">{money(order.total)} GHS</div>
         </div>
 
         <div
@@ -730,124 +831,53 @@ export default async function OrderPage({
           Payment method (goods):{" "}
           <b style={{ color: "#0f172a" }}>
             {order.goodsPaymentMethod === "COD"
-  ? "Cash on delivery"
-  : order.goodsPaymentMethod === "MOMO"
-  ? "MoMo on delivery"
-  : order.goodsPaymentMethod}
+              ? "Cash on delivery"
+              : order.goodsPaymentMethod === "MOMO"
+                ? "MoMo on delivery"
+                : order.goodsPaymentMethod}
           </b>
         </div>
       </div>
-{!order.customerId ? (
-  <section
-    style={{
-      marginTop: 18,
-      border: "1px solid #fed7aa",
-      borderRadius: 18,
-      padding: 18,
-      background: "#fff7ed",
-    }}
-  >
-    <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a" }}>
-      Save your details for next time
-    </h2>
 
-    <div
-      style={{
-        marginTop: 10,
-        color: "#475569",
-        fontSize: 15,
-        lineHeight: 1.6,
-      }}
-    >
-      Create an account to save your phone number and delivery details for faster
-      checkout on your next order.
-    </div>
+      {!order.customerId ? (
+        <section className="tc-guest-box">
+          <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a" }}>
+            Save your details for next time
+          </h2>
 
-    <div
-      style={{
-        marginTop: 14,
-        display: "flex",
-        gap: 12,
-        flexWrap: "wrap",
-      }}
-    >
-      <Link
-        href={`/auth/register?redirect=${encodeURIComponent(`/${townSlug}`)}`}
-        style={{
-          textDecoration: "none",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: 12,
-          padding: "12px 16px",
-          background: "#f97316",
-          color: "white",
-          fontWeight: 700,
-        }}
-      >
-        Create account
-      </Link>
+          <div
+            style={{
+              marginTop: 10,
+              color: "#475569",
+              fontSize: 15,
+              lineHeight: 1.6,
+            }}
+          >
+            Create an account to save your phone number and delivery details for faster
+            checkout on your next order.
+          </div>
 
-      <Link
-        href={`/${townSlug}`}
-        style={{
-          textDecoration: "none",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: 12,
-          padding: "12px 16px",
-          border: "1px solid #cbd5e1",
-          color: "#0f172a",
-          fontWeight: 700,
-          background: "white",
-        }}
-      >
-        Continue shopping as guest
-      </Link>
-    </div>
-  </section>
-) : null}
-      <div
-        style={{
-          marginTop: 18,
-          display: "flex",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
-        <Link
-          href={`/${townSlug}`}
-          style={{
-            textDecoration: "none",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 12,
-            padding: "12px 16px",
-            background: "#f97316",
-            color: "white",
-            fontWeight: 700,
-          }}
-        >
+          <div className="tc-actions" style={{ marginTop: 14 }}>
+            <Link
+              href={`/auth/register?redirect=${encodeURIComponent(`/${townSlug}`)}`}
+              className="tc-btn-primary"
+            >
+              Create account
+            </Link>
+
+            <Link href={`/${townSlug}`} className="tc-btn-secondary">
+              Continue shopping as guest
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
+      <div className="tc-actions">
+        <Link href={`/${townSlug}`} className="tc-btn-primary">
           Start another order
         </Link>
 
-        <a
-          href={`/${townSlug}/order/${orderId}`}
-          style={{
-            textDecoration: "none",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 12,
-            padding: "12px 16px",
-            border: "1px solid #cbd5e1",
-            color: "#0f172a",
-            fontWeight: 700,
-            background: "white",
-          }}
-        >
+        <a href={`/${townSlug}/order/${orderId}`} className="tc-btn-secondary">
           Refresh status
         </a>
       </div>

@@ -11,6 +11,7 @@ import {
   saveCart,
 } from "@/lib/cart";
 import ProductQuickView from "@/components/product/ProductQuickView";
+
 type ProductImage = {
   id?: string;
   url: string;
@@ -350,145 +351,150 @@ export default function ProductCard({
   }
 
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
-      {added ? (
-        <div className="absolute right-3 top-3 z-20 rounded-full bg-green-600 px-3 py-1 text-xs font-semibold text-white shadow">
-          Added ✓
-        </div>
-      ) : null}
-
-      <Link href={href} className="block">
-        <div className="p-2.5 pb-0">
-          <div className="relative rounded-2xl border border-orange-100 bg-gradient-to-b from-orange-50/80 via-amber-50/30 to-white p-3">
-            <div className="relative aspect-square overflow-hidden rounded-xl bg-white">
-              <Image
-                src={imageSrc}
-                alt={primaryImage?.alt || product.name}
-                fill
-                className="object-contain p-3 transition duration-300 group-hover:scale-[1.03]"
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                onError={() => setImgError(true)}
-              />
-            </div>
-
-            {!availability.available && (
-              <div className="absolute left-3 top-3 rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm">
-                Unavailable
-              </div>
-            )}
-
-            {product.pricingModel === "VARIANT" && variantCount > 0 && (
-              <div className="absolute right-3 top-3 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-sm">
-                {variantCount} option{variantCount > 1 ? "s" : ""}
-              </div>
-            )}
+    <>
+      <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+        {added ? (
+          <div className="absolute right-2 top-2 z-20 rounded-full bg-green-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow sm:right-3 sm:top-3 sm:px-3">
+            Added ✓
           </div>
-        </div>
-      </Link>
+        ) : null}
 
-      <div className="space-y-2 px-3.5 pb-3.5 pt-2.5">
         <Link href={href} className="block">
-          <h3 className="line-clamp-2 text-[17px] font-semibold leading-6 text-slate-900 transition group-hover:text-orange-600">
-            {toDisplayName(product.name)}
-          </h3>
+          <div className="p-2 pb-0 sm:p-2.5 sm:pb-0">
+            <div className="relative rounded-2xl border border-orange-100 bg-gradient-to-b from-orange-50/80 via-amber-50/30 to-white p-2.5 sm:p-3">
+              <div className="relative aspect-square overflow-hidden rounded-xl bg-white">
+                <Image
+                  src={imageSrc}
+                  alt={primaryImage?.alt || product.name}
+                  fill
+                  className="object-contain p-2 transition duration-300 group-hover:scale-[1.03] sm:p-3"
+                  sizes="(max-width: 640px) 45vw, (max-width: 1024px) 33vw, 20vw"
+                  onError={() => setImgError(true)}
+                />
+              </div>
+
+              {!availability.available && (
+                <div className="absolute left-2 top-2 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-medium text-white shadow-sm sm:left-3 sm:top-3 sm:px-2.5 sm:text-[11px]">
+                  Unavailable
+                </div>
+              )}
+
+              {product.pricingModel === "VARIANT" && variantCount > 0 && (
+                <div className="absolute right-2 top-2 max-w-[65%] truncate rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 shadow-sm sm:right-3 sm:top-3 sm:px-2.5 sm:text-[11px]">
+                  {variantCount} option{variantCount > 1 ? "s" : ""}
+                </div>
+              )}
+            </div>
+          </div>
         </Link>
 
-        {product.description ? (
-          <p className="line-clamp-2 min-h-[34px] text-[13px] leading-5 text-slate-500">
-            {product.description}
-          </p>
-        ) : (
-          <div className="min-h-[34px]" />
-        )}
-
-        <div className="space-y-1">
-          <div className="text-[1.35rem] font-bold tracking-tight text-slate-900">
-            {priceLabel}
-          </div>
-
-          <div className="text-[13px] font-medium text-slate-500">
-            {availability.label}
-          </div>
-
-          {availability.urgency ? (
-            <div className="text-[11px] font-medium text-orange-600">
-              {availability.urgency}
-            </div>
-          ) : null}
-
-          {product.pricingModel === "WEIGHT" ? (
-            <div className="text-[11px] text-slate-400">
-              Quick add {getDefaultWeight(product.name)}g
-            </div>
-          ) : null}
-        </div>
-
-        <div className="flex gap-2 pt-1.5">
-          <Link
-            href={href}
-            className="inline-flex h-10 flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-slate-700 transition hover:bg-slate-50"
-          >
-            View
+        <div className="flex flex-1 flex-col space-y-2 px-3 pb-3 pt-2.5 sm:px-3.5 sm:pb-3.5">
+          <Link href={href} className="block">
+            <h3 className="line-clamp-2 min-h-[2.75rem] text-sm font-semibold leading-5 text-slate-900 transition group-hover:text-orange-600 sm:min-h-[3rem] sm:text-[17px] sm:leading-6">
+              {toDisplayName(product.name)}
+            </h3>
           </Link>
-          <button
-  type="button"
-  onClick={() => setQuickView(true)}
-  className="inline-flex h-10 flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-slate-700 transition hover:bg-slate-50"
->
-  Quick view
-</button>
 
-          {product.pricingModel === "UNIT" ? (
-            <div className="inline-flex h-10 items-center overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <button
-                type="button"
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
-                className="px-2.5 text-sm text-slate-700 hover:bg-slate-100"
-              >
-                −
-              </button>
-              <div className="min-w-[2rem] px-2 text-center text-[13px] font-semibold text-slate-900">
-                {qty}
+          {product.description ? (
+            <p className="line-clamp-2 min-h-[2.25rem] text-xs leading-4 text-slate-500 sm:min-h-[34px] sm:text-[13px] sm:leading-5">
+              {product.description}
+            </p>
+          ) : (
+            <div className="min-h-[2.25rem] sm:min-h-[34px]" />
+          )}
+
+          <div className="space-y-1">
+            <div className="break-words text-lg font-bold tracking-tight text-slate-900 sm:text-[1.35rem]">
+              {priceLabel}
+            </div>
+
+            <div className="text-xs font-medium text-slate-500 sm:text-[13px]">
+              {availability.label}
+            </div>
+
+            {availability.urgency ? (
+              <div className="text-[11px] font-medium text-orange-600">
+                {availability.urgency}
               </div>
+            ) : null}
+
+            {product.pricingModel === "WEIGHT" ? (
+              <div className="text-[11px] text-slate-400">
+                Quick add {getDefaultWeight(product.name)}g
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-auto space-y-2 pt-1.5">
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href={href}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50 sm:text-[13px]"
+              >
+                View
+              </Link>
+
               <button
                 type="button"
-                onClick={() => setQty((q) => q + 1)}
-                className="px-2.5 text-sm text-slate-700 hover:bg-slate-100"
+                onClick={() => setQuickView(true)}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50 sm:text-[13px]"
               >
-                +
+                Quick view
               </button>
             </div>
-          ) : null}
-        </div>
 
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={quickAdd}
-            disabled={!availability.available}
-            className="inline-flex h-10 flex-1 items-center justify-center rounded-xl bg-orange-500 px-3 text-[13px] font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300"
-          >
-            Add
-          </button>
+            {product.pricingModel === "UNIT" ? (
+              <div className="inline-flex h-10 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setQty((q) => Math.max(1, q - 1))}
+                  className="flex h-full w-10 items-center justify-center text-sm text-slate-700 hover:bg-slate-100"
+                >
+                  −
+                </button>
+                <div className="flex-1 px-2 text-center text-xs font-semibold text-slate-900 sm:text-[13px]">
+                  {qty}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setQty((q) => q + 1)}
+                  className="flex h-full w-10 items-center justify-center text-sm text-slate-700 hover:bg-slate-100"
+                >
+                  +
+                </button>
+              </div>
+            ) : null}
 
-          {added ? (
-            <Link
-              href={`/${townSlug}/cart`}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-orange-200 bg-orange-50 px-3 text-[13px] font-medium text-orange-700 hover:bg-orange-100"
-            >
-              Cart
-            </Link>
-          ) : null}
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+              <button
+                type="button"
+                onClick={quickAdd}
+                disabled={!availability.available}
+                className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-orange-500 px-3 text-xs font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300 sm:text-[13px]"
+              >
+                Add
+              </button>
+
+              {added ? (
+                <Link
+                  href={`/${townSlug}/cart`}
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-orange-200 bg-orange-50 px-3 text-xs font-medium text-orange-700 hover:bg-orange-100 sm:text-[13px]"
+                >
+                  Cart
+                </Link>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
+
       {quickView && (
-  <ProductQuickView
-  townSlug={townSlug}
-  product={product}
-  onClose={() => setQuickView(false)}
-/>
-)}
-    </div>
-    
+        <ProductQuickView
+          townSlug={townSlug}
+          product={product}
+          onClose={() => setQuickView(false)}
+        />
+      )}
+    </>
   );
 }

@@ -58,24 +58,24 @@ function QtyStepper({
   min?: number;
 }) {
   return (
-    <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <div className="flex w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-white sm:w-auto">
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
-        className="px-3 py-2 text-lg text-slate-700 hover:bg-slate-100"
+        className="flex h-10 w-10 items-center justify-center text-lg text-slate-700 hover:bg-slate-100"
         aria-label="Decrease quantity"
       >
         −
       </button>
 
-      <div className="min-w-[3rem] px-3 text-center text-sm font-semibold text-slate-900">
+      <div className="flex-1 px-3 text-center text-sm font-semibold text-slate-900 sm:min-w-[3rem] sm:flex-none">
         {value}
       </div>
 
       <button
         type="button"
         onClick={() => onChange(value + 1)}
-        className="px-3 py-2 text-lg text-slate-700 hover:bg-slate-100"
+        className="flex h-10 w-10 items-center justify-center text-lg text-slate-700 hover:bg-slate-100"
         aria-label="Increase quantity"
       >
         +
@@ -129,10 +129,11 @@ export default function ProductClient({
   allProducts: Product[];
 }) {
   useEffect(() => {
-  if (townSlug && product?.townProductId) {
-    trackProductView(townSlug, product.townProductId);
-  }
-}, [townSlug, product]);
+    if (townSlug && product?.townProductId) {
+      trackProductView(townSlug, product.townProductId);
+    }
+  }, [townSlug, product]);
+
   const [qty, setQty] = useState(1);
   const [grams, setGrams] = useState(getSuggestedWeight(product.name));
   const [variantId, setVariantId] = useState(product.variants?.[0]?.id ?? "");
@@ -321,8 +322,8 @@ export default function ProductClient({
   const mainAlt = selected?.alt ?? coverAlt;
 
   return (
-    <div className="pb-24 pt-6 lg:pb-6">
-      <div className="flex items-center justify-between">
+    <div className="pb-28 pt-4 sm:pt-6 lg:pb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href={`/${townSlug}`}
           className="text-sm text-slate-600 hover:text-slate-900"
@@ -338,10 +339,10 @@ export default function ProductClient({
         </Link>
       </div>
 
-      <div className="mt-5 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+      <div className="mt-4 grid gap-5 sm:mt-5 sm:gap-6 lg:grid-cols-[0.95fr_1.05fr]">
         <div className="space-y-4">
-          <div className="overflow-hidden rounded-3xl border border-orange-100 bg-white shadow-sm">
-            <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-b from-orange-50/60 to-white">
+          <div className="overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm sm:rounded-3xl">
+            <div className="relative aspect-square w-full overflow-hidden bg-gradient-to-b from-orange-50/60 to-white sm:aspect-[4/3]">
               {mainSrc ? (
                 <div
                   className={[
@@ -390,7 +391,7 @@ export default function ProductClient({
                     src={mainSrc}
                     alt={mainAlt}
                     className={[
-                      "h-full w-full select-none object-contain bg-white/80 p-4 transition-transform duration-200",
+                      "h-full w-full select-none object-contain bg-white/80 p-3 transition-transform duration-200 sm:p-4",
                       zoomed ? "scale-150" : "scale-100",
                     ].join(" ")}
                     style={{ transformOrigin: `${origin.x}% ${origin.y}%` }}
@@ -399,7 +400,7 @@ export default function ProductClient({
                   />
                 </div>
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gray-100 text-sm text-slate-500">
+                <div className="flex h-full w-full items-center justify-center bg-gray-100 px-4 text-center text-sm text-slate-500">
                   No image available
                 </div>
               )}
@@ -419,7 +420,7 @@ export default function ProductClient({
               ) : null}
 
               {zoomed ? (
-                <div className="absolute bottom-3 left-3 rounded-full bg-black/60 px-3 py-1 text-xs text-white">
+                <div className="absolute bottom-3 left-3 rounded-full bg-black/60 px-3 py-1 text-[11px] text-white sm:text-xs">
                   Drag to pan • Esc to reset
                 </div>
               ) : null}
@@ -427,7 +428,7 @@ export default function ProductClient({
           </div>
 
           {hasImages && images.length > 1 ? (
-            <div className="flex gap-3 overflow-x-auto pb-1">
+            <div className="flex gap-2 overflow-x-auto pb-1 sm:gap-3">
               {images.map((img, idx) => {
                 const active = idx === selectedIndex;
 
@@ -441,10 +442,10 @@ export default function ProductClient({
                       setOrigin({ x: 50, y: 50 });
                     }}
                     className={[
-                      "h-16 w-16 shrink-0 overflow-hidden rounded-2xl border bg-white transition",
+                      "h-14 w-14 shrink-0 overflow-hidden rounded-xl border bg-white transition sm:h-16 sm:w-16 sm:rounded-2xl",
                       active
                         ? "border-primary ring-2 ring-primary"
-                        : "border-slate-200 hover:border-slate-300 hover:opacity-100 opacity-80",
+                        : "border-slate-200 opacity-80 hover:border-slate-300 hover:opacity-100",
                     ].join(" ")}
                     aria-label={`Select image ${idx + 1}`}
                   >
@@ -462,7 +463,7 @@ export default function ProductClient({
         </div>
 
         <div className="space-y-4">
-          <Card className="rounded-3xl border-orange-100 p-5 shadow-sm">
+          <Card className="rounded-2xl border-orange-100 p-4 shadow-sm sm:rounded-3xl sm:p-5">
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2 text-sm">
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
@@ -475,7 +476,7 @@ export default function ProductClient({
                 ) : null}
               </div>
 
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                 {toDisplayName(product.name)}
               </h1>
 
@@ -487,13 +488,13 @@ export default function ProductClient({
             </div>
           </Card>
 
-          <Card className="sticky top-6 rounded-3xl border-orange-100 p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div>
+          <Card className="rounded-2xl border-orange-100 p-4 shadow-sm sm:rounded-3xl sm:p-5 lg:sticky lg:top-6">
+            <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
+              <div className="min-w-0">
                 <div className="text-sm font-medium uppercase tracking-wide text-slate-500">
                   Price
                 </div>
-                <div className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
+                <div className="mt-1 break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                   {priceLabel}
                 </div>
               </div>
@@ -534,7 +535,7 @@ export default function ProductClient({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <label className="text-sm font-medium text-slate-700">
                     Quantity
                   </label>
@@ -545,7 +546,7 @@ export default function ProductClient({
 
             {product.pricingModel === "UNIT" ? (
               <div className="space-y-4">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <label className="text-sm font-medium text-slate-700">
                     Quantity
                   </label>
@@ -556,7 +557,7 @@ export default function ProductClient({
 
             {product.pricingModel === "WEIGHT" ? (
               <div className="space-y-4">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <label className="text-sm font-medium text-slate-700">
                     Weight (grams)
                   </label>
@@ -565,7 +566,7 @@ export default function ProductClient({
                     min={1}
                     value={grams}
                     onChange={(e) => setGrams(Number(e.target.value))}
-                    className="w-32"
+                    className="w-full sm:w-32"
                   />
                 </div>
 
@@ -605,7 +606,7 @@ export default function ProductClient({
       </div>
 
       {relatedProducts.length > 0 ? (
-        <section className="mt-10 space-y-4">
+        <section className="mt-8 space-y-4 sm:mt-10">
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-slate-900">
               Customers also buy
@@ -615,8 +616,8 @@ export default function ProductClient({
             </p>
           </div>
 
-          <div className="rounded-3xl border border-orange-100 bg-white p-5 shadow-sm">
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-6">
+          <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm sm:rounded-3xl sm:p-5">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-6">
               {relatedProducts.map((p) => (
                 <ProductCard
                   key={p.townProductId}
@@ -628,10 +629,8 @@ export default function ProductClient({
           </div>
         </section>
       ) : null}
-      <RecentlyViewed
-  townSlug={townSlug}
-  products={allProducts as any}
-/>
+
+      <RecentlyViewed townSlug={townSlug} products={allProducts as any} />
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-orange-100 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur lg:hidden">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">

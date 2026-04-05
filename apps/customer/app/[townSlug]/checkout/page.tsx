@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { clearCart, loadCart } from "@/lib/cart";
+import { loadCart, clearCart } from "@/lib/cart";
 import { apiFetch } from "@/lib/api";
 import type { CartItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -117,6 +117,7 @@ export default function CheckoutPage() {
   const searchParams = useSearchParams();
   const [highlightPlaceOrder, setHighlightPlaceOrder] = useState(false);
   const summaryRef = useRef<HTMLDivElement | null>(null);
+
   const [items, setItems] = useState<CartItem[]>([]);
   const [phone, setPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("COD");
@@ -169,7 +170,7 @@ export default function CheckoutPage() {
         setCustomer(me.customer);
         setPhone((prev) => prev || me.customer?.phone || "");
         setRecipientName(
-          `${me.customer.firstName ?? ""} ${me.customer.lastName ?? ""}`.trim(),
+          `${me.customer.firstName ?? ""} ${me.customer.lastName ?? ""}`.trim()
         );
 
         try {
@@ -223,7 +224,7 @@ export default function CheckoutPage() {
       try {
         const json = await apiFetch<TownSettingsResponse>(
           `/town-settings/by-slug/${encodeURIComponent(townSlug)}`,
-          { cache: "no-store" },
+          { cache: "no-store" }
         );
 
         setDeliveryFee(Number(json?.settings?.deliveryFee ?? 0));
@@ -275,12 +276,12 @@ export default function CheckoutPage() {
 
   const selectedAddress = useMemo(
     () => addresses.find((a) => a.id === selectedAddressId) || null,
-    [addresses, selectedAddressId],
+    [addresses, selectedAddressId]
   );
 
   const usingSavedAddress = useMemo(
     () => !!(customer && useSavedAddress && addresses.length > 0),
-    [customer, useSavedAddress, addresses.length],
+    [customer, useSavedAddress, addresses.length]
   );
 
   const effectiveTown = useMemo(() => {
@@ -454,7 +455,7 @@ export default function CheckoutPage() {
 
     if (townMismatch) {
       setAddressError(
-        `Your delivery address town (${effectiveTown}) does not match the selected market (${townSlug}). Please update the address or switch town.`,
+        `Your delivery address town (${effectiveTown}) does not match the selected market (${townSlug}). Please update the address or switch town.`
       );
     } else if (Object.keys(nextErrors).length > 0) {
       setAddressError("Please complete the highlighted fields.");
@@ -578,10 +579,10 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="pt-6">
+    <div className="pt-4 sm:pt-6">
       <CheckoutProgress step="checkout" />
 
-      <div className="mt-6 flex items-center justify-between gap-3">
+      <div className="mt-5 flex items-center justify-between gap-3 sm:mt-6">
         <Link
           href={townSlug ? `/${townSlug}/cart` : "/"}
           className="text-sm text-slate-600 hover:text-slate-900"
@@ -590,7 +591,9 @@ export default function CheckoutPage() {
         </Link>
       </div>
 
-      <h1 className="mt-4 text-2xl font-extrabold tracking-tight">Checkout</h1>
+      <h1 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl">
+        Checkout
+      </h1>
 
       {checkoutError ? (
         <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -604,11 +607,11 @@ export default function CheckoutPage() {
         </div>
       ) : null}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <Card className="rounded-2xl p-6">
-            <div className="text-2xl font-semibold">Contact</div>
-            <Separator className="my-5" />
+      <div className="mt-6 grid gap-5 sm:gap-6 lg:grid-cols-3">
+        <div className="space-y-5 sm:space-y-6 lg:col-span-2">
+          <Card className="rounded-2xl p-4 sm:p-6">
+            <div className="text-xl font-semibold sm:text-2xl">Contact</div>
+            <Separator className="my-4 sm:my-5" />
 
             {customer ? (
               <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
@@ -624,11 +627,12 @@ export default function CheckoutPage() {
                 </div>
 
                 {townSlug ? (
-                  <div className="mt-3 flex items-center gap-3">
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
                     <Link
                       href={`/auth/login?redirect=${encodeURIComponent(`/${townSlug}/checkout`)}`}
+                      className="w-full sm:w-auto"
                     >
-                      <Button className="h-10 rounded-xl bg-orange-500 text-white hover:bg-orange-600">
+                      <Button className="h-10 w-full rounded-xl bg-orange-500 text-white hover:bg-orange-600 sm:w-auto">
                         Login for faster checkout
                       </Button>
                     </Link>
@@ -662,10 +666,13 @@ export default function CheckoutPage() {
             </div>
           </Card>
 
-          <Card className="rounded-2xl p-6">
-            <div className="text-2xl font-semibold">Delivery address</div>
+          <Card className="rounded-2xl p-4 sm:p-6">
+            <div className="text-xl font-semibold sm:text-2xl">
+              Delivery address
+            </div>
+
             {customer && addresses.length > 0 ? (
-              <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+              <div className="mb-4 mt-4 flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <div>Using saved addresses for faster checkout</div>
 
                 <Link
@@ -676,11 +683,12 @@ export default function CheckoutPage() {
                 </Link>
               </div>
             ) : null}
-            <Separator className="my-5" />
+
+            <Separator className="my-4 sm:my-5" />
 
             {customer && addresses.length > 0 ? (
               <div className="mb-5 space-y-3">
-                <label className="flex items-center gap-2 text-sm">
+                <label className="flex items-start gap-2 text-sm sm:items-center">
                   <input
                     type="radio"
                     checked={useSavedAddress}
@@ -696,10 +704,10 @@ export default function CheckoutPage() {
                       }));
                     }}
                   />
-                  Use a saved address
+                  <span>Use a saved address</span>
                 </label>
 
-                <label className="flex items-center gap-2 text-sm">
+                <label className="flex items-start gap-2 text-sm sm:items-center">
                   <input
                     type="radio"
                     checked={!useSavedAddress}
@@ -712,7 +720,7 @@ export default function CheckoutPage() {
                       }));
                     }}
                   />
-                  Enter a new address
+                  <span>Enter a new address</span>
                 </label>
               </div>
             ) : null}
@@ -903,15 +911,15 @@ export default function CheckoutPage() {
                   you are shopping in <strong>{townSlug}</strong>.
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   <button
                     type="button"
                     onClick={() =>
                       router.push(
-                        `/account/addresses?redirect=${encodeURIComponent(`/${townSlug}/checkout`)}`,
+                        `/account/addresses?redirect=${encodeURIComponent(`/${townSlug}/checkout`)}`
                       )
                     }
-                    className="inline-flex items-center rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700"
+                    className="inline-flex items-center justify-center rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700"
                   >
                     Update address
                   </button>
@@ -924,11 +932,12 @@ export default function CheckoutPage() {
                         router.push(`/${nextTown}/checkout`);
                       }
                     }}
-                    className="inline-flex items-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                    className="inline-flex items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100"
                   >
                     Switch to {effectiveTown}
                   </button>
                 </div>
+
                 <p className="mt-2 text-xs text-slate-500">
                   After updating, you’ll be returned here automatically.
                 </p>
@@ -936,9 +945,11 @@ export default function CheckoutPage() {
             ) : null}
           </Card>
 
-          <Card className="rounded-2xl p-6">
-            <div className="text-2xl font-semibold">Payment method (goods)</div>
-            <Separator className="my-5" />
+          <Card className="rounded-2xl p-4 sm:p-6">
+            <div className="text-xl font-semibold sm:text-2xl">
+              Payment method (goods)
+            </div>
+            <Separator className="my-4 sm:my-5" />
 
             <label className="mb-2 block text-sm font-medium">
               Choose payment method
@@ -957,9 +968,9 @@ export default function CheckoutPage() {
             </div>
           </Card>
 
-          <Card className="rounded-2xl p-6">
-            <div className="text-2xl font-semibold">Promo code</div>
-            <Separator className="my-5" />
+          <Card className="rounded-2xl p-4 sm:p-6">
+            <div className="text-xl font-semibold sm:text-2xl">Promo code</div>
+            <Separator className="my-4 sm:my-5" />
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <input
@@ -977,6 +988,7 @@ export default function CheckoutPage() {
                 type="button"
                 onClick={() => void applyPromo()}
                 disabled={isApplyingPromo}
+                className="w-full sm:w-auto"
               >
                 {isApplyingPromo ? "Applying..." : "Apply"}
               </Button>
@@ -1004,23 +1016,23 @@ export default function CheckoutPage() {
         </div>
 
         <div className="lg:col-span-1" ref={summaryRef}>
-          <Card className="sticky top-6 rounded-2xl p-6">
-            <div className="text-2xl font-semibold">Summary</div>
-            <Separator className="my-5" />
+          <Card className="rounded-2xl p-4 sm:p-6 lg:sticky lg:top-6">
+            <div className="text-xl font-semibold sm:text-2xl">Summary</div>
+            <Separator className="my-4 sm:my-5" />
 
             <div className="flex items-center justify-between text-sm text-slate-600">
               <div>Items</div>
               <div>{items.length}</div>
             </div>
 
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+            <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-600">
               <div>Subtotal</div>
-              <div>
+              <div className="text-right">
                 {money(localTotals.subtotal)} {currency}
               </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+            <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-600">
               <div>Service fee</div>
               <div className="text-right">
                 {appliedPromo?.type === "SERVICE_FREE" ? (
@@ -1039,7 +1051,7 @@ export default function CheckoutPage() {
               </div>
             ) : null}
 
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+            <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-600">
               <div>Delivery fee</div>
               <div className="text-right">
                 {appliedPromo?.type === "DELIVERY_FREE" ? (
@@ -1060,9 +1072,9 @@ export default function CheckoutPage() {
 
             {localTotals.discount > 0 ? (
               <>
-                <div className="mt-4 flex items-center justify-between text-sm text-green-700">
+                <div className="mt-4 flex items-center justify-between gap-3 text-sm text-green-700">
                   <div>Discount</div>
-                  <div>
+                  <div className="text-right">
                     -{money(localTotals.discount)} {currency}
                   </div>
                 </div>
@@ -1073,10 +1085,10 @@ export default function CheckoutPage() {
               </>
             ) : null}
 
-            <Separator className="my-5" />
+            <Separator className="my-4 sm:my-5" />
 
-            <div className="flex items-center justify-between">
-              <div className="text-xl font-semibold">Total</div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-lg font-semibold sm:text-xl">Total</div>
 
               <div className="text-right">
                 {localTotals.discount > 0 ? (
@@ -1085,7 +1097,7 @@ export default function CheckoutPage() {
                   </div>
                 ) : null}
 
-                <div className="text-2xl font-extrabold">
+                <div className="text-xl font-extrabold sm:text-2xl">
                   {money(localTotals.total)} {currency}
                 </div>
               </div>
@@ -1111,9 +1123,7 @@ export default function CheckoutPage() {
 
             <Button
               className={`mt-6 w-full transition-all duration-300 ${
-                highlightPlaceOrder
-                  ? "ring-4 ring-green-300 shadow-lg scale-[1.02]"
-                  : ""
+                highlightPlaceOrder ? "scale-[1.02] ring-4 ring-green-300 shadow-lg" : ""
               }`}
               onClick={placeOrder}
               disabled={!canSubmit}

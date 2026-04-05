@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ phone }),
-        },
+        }
       );
 
       setMessage(data?.message || "Reset code requested.");
@@ -86,21 +86,23 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-white px-6 py-10">
+    <main className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-white px-4 py-6 sm:px-6 sm:py-10">
       <div className="mx-auto max-w-xl">
-        <Card className="overflow-hidden rounded-[32px] border-orange-100 shadow-xl shadow-orange-100/40">
+        <Card className="overflow-hidden rounded-3xl border-orange-100 shadow-xl shadow-orange-100/40 sm:rounded-[32px]">
           <CardContent className="p-0">
-            <div className="bg-gradient-to-r from-orange-500 to-orange-400 px-8 py-8 text-white">
-              <div className="text-sm font-medium uppercase tracking-[0.2em] text-orange-100">
+            <div className="bg-gradient-to-r from-orange-500 to-orange-400 px-5 py-6 text-white sm:px-8 sm:py-8">
+              <div className="text-xs font-medium uppercase tracking-[0.2em] text-orange-100 sm:text-sm">
                 Somame
               </div>
-              <h1 className="mt-3 text-3xl font-bold">Forgot password</h1>
+              <h1 className="mt-3 text-2xl font-bold sm:text-3xl">
+                Forgot password
+              </h1>
               <p className="mt-2 text-sm text-orange-50">
                 Reset your password using your phone number.
               </p>
             </div>
 
-            <div className="px-8 py-8">
+            <div className="px-5 py-6 sm:px-8 sm:py-8">
               {step === 1 ? (
                 <form onSubmit={requestCode} className="grid gap-5">
                   <div>
@@ -108,7 +110,7 @@ export default function ForgotPasswordPage() {
                       Phone number
                     </label>
                     <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
-                      <Phone className="h-5 w-5 text-orange-500" />
+                      <Phone className="h-5 w-5 shrink-0 text-orange-500" />
                       <input
                         type="text"
                         placeholder="e.g. 0241234567"
@@ -148,7 +150,7 @@ export default function ForgotPasswordPage() {
                       Phone number
                     </label>
                     <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                      <Phone className="h-5 w-5 text-orange-500" />
+                      <Phone className="h-5 w-5 shrink-0 text-orange-500" />
                       <input
                         type="text"
                         value={phone}
@@ -164,7 +166,7 @@ export default function ForgotPasswordPage() {
                       Reset code
                     </label>
                     <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
-                      <KeyRound className="h-5 w-5 text-orange-500" />
+                      <KeyRound className="h-5 w-5 shrink-0 text-orange-500" />
                       <input
                         type="text"
                         placeholder="Enter 6-digit code"
@@ -181,7 +183,7 @@ export default function ForgotPasswordPage() {
                       New password
                     </label>
                     <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
-                      <Lock className="h-5 w-5 text-orange-500" />
+                      <Lock className="h-5 w-5 shrink-0 text-orange-500" />
                       <input
                         type="password"
                         placeholder="Enter new password"
@@ -194,8 +196,9 @@ export default function ForgotPasswordPage() {
                   </div>
 
                   {devResetCode ? (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                      Dev reset code: <span className="font-bold">{devResetCode}</span>
+                    <div className="break-words rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      Dev reset code:{" "}
+                      <span className="font-bold">{devResetCode}</span>
                     </div>
                   ) : null}
 
@@ -227,7 +230,7 @@ export default function ForgotPasswordPage() {
                       setError("");
                       setMessage("");
                     }}
-                    className="text-sm font-medium text-orange-600 hover:text-orange-700"
+                    className="text-left text-sm font-medium text-orange-600 hover:text-orange-700"
                   >
                     ← Back
                   </button>
