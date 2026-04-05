@@ -331,7 +331,9 @@ export default function ProductCard({
         townProductVariantId: activeVariant.id,
         name: product.name,
         variantLabel,
-        unitPrice: String(toNumber(activeVariant.unitPrice ?? activeVariant.price)),
+        unitPrice: String(
+          toNumber(activeVariant.unitPrice ?? activeVariant.price)
+        ),
         quantity: 1,
       } satisfies CartItem;
 
@@ -352,7 +354,7 @@ export default function ProductCard({
 
   return (
     <>
-      <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+      <div className="group relative flex h-full min-h-[100%] flex-col overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
         {added ? (
           <div className="absolute right-2 top-2 z-20 rounded-full bg-green-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow sm:right-3 sm:top-3 sm:px-3">
             Added ✓
@@ -388,38 +390,38 @@ export default function ProductCard({
           </div>
         </Link>
 
-        <div className="flex flex-1 flex-col space-y-2 px-3 pb-3 pt-2.5 sm:px-3.5 sm:pb-3.5">
-          <Link href={href} className="block">
-            <h3 className="line-clamp-2 min-h-[2.75rem] text-sm font-semibold leading-5 text-slate-900 transition group-hover:text-orange-600 sm:min-h-[3rem] sm:text-[17px] sm:leading-6">
-              {toDisplayName(product.name)}
-            </h3>
-          </Link>
+        <div className="flex flex-1 flex-col px-3 pb-3 pt-2.5 sm:px-3.5 sm:pb-3.5">
+          <div className="flex min-h-[7.75rem] flex-col sm:min-h-[8.25rem]">
+            <Link href={href} className="block">
+              <h3 className="line-clamp-2 min-h-[2.75rem] text-sm font-semibold leading-5 text-slate-900 transition group-hover:text-orange-600 sm:min-h-[3rem] sm:text-[17px] sm:leading-6">
+                {toDisplayName(product.name)}
+              </h3>
+            </Link>
 
-          {product.description ? (
-            <p className="line-clamp-2 min-h-[2.25rem] text-xs leading-4 text-slate-500 sm:min-h-[34px] sm:text-[13px] sm:leading-5">
-              {product.description}
-            </p>
-          ) : (
-            <div className="min-h-[2.25rem] sm:min-h-[34px]" />
-          )}
+            {product.description ? (
+              <p className="mt-1 line-clamp-2 min-h-[2.25rem] text-xs leading-4 text-slate-500 sm:min-h-[34px] sm:text-[13px] sm:leading-5">
+                {product.description}
+              </p>
+            ) : (
+              <div className="mt-1 min-h-[2.25rem] sm:min-h-[34px]" />
+            )}
 
-          <div className="space-y-1">
-            <div className="break-words text-lg font-bold tracking-tight text-slate-900 sm:text-[1.35rem]">
-              {priceLabel}
-            </div>
-
-            <div className="text-xs font-medium text-slate-500 sm:text-[13px]">
-              {availability.label}
-            </div>
-
-            {availability.urgency ? (
-              <div className="text-[11px] font-medium text-orange-600">
-                {availability.urgency}
+            <div className="mt-2 space-y-1">
+              <div className="min-h-[2rem] break-words text-lg font-bold tracking-tight text-slate-900 sm:min-h-[2.25rem] sm:text-[1.35rem]">
+                {priceLabel}
               </div>
-            ) : null}
+
+              <div className="text-xs font-medium text-slate-500 sm:text-[13px]">
+                {availability.label}
+              </div>
+
+              <div className="min-h-[1rem] text-[11px] font-medium text-orange-600">
+                {availability.urgency ?? ""}
+              </div>
+            </div>
           </div>
 
-          <div className="mt-auto space-y-2 pt-1.5">
+          <div className="mt-auto space-y-2 pt-2">
             <div className="grid grid-cols-2 gap-2">
               <Link
                 href={href}
@@ -437,33 +439,37 @@ export default function ProductCard({
               </button>
             </div>
 
-            <div className="h-10">
+            <div className="h-11">
               {product.pricingModel === "UNIT" ? (
-                <div className="inline-flex h-10 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div className="flex h-11 w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-white">
                   <button
                     type="button"
+                    aria-label={`Decrease quantity of ${product.name}`}
                     onClick={() => setQty((q) => Math.max(1, q - 1))}
-                    className="flex h-full w-10 items-center justify-center text-sm text-slate-700 hover:bg-slate-100"
+                    className="flex h-full w-11 shrink-0 items-center justify-center text-base font-semibold text-slate-700 transition active:bg-slate-100"
                   >
                     −
                   </button>
-                  <div className="flex-1 px-2 text-center text-xs font-semibold text-slate-900 sm:text-[13px]">
+
+                  <div className="flex flex-1 items-center justify-center border-x border-slate-200 px-2 text-sm font-semibold text-slate-900">
                     {qty}
                   </div>
+
                   <button
                     type="button"
+                    aria-label={`Increase quantity of ${product.name}`}
                     onClick={() => setQty((q) => q + 1)}
-                    className="flex h-full w-10 items-center justify-center text-sm text-slate-700 hover:bg-slate-100"
+                    className="flex h-full w-11 shrink-0 items-center justify-center text-base font-semibold text-slate-700 transition active:bg-slate-100"
                   >
                     +
                   </button>
                 </div>
               ) : product.pricingModel === "WEIGHT" ? (
-                <div className="flex h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-500 sm:text-[13px]">
+                <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-500 sm:text-[13px]">
                   Quick add {getDefaultWeight(product.name)}g
                 </div>
               ) : (
-                <div className="flex h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-500 sm:text-[13px]">
+                <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-500 sm:text-[13px]">
                   Select options
                 </div>
               )}
@@ -474,7 +480,7 @@ export default function ProductCard({
                 type="button"
                 onClick={quickAdd}
                 disabled={!availability.available}
-                className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-orange-500 px-3 text-xs font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300 sm:text-[13px]"
+                className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-orange-500 px-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 Add
               </button>
@@ -482,7 +488,7 @@ export default function ProductCard({
               {added ? (
                 <Link
                   href={`/${townSlug}/cart`}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-orange-200 bg-orange-50 px-3 text-xs font-medium text-orange-700 hover:bg-orange-100 sm:text-[13px]"
+                  className="inline-flex h-11 items-center justify-center rounded-xl border border-orange-200 bg-orange-50 px-3 text-sm font-medium text-orange-700 hover:bg-orange-100"
                 >
                   Cart
                 </Link>

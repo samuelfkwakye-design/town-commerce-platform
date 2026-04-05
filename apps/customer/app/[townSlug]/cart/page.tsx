@@ -40,22 +40,24 @@ function QtyStepper({
   onIncrease: () => void;
 }) {
   return (
-    <div className="inline-flex h-11 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white sm:w-auto">
+    <div className="flex h-12 w-full items-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:w-auto">
       <button
         type="button"
         onClick={onDecrease}
-        className="flex h-full w-11 items-center justify-center text-lg text-slate-700 hover:bg-slate-100"
+        className="flex h-full w-12 shrink-0 items-center justify-center text-xl font-semibold text-slate-700 transition active:bg-slate-100"
         aria-label="Decrease quantity"
       >
         −
       </button>
-      <div className="flex-1 px-3 text-center text-sm font-semibold text-slate-900 sm:min-w-[3rem] sm:flex-none">
+
+      <div className="flex flex-1 items-center justify-center border-x border-slate-200 px-4 text-base font-semibold text-slate-900 sm:min-w-[4rem] sm:flex-none">
         {value}
       </div>
+
       <button
         type="button"
         onClick={onIncrease}
-        className="flex h-full w-11 items-center justify-center text-lg text-slate-700 hover:bg-slate-100"
+        className="flex h-full w-12 shrink-0 items-center justify-center text-xl font-semibold text-slate-700 transition active:bg-slate-100"
         aria-label="Increase quantity"
       >
         +
@@ -82,7 +84,7 @@ function WeightStepper({
       <button
         type="button"
         onClick={onDecrease}
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg text-slate-700 hover:bg-slate-100"
+        className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-xl font-semibold text-slate-700 transition active:bg-slate-100"
         aria-label="Decrease weight"
       >
         −
@@ -93,13 +95,13 @@ function WeightStepper({
         min={1}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm outline-none focus:border-primary sm:w-28"
+        className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-center text-base outline-none focus:border-[#f97316] sm:w-32"
       />
 
       <button
         type="button"
         onClick={onIncrease}
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg text-slate-700 hover:bg-slate-100"
+        className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-xl font-semibold text-slate-700 transition active:bg-slate-100"
         aria-label="Increase weight"
       >
         +
@@ -224,30 +226,31 @@ export default function CartPage() {
         <Button
           variant="outline"
           onClick={wipe}
-          className="w-full transition active:scale-[0.98] sm:w-auto"
+          className="w-full rounded-2xl border-slate-200 transition active:scale-[0.98] sm:w-auto"
         >
           Clear cart
         </Button>
       </div>
 
-      <h1 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl">
+      <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
         Cart
       </h1>
 
       {items.length === 0 ? (
-        <Card className="mt-6 rounded-2xl p-5 sm:p-6">
+        <Card className="mt-6 rounded-3xl border-orange-100 p-5 shadow-sm sm:p-6">
           <div className="text-slate-700">Your cart is empty.</div>
+
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link
               href={townSlug ? `/${townSlug}` : "/"}
-              className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98] sm:w-auto"
+              className="inline-flex w-full items-center justify-center rounded-2xl bg-[#f97316] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#ea580c] active:scale-[0.98] sm:w-auto"
             >
               Browse products →
             </Link>
 
             <Link
               href={townSlug ? `/${townSlug}` : "/"}
-              className="inline-flex w-full items-center justify-center rounded-lg border px-4 py-2 text-sm transition hover:bg-slate-50 active:scale-[0.98] sm:w-auto"
+              className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] sm:w-auto"
             >
               Continue shopping
             </Link>
@@ -256,83 +259,114 @@ export default function CartPage() {
       ) : (
         <div className="mt-6 grid gap-5 sm:gap-6 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-2">
-            {items.map((it, idx) => (
-              <Card key={idx} className="rounded-2xl p-4 sm:p-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                  <div className="min-w-0">
-                    <div className="break-words text-base font-semibold sm:text-lg">
-                      {it.name}
-                    </div>
+            {items.map((it, idx) => {
+              const lineTotal =
+                it.pricingModel === "WEIGHT"
+                  ? (Number(it.pricePerKg) * Number(it.weightGrams)) / 1000
+                  : Number(it.unitPrice) * Number(it.quantity);
 
-                    {it.pricingModel === "VARIANT" ? (
-                      <div className="mt-1 text-sm text-slate-600">
-                        Variant:{" "}
-                        <span className="font-medium">{it.variantLabel}</span>
+              return (
+                <Card
+                  key={idx}
+                  className="rounded-3xl border-orange-100 p-4 shadow-sm sm:p-5"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                    <div className="min-w-0">
+                      <div className="break-words text-base font-semibold text-slate-900 sm:text-lg">
+                        {it.name}
                       </div>
-                    ) : null}
 
-                    <div className="mt-1 text-sm text-slate-500">
-                      Pricing:{" "}
-                      <span className="font-medium">{it.pricingModel}</span>
-                    </div>
-                  </div>
+                      {it.pricingModel === "VARIANT" ? (
+                        <div className="mt-1 text-sm text-slate-600">
+                          Variant:{" "}
+                          <span className="font-medium">{it.variantLabel}</span>
+                        </div>
+                      ) : null}
 
-                  <Button
-                    variant="outline"
-                    onClick={() => removeAt(idx)}
-                    className="w-full transition active:scale-[0.98] sm:w-auto"
-                  >
-                    Remove
-                  </Button>
-                </div>
-
-                <Separator className="my-4" />
-
-                {it.pricingModel === "WEIGHT" ? (
-                  <div className="flex flex-col gap-3 sm:gap-2">
-                    <div className="text-sm font-medium">Weight (g)</div>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <WeightStepper
-                        value={Number(it.weightGrams)}
-                        onDecrease={() =>
-                          changeGrams(idx, Math.max(1, Number(it.weightGrams) - 100))
-                        }
-                        onIncrease={() =>
-                          changeGrams(idx, Number(it.weightGrams) + 100)
-                        }
-                        onChange={(next) => changeGrams(idx, next)}
-                      />
-                      <div className="text-sm text-slate-600">
-                        {it.pricePerKg}{" "}
-                        <span className="text-slate-500">{currency}/kg</span>
+                      <div className="mt-1 text-sm text-slate-500">
+                        Pricing:{" "}
+                        <span className="font-medium">{it.pricingModel}</span>
                       </div>
                     </div>
+
+                    <Button
+                      variant="outline"
+                      onClick={() => removeAt(idx)}
+                      className="w-full rounded-2xl border-slate-200 transition active:scale-[0.98] sm:w-auto"
+                    >
+                      Remove
+                    </Button>
                   </div>
-                ) : (
-                  <div className="flex flex-col gap-3 sm:gap-2">
-                    <div className="text-sm font-medium">Quantity</div>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <QtyStepper
-                        value={Number(it.quantity)}
-                        onDecrease={() =>
-                          changeQty(idx, Math.max(1, Number(it.quantity) - 1))
-                        }
-                        onIncrease={() => changeQty(idx, Number(it.quantity) + 1)}
-                      />
-                      <div className="text-sm text-slate-600">
-                        {it.unitPrice}{" "}
-                        <span className="text-slate-500">{currency} each</span>
+
+                  <Separator className="my-4" />
+
+                  {it.pricingModel === "WEIGHT" ? (
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium text-slate-900">
+                        Weight (g)
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                        <WeightStepper
+                          value={Number(it.weightGrams)}
+                          onDecrease={() =>
+                            changeGrams(
+                              idx,
+                              Math.max(1, Number(it.weightGrams) - 100)
+                            )
+                          }
+                          onIncrease={() =>
+                            changeGrams(idx, Number(it.weightGrams) + 100)
+                          }
+                          onChange={(next) => changeGrams(idx, next)}
+                        />
+
+                        <div className="rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                          {money(Number(it.pricePerKg))} {currency}/kg
+                        </div>
                       </div>
                     </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium text-slate-900">
+                        Quantity
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                        <QtyStepper
+                          value={Number(it.quantity)}
+                          onDecrease={() =>
+                            changeQty(idx, Math.max(1, Number(it.quantity) - 1))
+                          }
+                          onIncrease={() =>
+                            changeQty(idx, Number(it.quantity) + 1)
+                          }
+                        />
+
+                        <div className="rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                          {money(Number(it.unitPrice))} {currency} each
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-4 flex items-center justify-between rounded-2xl bg-[#fffaf5] px-3 py-3">
+                    <div className="text-sm text-slate-600">Item total</div>
+                    <div className="text-base font-bold text-slate-900">
+                      {money(lineTotal)} {currency}
+                    </div>
                   </div>
-                )}
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
 
           <div className="lg:col-span-1">
-            <Card className="rounded-2xl p-4 sm:p-5 lg:sticky lg:top-6">
-              <div className="text-lg font-semibold">Order summary</div>
+            <Card className="rounded-3xl border-orange-100 p-4 shadow-sm sm:p-5 lg:sticky lg:top-6">
+              <div className="text-lg font-semibold text-slate-900">
+                Order summary
+              </div>
+
               <Separator className="my-4" />
 
               <div className="flex items-center justify-between text-sm text-slate-600">
@@ -363,9 +397,9 @@ export default function CartPage() {
 
               <Separator className="my-4" />
 
-              <div className="mt-3 flex items-center justify-between gap-3 text-base">
-                <div className="font-medium">Total</div>
-                <div className="text-right text-xl font-extrabold">
+              <div className="flex items-center justify-between gap-3 text-base">
+                <div className="font-medium text-slate-900">Total</div>
+                <div className="text-right text-xl font-extrabold text-slate-900">
                   {money(totals.total)}{" "}
                   <span className="text-base font-semibold">{currency}</span>
                 </div>
@@ -378,23 +412,32 @@ export default function CartPage() {
               ) : null}
 
               {totals.belowMinimum ? (
-                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                   Your subtotal is below the minimum order for this town.
                 </div>
               ) : null}
 
               <div className="mt-5 grid gap-3">
-                <Link href={townSlug ? `/${townSlug}/checkout` : "/"}>
+                {totals.belowMinimum ? (
                   <Button
-                    className="w-full transition hover:bg-primary/90 active:scale-[0.98]"
-                    disabled={totals.belowMinimum}
+                    disabled
+                    className="h-12 w-full rounded-2xl bg-slate-300 text-sm font-semibold text-white"
                   >
                     Checkout →
                   </Button>
-                </Link>
+                ) : (
+                  <Link href={townSlug ? `/${townSlug}/checkout` : "/"}>
+                    <Button className="h-12 w-full rounded-2xl bg-[#f97316] text-sm font-semibold text-white transition hover:bg-[#ea580c] active:scale-[0.98]">
+                      Checkout →
+                    </Button>
+                  </Link>
+                )}
 
                 <Link href={townSlug ? `/${townSlug}` : "/"}>
-                  <Button variant="outline" className="w-full">
+                  <Button
+                    variant="outline"
+                    className="h-12 w-full rounded-2xl border-slate-200"
+                  >
                     Continue shopping
                   </Button>
                 </Link>
