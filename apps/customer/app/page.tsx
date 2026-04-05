@@ -245,18 +245,18 @@ export default function Page() {
 
               <div className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap sm:gap-4">
                 <a href="#towns" className="w-full sm:w-auto">
-                  <Button className="h-12 w-full rounded-2xl bg-orange-500 px-6 text-base font-semibold text-white hover:bg-orange-600 sm:w-auto">
-                    Choose Your Town
-                  </Button>
+                  <Button className="bg-[#0f172a] hover:bg-[#1e293b] text-white">
+  Choose Your Town
+</Button>
                 </a>
 
                 <a href="#how-it-works" className="w-full sm:w-auto">
-                  <Button
-                    variant="outline"
-                    className="h-12 w-full rounded-2xl border-[#0f172a]/15 bg-white px-6 text-base font-semibold text-[#0f172a] hover:bg-slate-50 sm:w-auto"
-                  >
-                    Learn More
-                  </Button>
+                 <Button
+  variant="outline"
+  className="h-12 w-full rounded-2xl border-[#0f172a]/20 bg-white px-6 text-base font-semibold text-[#0f172a] hover:bg-[#0f172a]/5 sm:w-auto"
+>
+  Learn More
+</Button>
                 </a>
               </div>
 
