@@ -77,6 +77,12 @@ export class OrdersController {
     return this.service.confirmOrder(id);
   }
 
+  // PATCH /api/v1/orders/admin/:id/confirm
+  @Patch('admin/:id/confirm')
+  adminConfirm(@Param('id') id: string) {
+    return this.service.confirmOrder(id);
+  }
+
   // PATCH /api/v1/orders/:id/complete
   @Patch(':id/complete')
   complete(@Param('id') id: string, @Body() dto: CompleteOrderDto) {

@@ -240,6 +240,7 @@ export default function OrderDetailPage() {
     };
   }, [paymentsSorted]);
 
+  const canConfirmAvailability = (order?.status || '').toUpperCase() === 'DRAFT';
   const canForceSettle = (order?.status || '').toUpperCase() === 'FULFILLED';
   const canCancel = ['DRAFT', 'CONFIRMED'].includes((order?.status || '').toUpperCase());
   const canRefund = ['SETTLED', 'FULFILLED', 'PARTIALLY_REFUNDED'].includes(
@@ -287,6 +288,28 @@ export default function OrderDetailPage() {
 
   function closeRefund() {
     setRefundOpen(false);
+  }
+
+  async function confirmAvailability() {
+    if (!id) return;
+
+    try {
+      setActionLoading(true);
+      setActionErr(null);
+      setActionOk(null);
+
+      await apiFetch(`/orders/admin/${id}/confirm`, {
+        method: 'PATCH',
+      });
+
+      setActionOk('Availability confirmed. Order moved to CONFIRMED.');
+      await load();
+      setTimeout(() => setActionOk(null), 2500);
+    } catch (e: any) {
+      setActionErr(e?.message ?? 'Confirm availability failed');
+    } finally {
+      setActionLoading(false);
+    }
   }
 
   async function submitRefund() {
@@ -431,27 +454,27 @@ export default function OrderDetailPage() {
   if (!order) return <div className="p-6">No data</div>;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 bg-[#fffaf5] p-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-slate-600">
             <Link className="underline" href="/ops/orders">
               ← Back to Orders
             </Link>
           </div>
 
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold">Order</h1>
-            <span className={`px-2 py-1 rounded-full text-xs border ${statusBadgeClass(order.status)}`}>
+            <h1 className="text-xl font-semibold text-[#0f172a]">Order</h1>
+            <span className={`rounded-full border px-2 py-1 text-xs ${statusBadgeClass(order.status)}`}>
               {order.status}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="font-mono text-xs text-gray-700">{order.id}</div>
+            <div className="font-mono text-xs text-slate-700">{order.id}</div>
             <button
-              className="underline text-xs text-gray-700"
+              className="text-xs text-slate-700 underline"
               onClick={async () => {
                 await copyText(order.id);
                 setActionOk('Order ID copied.');
@@ -462,15 +485,15 @@ export default function OrderDetailPage() {
             </button>
           </div>
 
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-slate-500">
             Created: {formatDate(order.createdAt)} • Updated: {formatDate(order.updatedAt)}
           </div>
         </div>
 
-        <div className="text-right space-y-1">
-          <div className="text-sm text-gray-600">{order.town?.name ?? '—'}</div>
-          <div className="text-xs text-gray-500">{order.town?.slug ?? ''}</div>
-          <div className="text-sm text-gray-700">
+        <div className="space-y-1 text-right">
+          <div className="text-sm text-slate-600">{order.town?.name ?? '—'}</div>
+          <div className="text-xs text-slate-500">{order.town?.slug ?? ''}</div>
+          <div className="text-sm text-slate-700">
             {customerPhone}
             {order.customerEmail ? ` • ${order.customerEmail}` : ''}
           </div>
@@ -478,15 +501,15 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Customer + delivery */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="border rounded-2xl p-4 space-y-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="space-y-3 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="font-semibold">Customer</h2>
+            <h2 className="font-semibold text-[#0f172a]">Customer</h2>
             <span
-              className={`px-2 py-1 rounded-full text-xs border ${
+              className={`rounded-full border px-2 py-1 text-xs ${
                 registeredCustomer
-                  ? 'bg-green-50 border-green-200 text-green-800'
-                  : 'bg-amber-50 border-amber-200 text-amber-800'
+                  ? 'border-green-200 bg-green-50 text-green-800'
+                  : 'border-amber-200 bg-amber-50 text-amber-800'
               }`}
             >
               {registeredCustomer ? 'Registered customer' : 'Guest checkout'}
@@ -495,71 +518,71 @@ export default function OrderDetailPage() {
 
           <div className="grid grid-cols-1 gap-2 text-sm">
             <div className="flex justify-between gap-4">
-              <span className="text-gray-600">Name</span>
-              <span className="font-semibold text-right">{customerName}</span>
+              <span className="text-slate-600">Name</span>
+              <span className="text-right font-semibold text-[#0f172a]">{customerName}</span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-600">Phone</span>
-              <span className="font-semibold text-right">{customerPhone}</span>
+              <span className="text-slate-600">Phone</span>
+              <span className="text-right font-semibold text-[#0f172a]">{customerPhone}</span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-600">Email</span>
-              <span className="font-semibold text-right">{order.customerEmail ?? '—'}</span>
+              <span className="text-slate-600">Email</span>
+              <span className="text-right font-semibold text-[#0f172a]">{order.customerEmail ?? '—'}</span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-600">Account</span>
-              <span className="font-semibold text-right">
+              <span className="text-slate-600">Account</span>
+              <span className="text-right font-semibold text-[#0f172a]">
                 {registeredCustomer ? order.customerId ?? order.customer?.id ?? 'Registered' : 'Guest'}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="border rounded-2xl p-4 space-y-3">
-          <h2 className="font-semibold">Delivery address</h2>
+        <div className="space-y-3 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
+          <h2 className="font-semibold text-[#0f172a]">Delivery address</h2>
 
           <div className="grid grid-cols-1 gap-2 text-sm">
             <div className="flex justify-between gap-4">
-              <span className="text-gray-600">Recipient</span>
-              <span className="font-semibold text-right">{deliveryAddress.recipientName}</span>
+              <span className="text-slate-600">Recipient</span>
+              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.recipientName}</span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-600">Phone</span>
-              <span className="font-semibold text-right">{deliveryAddress.phone}</span>
+              <span className="text-slate-600">Phone</span>
+              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.phone}</span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-600">Address line 1</span>
-              <span className="font-semibold text-right">{deliveryAddress.line1}</span>
+              <span className="text-slate-600">Address line 1</span>
+              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.line1}</span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-600">Address line 2</span>
-              <span className="font-semibold text-right">{deliveryAddress.line2 || '—'}</span>
+              <span className="text-slate-600">Address line 2</span>
+              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.line2 || '—'}</span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-600">Area</span>
-              <span className="font-semibold text-right">{deliveryAddress.area || '—'}</span>
+              <span className="text-slate-600">Area</span>
+              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.area || '—'}</span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-600">Town</span>
-              <span className="font-semibold text-right">{deliveryAddress.town}</span>
+              <span className="text-slate-600">Town</span>
+              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.town}</span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-600">Landmark</span>
-              <span className="font-semibold text-right">{deliveryAddress.landmark || '—'}</span>
+              <span className="text-slate-600">Landmark</span>
+              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.landmark || '—'}</span>
             </div>
 
             <div className="flex justify-between gap-4">
-              <span className="text-gray-600">Notes</span>
-              <span className="font-semibold text-right">{deliveryAddress.notes || '—'}</span>
+              <span className="text-slate-600">Notes</span>
+              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.notes || '—'}</span>
             </div>
           </div>
         </div>
@@ -567,7 +590,22 @@ export default function OrderDetailPage() {
 
       {/* Quick actions */}
       <div className="space-y-2">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
+          {canConfirmAvailability ? (
+            <button
+              onClick={() =>
+                openConfirm(
+                  'Confirm availability for this order? This will move the order from DRAFT to CONFIRMED.',
+                  confirmAvailability,
+                )
+              }
+              disabled={actionLoading}
+              className="rounded-xl bg-[#f97316] px-4 py-2 text-sm font-semibold text-white hover:bg-[#ea6a0a] disabled:opacity-50"
+            >
+              {actionLoading ? 'Confirming…' : 'Confirm availability'}
+            </button>
+          ) : null}
+
           {canMarkCodCollected ? (
             <button
               onClick={() =>
@@ -577,7 +615,7 @@ export default function OrderDetailPage() {
                 )
               }
               disabled={actionLoading}
-              className="px-3 py-2 border rounded-xl text-sm bg-white hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-xl border border-[#0f172a]/15 bg-white px-3 py-2 text-sm text-[#0f172a] hover:bg-slate-50 disabled:opacity-50"
             >
               {actionLoading
                 ? 'Working…'
@@ -586,7 +624,7 @@ export default function OrderDetailPage() {
           ) : null}
 
           {codCollected ? (
-            <span className="px-2 py-1 rounded-full text-xs border bg-green-50 border-green-200 text-green-800">
+            <span className="rounded-full border border-green-200 bg-green-50 px-2 py-1 text-xs text-green-800">
               COD collected
             </span>
           ) : null}
@@ -595,7 +633,7 @@ export default function OrderDetailPage() {
             <button
               onClick={() => openConfirm('Force settle this order? (DEV action)', forceSettleDev)}
               disabled={actionLoading}
-              className="px-3 py-2 border rounded-xl text-sm bg-white hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-xl border border-[#0f172a]/15 bg-white px-3 py-2 text-sm text-[#0f172a] hover:bg-slate-50 disabled:opacity-50"
               title="DEV: mark order settled + create SUCCESS payment"
             >
               {actionLoading ? 'Forcing…' : 'Force settle (dev)'}
@@ -606,7 +644,7 @@ export default function OrderDetailPage() {
             <button
               onClick={openRefund}
               disabled={actionLoading}
-              className="px-3 py-2 rounded-xl text-sm border border-amber-500 text-amber-700 bg-amber-50 hover:bg-amber-100 disabled:opacity-50"
+              className="rounded-xl border border-amber-500 bg-amber-50 px-3 py-2 text-sm text-amber-700 hover:bg-amber-100 disabled:opacity-50"
               title="Refund selected items"
             >
               Refund items
@@ -617,7 +655,7 @@ export default function OrderDetailPage() {
             <button
               onClick={() => openConfirm('Cancel this order? This cannot be undone.', cancelOrder)}
               disabled={actionLoading}
-              className="px-3 py-2 rounded-xl text-sm border border-red-500 text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+              className="rounded-xl border border-red-500 bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100 disabled:opacity-50"
               title="Cancel this order"
             >
               <span className="inline-flex items-center gap-2">
@@ -633,46 +671,46 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Totals */}
-      <div className="border rounded-2xl p-4">
-        <h2 className="font-semibold mb-3">Totals</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+      <div className="rounded-2xl border border-[#0f172a]/10 bg-white p-4">
+        <h2 className="mb-3 font-semibold text-[#0f172a]">Totals</h2>
+        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           <div className="flex justify-between">
-            <span className="text-gray-600">Subtotal</span>
-            <span className="font-semibold">{formatMoney(order.subtotal, currency)}</span>
+            <span className="text-slate-600">Subtotal</span>
+            <span className="font-semibold text-[#0f172a]">{formatMoney(order.subtotal, currency)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Items subtotal</span>
-            <span className="font-semibold">{formatMoney(order.itemsSubtotal, currency)}</span>
+            <span className="text-slate-600">Items subtotal</span>
+            <span className="font-semibold text-[#0f172a]">{formatMoney(order.itemsSubtotal, currency)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Delivery fee</span>
-            <span className="font-semibold">{formatMoney(order.deliveryFee, currency)}</span>
+            <span className="text-slate-600">Delivery fee</span>
+            <span className="font-semibold text-[#0f172a]">{formatMoney(order.deliveryFee, currency)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Service fee</span>
-            <span className="font-semibold">{formatMoney(order.serviceFee, currency)}</span>
+            <span className="text-slate-600">Service fee</span>
+            <span className="font-semibold text-[#0f172a]">{formatMoney(order.serviceFee, currency)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Pay now</span>
-            <span className="font-semibold">{formatMoney(order.payNowTotal, currency)}</span>
+            <span className="text-slate-600">Pay now</span>
+            <span className="font-semibold text-[#0f172a]">{formatMoney(order.payNowTotal, currency)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Pay on delivery</span>
-            <span className="font-semibold">{formatMoney(order.payOnDeliveryTotal, currency)}</span>
+            <span className="text-slate-600">Pay on delivery</span>
+            <span className="font-semibold text-[#0f172a]">{formatMoney(order.payOnDeliveryTotal, currency)}</span>
           </div>
           <div className="flex justify-between sm:col-span-2">
-            <span className="text-gray-600">Order total</span>
-            <span className="font-semibold">{formatMoney(order.total, currency)}</span>
+            <span className="text-slate-600">Order total</span>
+            <span className="font-semibold text-[#0f172a]">{formatMoney(order.total, currency)}</span>
           </div>
         </div>
       </div>
 
       {/* Items */}
-      <div className="border rounded-2xl p-4 space-y-3">
-        <h2 className="font-semibold">Items</h2>
-        <div className="border rounded-xl overflow-hidden">
+      <div className="space-y-3 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
+        <h2 className="font-semibold text-[#0f172a]">Items</h2>
+        <div className="overflow-hidden rounded-xl border">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left">
+            <thead className="bg-slate-50 text-left">
               <tr>
                 <th className="p-3">Product</th>
                 <th className="p-3">Pricing</th>
@@ -701,9 +739,9 @@ export default function OrderDetailPage() {
                       )}
 
                       <div className="flex items-center gap-2">
-                        <div className="font-mono text-xs text-gray-400">{it.id}</div>
+                        <div className="font-mono text-xs text-slate-400">{it.id}</div>
                         <button
-                          className="underline text-xs text-gray-500"
+                          className="text-xs text-slate-500 underline"
                           onClick={async () => {
                             await copyText(it.id);
                             setActionOk('OrderItem ID copied.');
@@ -723,7 +761,7 @@ export default function OrderDetailPage() {
               })}
               {(order.items ?? []).length === 0 ? (
                 <tr>
-                  <td className="p-3 text-gray-600" colSpan={5}>
+                  <td className="p-3 text-slate-600" colSpan={5}>
                     No items.
                   </td>
                 </tr>
@@ -734,37 +772,37 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Payments timeline */}
-      <div id="payments" className="border rounded-2xl p-4 space-y-4">
+      <div id="payments" className="space-y-4 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Payments</h2>
-          <div className="text-xs text-gray-500">Latest first</div>
+          <h2 className="font-semibold text-[#0f172a]">Payments</h2>
+          <div className="text-xs text-slate-500">Latest first</div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-          <div className="border rounded-xl p-3 bg-white">
-            <div className="text-xs text-gray-500">Paid (SUCCESS)</div>
-            <div className="text-sm font-semibold">{formatMoney(paymentsSummary.paidTotal, currency)}</div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+          <div className="rounded-xl border bg-white p-3">
+            <div className="text-xs text-slate-500">Paid (SUCCESS)</div>
+            <div className="text-sm font-semibold text-[#0f172a]">{formatMoney(paymentsSummary.paidTotal, currency)}</div>
           </div>
 
-          <div className="border rounded-xl p-3 bg-white">
-            <div className="text-xs text-gray-500">Refunded</div>
-            <div className="text-sm font-semibold">{formatMoney(paymentsSummary.refundedTotal, currency)}</div>
-            <div className="text-xs text-gray-500">{paymentsSummary.refundsCount} refund(s)</div>
+          <div className="rounded-xl border bg-white p-3">
+            <div className="text-xs text-slate-500">Refunded</div>
+            <div className="text-sm font-semibold text-[#0f172a]">{formatMoney(paymentsSummary.refundedTotal, currency)}</div>
+            <div className="text-xs text-slate-500">{paymentsSummary.refundsCount} refund(s)</div>
           </div>
 
-          <div className="border rounded-xl p-3 bg-white">
-            <div className="text-xs text-gray-500">Net</div>
-            <div className="text-sm font-semibold">{formatMoney(paymentsSummary.net, currency)}</div>
+          <div className="rounded-xl border bg-white p-3">
+            <div className="text-xs text-slate-500">Net</div>
+            <div className="text-sm font-semibold text-[#0f172a]">{formatMoney(paymentsSummary.net, currency)}</div>
           </div>
 
-          <div className="border rounded-xl p-3 bg-white">
-            <div className="text-xs text-gray-500">Events</div>
-            <div className="text-sm font-semibold">{paymentsSummary.paymentsCount} payment(s)</div>
+          <div className="rounded-xl border bg-white p-3">
+            <div className="text-xs text-slate-500">Events</div>
+            <div className="text-sm font-semibold text-[#0f172a]">{paymentsSummary.paymentsCount} payment(s)</div>
           </div>
         </div>
 
         {paymentsSorted.length === 0 ? (
-          <div className="text-sm text-gray-600">No payments.</div>
+          <div className="text-sm text-slate-600">No payments.</div>
         ) : (
           <div className="space-y-4">
             {paymentsSorted.map((p: any) => {
@@ -772,19 +810,19 @@ export default function OrderDetailPage() {
 
               return (
                 <div key={p.id} className="relative pl-7">
-                  <div className="absolute left-2 top-0 bottom-0 w-px bg-gray-200" />
+                  <div className="absolute bottom-0 left-2 top-0 w-px bg-slate-200" />
                   <div className="absolute left-0 top-4 h-4 w-4 rounded-full border bg-white" />
 
-                  <div className="border rounded-xl p-3 space-y-3 bg-white">
+                  <div className="space-y-3 rounded-xl border bg-white p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex flex-wrap items-center gap-2">
                           <div className="text-sm">
-                            <span className="font-semibold">{p.method ?? '—'}</span>
-                            <span className="text-gray-500"> • {p.purpose ?? '—'}</span>
+                            <span className="font-semibold text-[#0f172a]">{p.method ?? '—'}</span>
+                            <span className="text-slate-500"> • {p.purpose ?? '—'}</span>
                           </div>
                           <span
-                            className={`px-2 py-1 rounded-full text-xs border ${paymentStatusBadgeClass(
+                            className={`rounded-full border px-2 py-1 text-xs ${paymentStatusBadgeClass(
                               p.status,
                             )}`}
                           >
@@ -792,12 +830,12 @@ export default function OrderDetailPage() {
                           </span>
                         </div>
 
-                        <div className="text-xs text-gray-500">{formatDate(p.createdAt)}</div>
+                        <div className="text-xs text-slate-500">{formatDate(p.createdAt)}</div>
 
                         <div className="flex items-center gap-2">
-                          <div className="font-mono text-xs text-gray-600">{p.id}</div>
+                          <div className="font-mono text-xs text-slate-600">{p.id}</div>
                           <button
-                            className="underline text-xs text-gray-600"
+                            className="text-xs text-slate-600 underline"
                             onClick={async () => {
                               await copyText(p.id);
                               setActionOk('Payment ID copied.');
@@ -810,8 +848,8 @@ export default function OrderDetailPage() {
                       </div>
 
                       <div className="text-right">
-                        <div className="text-xs text-gray-500">Amount</div>
-                        <div className="text-sm font-semibold">
+                        <div className="text-xs text-slate-500">Amount</div>
+                        <div className="text-sm font-semibold text-[#0f172a]">
                           {formatMoney(p.amount, p.currency ?? currency)}
                         </div>
                       </div>
@@ -819,26 +857,26 @@ export default function OrderDetailPage() {
 
                     <div className="border-t pt-3">
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold">Refunds</div>
-                        <div className="text-xs text-gray-500">{refunds.length} total</div>
+                        <div className="text-sm font-semibold text-[#0f172a]">Refunds</div>
+                        <div className="text-xs text-slate-500">{refunds.length} total</div>
                       </div>
 
                       {refunds.length === 0 ? (
-                        <div className="text-sm text-gray-600 mt-2">No refunds on this payment.</div>
+                        <div className="mt-2 text-sm text-slate-600">No refunds on this payment.</div>
                       ) : (
-                        <div className="space-y-3 mt-3">
+                        <div className="mt-3 space-y-3">
                           {refunds.map((r: any) => (
                             <div key={r.id} className="relative pl-6">
-                              <div className="absolute left-2 top-0 bottom-0 w-px bg-gray-200" />
+                              <div className="absolute bottom-0 left-2 top-0 w-px bg-slate-200" />
                               <div className="absolute left-0 top-3 h-3 w-3 rounded-full border bg-white" />
 
-                              <div className="bg-gray-50 border rounded-xl p-3 space-y-2">
+                              <div className="space-y-2 rounded-xl border bg-slate-50 p-3">
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="space-y-1">
                                     <div className="flex items-center gap-2">
-                                      <div className="font-mono text-xs text-gray-700">{r.id}</div>
+                                      <div className="font-mono text-xs text-slate-700">{r.id}</div>
                                       <button
-                                        className="underline text-xs text-gray-700"
+                                        className="text-xs text-slate-700 underline"
                                         onClick={async () => {
                                           await copyText(r.id);
                                           setActionOk('Refund ID copied.');
@@ -849,7 +887,7 @@ export default function OrderDetailPage() {
                                       </button>
 
                                       <span
-                                        className={`px-2 py-1 rounded-full text-xs border ${statusBadgeClass(
+                                        className={`rounded-full border px-2 py-1 text-xs ${statusBadgeClass(
                                           r.status,
                                         )}`}
                                       >
@@ -857,37 +895,37 @@ export default function OrderDetailPage() {
                                       </span>
                                     </div>
 
-                                    <div className="text-xs text-gray-500">{formatDate(r.createdAt)}</div>
+                                    <div className="text-xs text-slate-500">{formatDate(r.createdAt)}</div>
                                   </div>
 
                                   <div className="text-right">
-                                    <div className="text-xs text-gray-500">Amount</div>
-                                    <div className="text-sm font-semibold">
+                                    <div className="text-xs text-slate-500">Amount</div>
+                                    <div className="text-sm font-semibold text-[#0f172a]">
                                       {formatMoney(r.amount, r.currency ?? currency)}
                                     </div>
                                   </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                                <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                                   <div className="flex justify-between">
-                                    <span className="text-gray-600">Restock</span>
-                                    <span className="font-semibold">{String(r.restock)}</span>
+                                    <span className="text-slate-600">Restock</span>
+                                    <span className="font-semibold text-[#0f172a]">{String(r.restock)}</span>
                                   </div>
 
                                   <div className="flex justify-between sm:col-span-2">
-                                    <span className="text-gray-600">Reason</span>
-                                    <span className="font-semibold">{r.reason ?? '—'}</span>
+                                    <span className="text-slate-600">Reason</span>
+                                    <span className="font-semibold text-[#0f172a]">{r.reason ?? '—'}</span>
                                   </div>
                                 </div>
 
                                 <div>
-                                  <div className="text-sm font-semibold mb-2">Refund items</div>
+                                  <div className="mb-2 text-sm font-semibold text-[#0f172a]">Refund items</div>
                                   {(r.items ?? []).length === 0 ? (
-                                    <div className="text-sm text-gray-600">No refund items.</div>
+                                    <div className="text-sm text-slate-600">No refund items.</div>
                                   ) : (
-                                    <div className="border rounded-lg overflow-hidden bg-white">
+                                    <div className="overflow-hidden rounded-lg border bg-white">
                                       <table className="w-full text-sm">
-                                        <thead className="bg-gray-50 text-left">
+                                        <thead className="bg-slate-50 text-left">
                                           <tr>
                                             <th className="p-2">OrderItem</th>
                                             <th className="p-2">Qty</th>
@@ -911,7 +949,7 @@ export default function OrderDetailPage() {
                                                     </div>
                                                     {ri.orderItemId ? (
                                                       <button
-                                                        className="underline text-xs text-gray-600"
+                                                        className="text-xs text-slate-600 underline"
                                                         onClick={async () => {
                                                           await copyText(ri.orderItemId);
                                                           setActionOk('OrderItem ID copied.');
@@ -932,11 +970,11 @@ export default function OrderDetailPage() {
                                                 </td>
                                                 <td className="p-2">
                                                   {tpId ? (
-                                                    <Link href={`/ops/stock/${tpId}`} className="underline text-xs">
+                                                    <Link href={`/ops/stock/${tpId}`} className="text-xs underline">
                                                       view
                                                     </Link>
                                                   ) : (
-                                                    <span className="text-xs text-gray-400">—</span>
+                                                    <span className="text-xs text-slate-400">—</span>
                                                   )}
                                                 </td>
                                               </tr>
@@ -962,14 +1000,14 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Stock movements */}
-      <div className="border rounded-2xl p-4 space-y-3">
-        <h2 className="font-semibold">Stock movements</h2>
+      <div className="space-y-3 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
+        <h2 className="font-semibold text-[#0f172a]">Stock movements</h2>
         {movements.length === 0 ? (
-          <div className="text-sm text-gray-600">No stock movements.</div>
+          <div className="text-sm text-slate-600">No stock movements.</div>
         ) : (
-          <div className="border rounded-xl overflow-hidden">
+          <div className="overflow-hidden rounded-xl border">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left">
+              <thead className="bg-slate-50 text-left">
                 <tr>
                   <th className="p-3">Created</th>
                   <th className="p-3">Reason</th>
@@ -1002,15 +1040,15 @@ export default function OrderDetailPage() {
       {refundOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={closeRefund} />
-          <div className="relative w-full max-w-2xl mx-4 rounded-2xl border bg-white shadow-lg p-5">
+          <div className="relative mx-4 w-full max-w-2xl rounded-2xl border bg-white p-5 shadow-lg">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-lg font-semibold">Refund items</div>
-                <div className="text-sm text-gray-600">Select quantities/weights to refund.</div>
+                <div className="text-lg font-semibold text-[#0f172a]">Refund items</div>
+                <div className="text-sm text-slate-600">Select quantities/weights to refund.</div>
               </div>
               <button
                 onClick={closeRefund}
-                className="px-3 py-2 rounded-xl text-sm border bg-white hover:bg-gray-50"
+                className="rounded-xl border bg-white px-3 py-2 text-sm hover:bg-slate-50"
                 disabled={actionLoading}
               >
                 Close
@@ -1018,19 +1056,19 @@ export default function OrderDetailPage() {
             </div>
 
             <div className="mt-4 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-medium">Reason</label>
+                  <label className="text-sm font-medium text-[#0f172a]">Reason</label>
                   <input
                     value={refundReason}
                     onChange={(e) => setRefundReason(e.target.value)}
                     placeholder="e.g. Customer returned item"
-                    className="mt-1 w-full px-3 py-2 border rounded-xl text-sm"
+                    className="mt-1 w-full rounded-xl border px-3 py-2 text-sm"
                   />
                 </div>
 
                 <div className="flex items-end gap-2">
-                  <label className="inline-flex items-center gap-2 text-sm">
+                  <label className="inline-flex items-center gap-2 text-sm text-[#0f172a]">
                     <input
                       type="checkbox"
                       checked={refundRestock}
@@ -1041,9 +1079,9 @@ export default function OrderDetailPage() {
                 </div>
               </div>
 
-              <div className="border rounded-xl overflow-hidden">
+              <div className="overflow-hidden rounded-xl border">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-left">
+                  <thead className="bg-slate-50 text-left">
                     <tr>
                       <th className="p-3">Item</th>
                       <th className="p-3">Pricing</th>
@@ -1064,7 +1102,7 @@ export default function OrderDetailPage() {
                         <tr key={it.id} className="border-t">
                           <td className="p-3">
                             {name}
-                            <div className="font-mono text-xs text-gray-400">{it.id}</div>
+                            <div className="font-mono text-xs text-slate-400">{it.id}</div>
                           </td>
 
                           <td className="p-3">{pricingModel || '—'}</td>
@@ -1088,9 +1126,9 @@ export default function OrderDetailPage() {
                                     const grams = Math.round(clampedKg * 1000);
                                     setRefundWeightGramsByItemId((prev) => ({ ...prev, [it.id]: grams }));
                                   }}
-                                  className="w-32 px-3 py-2 border rounded-xl text-sm"
+                                  className="w-32 rounded-xl border px-3 py-2 text-sm"
                                 />
-                                <span className="text-sm text-gray-600">kg</span>
+                                <span className="text-sm text-slate-600">kg</span>
                               </div>
                             ) : (
                               <input
@@ -1102,7 +1140,7 @@ export default function OrderDetailPage() {
                                   const v = Math.max(0, Math.min(maxQty, Number(e.target.value || 0)));
                                   setRefundQtyByItemId((prev) => ({ ...prev, [it.id]: v }));
                                 }}
-                                className="w-28 px-3 py-2 border rounded-xl text-sm"
+                                className="w-28 rounded-xl border px-3 py-2 text-sm"
                               />
                             )}
                           </td>
@@ -1112,7 +1150,7 @@ export default function OrderDetailPage() {
 
                     {(order?.items ?? []).length === 0 ? (
                       <tr>
-                        <td className="p-3 text-gray-600" colSpan={4}>
+                        <td className="p-3 text-slate-600" colSpan={4}>
                           No items.
                         </td>
                       </tr>
@@ -1124,7 +1162,7 @@ export default function OrderDetailPage() {
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   onClick={closeRefund}
-                  className="px-3 py-2 rounded-xl text-sm border bg-white hover:bg-gray-50"
+                  className="rounded-xl border bg-white px-3 py-2 text-sm hover:bg-slate-50"
                   disabled={actionLoading}
                 >
                   Back
@@ -1135,7 +1173,7 @@ export default function OrderDetailPage() {
                     setRefundOpen(false);
                     await submitRefund();
                   }}
-                  className="px-3 py-2 rounded-xl text-sm border bg-black text-white hover:bg-gray-900 disabled:opacity-50"
+                  className="rounded-xl bg-[#0f172a] px-3 py-2 text-sm text-white hover:bg-slate-900 disabled:opacity-50"
                   disabled={actionLoading}
                 >
                   {actionLoading ? 'Submitting…' : 'Submit refund'}
@@ -1150,14 +1188,14 @@ export default function OrderDetailPage() {
       {confirmOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={closeConfirm} />
-          <div className="relative w-full max-w-md mx-4 rounded-2xl border bg-white shadow-lg p-5">
-            <div className="text-lg font-semibold">Confirm</div>
-            <div className="mt-2 text-sm text-gray-700">{confirmText}</div>
+          <div className="relative mx-4 w-full max-w-md rounded-2xl border bg-white p-5 shadow-lg">
+            <div className="text-lg font-semibold text-[#0f172a]">Confirm</div>
+            <div className="mt-2 text-sm text-slate-700">{confirmText}</div>
 
             <div className="mt-5 flex items-center justify-end gap-2">
               <button
                 onClick={closeConfirm}
-                className="px-3 py-2 rounded-xl text-sm border bg-white hover:bg-gray-50"
+                className="rounded-xl border bg-white px-3 py-2 text-sm hover:bg-slate-50"
                 disabled={actionLoading}
               >
                 Back
@@ -1169,7 +1207,7 @@ export default function OrderDetailPage() {
                   closeConfirm();
                   await confirmAction();
                 }}
-                className="px-3 py-2 rounded-xl text-sm border bg-black text-white hover:bg-gray-900 disabled:opacity-50"
+                className="rounded-xl bg-[#0f172a] px-3 py-2 text-sm text-white hover:bg-slate-900 disabled:opacity-50"
                 disabled={actionLoading}
               >
                 Confirm
