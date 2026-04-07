@@ -19,6 +19,7 @@ import { TownSettingsModule } from './town-settings/town-settings.module';
 import { PromosModule } from './promos/promos.module';
 import { PromosAdminModule } from './admin/promos/promos.admin.module';
 import { AdminCustomersModule } from './admin/customers/admin-customers.module';
+import { NotificationsModule } from './notifications/notifications.module';
 @Module({
   imports: [
     HealthModule,
@@ -39,6 +40,7 @@ import { AdminCustomersModule } from './admin/customers/admin-customers.module';
     PromosModule,
     PromosAdminModule,
     AdminCustomersModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

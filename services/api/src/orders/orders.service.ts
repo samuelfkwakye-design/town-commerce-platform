@@ -4,7 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { WhatsappService } from '../notifications/whatsapp.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   OrderStatus,
   PaymentMethod,
@@ -34,7 +34,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly hubtel: HubtelService,
-    private readonly whatsappService: WhatsappService,
+    private readonly notificationsService: NotificationsService,
   ) {}
   private dec(value: string | number): Prisma.Decimal {
     return new Prisma.Decimal(String(value));
@@ -980,24 +980,22 @@ private normalizeTownText(value?: string | null) {
   const fullOrder = await this.getOrder(orderId);
 
   try {
-    await this.whatsappService.sendOrderConfirmation({
-      phoneNumber: fullOrder.customerPhone ?? '',
-      orderId: String(fullOrder.id),
-      totalAmount: Number(fullOrder.total ?? 0),
-      paymentMethod: fullOrder.goodsPaymentMethod
-        ? String(fullOrder.goodsPaymentMethod)
-        : null,
-      townSlug: fullOrder.town?.slug ?? null,
-    });
-  } catch (error) {
-    this.logger.warn(
-      `Failed to send WhatsApp confirmation for order ${orderId}: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-  }
+  await this.notificationsService.sendOrderConfirmationSms({
+    phoneNumber: fullOrder.customerPhone ?? fullOrder.deliveryPhone ?? null,
+    orderId: String(fullOrder.id),
+    totalAmount: Number(fullOrder.total ?? 0),
+    townSlug: fullOrder.town?.slug ?? null,
+    currency: 'GHS',
+  });
+} catch (error) {
+  this.logger.warn(
+    `Failed to send SMS confirmation for order ${orderId}: ${
+      error instanceof Error ? error.message : String(error)
+    }`,
+  );
+}
 
-  return fullOrder;
+return fullOrder;
 }
   async getOrder(id: string) {
   const order = await this.prisma.order.findUnique({
