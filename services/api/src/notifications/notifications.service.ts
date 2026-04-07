@@ -28,12 +28,13 @@ export class NotificationsService {
   }
 
   async sendOrderConfirmationSms(input: {
-    phoneNumber?: string | null;
-    orderId: string;
-    totalAmount: number;
-    townSlug?: string | null;
-    currency?: string | null;
-  }) {
+  phoneNumber?: string | null;
+  orderId: string;
+  totalAmount: number;
+  townSlug?: string | null;
+  currency?: string | null;
+  customerName?: string | null;
+}) {
     const phone = String(input.phoneNumber ?? '').trim();
     if (!phone) {
       this.logger.warn(`No phone number for order ${input.orderId}. SMS skipped.`);
@@ -44,12 +45,16 @@ export class NotificationsService {
     const currency = input.currency || 'GHS';
     const orderUrl = this.buildOrderUrl(townSlug, input.orderId);
 
-    const message =
-      `Somame order confirmed. ` +
-      `Ref: ${input.orderId}. ` +
-      `Total: ${currency} ${this.money(input.totalAmount)}. ` +
-      `View order: ${orderUrl}. ` +
-      `Pay on delivery.`;
+    const firstName =
+  input.customerName?.split(' ')[0] || 'Customer';
+
+const message =
+  `Hi ${firstName},\n\n` +
+  `Your Somame order is confirmed.\n` +
+  `Ref: ${input.orderId}\n` +
+  `Total: ${currency} ${this.money(input.totalAmount)}\n\n` +
+  `Track order:\n${orderUrl}\n\n` +
+  `Pay on delivery`;
 
     return this.sms.sendSms(phone, message);
   }

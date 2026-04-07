@@ -979,13 +979,14 @@ private normalizeTownText(value?: string | null) {
 
   const fullOrder = await this.getOrder(orderId);
 
-  try {
+ try {
   await this.notificationsService.sendOrderConfirmationSms({
     phoneNumber: fullOrder.customerPhone ?? fullOrder.deliveryPhone ?? null,
     orderId: String(fullOrder.id),
     totalAmount: Number(fullOrder.total ?? 0),
     townSlug: fullOrder.town?.slug ?? null,
     currency: 'GHS',
+    customerName: fullOrder.deliveryRecipientName || null,
   });
 } catch (error) {
   this.logger.warn(
