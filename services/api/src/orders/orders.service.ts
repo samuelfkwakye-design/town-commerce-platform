@@ -1194,10 +1194,10 @@ return fullOrder;
     return this.getOrder(orderId);
   }
 
-  async confirmOrder(orderId: string) {
+    async confirmOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: true },
+      include: { items: true, town: true },
     });
 
     if (!order) throw new NotFoundException(`Order not found: ${orderId}`);
@@ -1210,7 +1210,7 @@ return fullOrder;
       throw new BadRequestException('Cannot confirm an empty order');
     }
 
-    if (!order.customerEmail && !order.customerPhone) {
+    if (!order.customerEmail && !order.customerPhone && !order.deliveryPhone) {
       throw new BadRequestException(
         'Order confirmation requires at least an email or phone number',
       );
@@ -1229,7 +1229,27 @@ return fullOrder;
         deliveryCodeHash,
         deliveryCodeExpiresAt,
       },
+      include: {
+        town: true,
+      },
     });
+
+    try {
+      await this.notificationsService.sendOrderAvailabilityConfirmedSms({
+        phoneNumber: updated.customerPhone ?? updated.deliveryPhone ?? null,
+        orderId: String(updated.id),
+        totalAmount: Number(updated.total ?? 0),
+        townSlug: updated.town?.slug ?? null,
+        currency: 'GHS',
+        customerName: updated.deliveryRecipientName || null,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to send availability-confirmed SMS for order ${orderId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
 
     return { ...updated, deliveryCode: code };
   }

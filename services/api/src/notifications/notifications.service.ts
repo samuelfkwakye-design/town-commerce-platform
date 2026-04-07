@@ -27,14 +27,18 @@ export class NotificationsService {
     return `${this.customerAppBaseUrl}/${townSlug}/order/${orderId}`;
   }
 
+  private firstName(customerName?: string | null) {
+    return customerName?.trim()?.split(/\s+/)[0] || 'Customer';
+  }
+
   async sendOrderConfirmationSms(input: {
-  phoneNumber?: string | null;
-  orderId: string;
-  totalAmount: number;
-  townSlug?: string | null;
-  currency?: string | null;
-  customerName?: string | null;
-}) {
+    phoneNumber?: string | null;
+    orderId: string;
+    totalAmount: number;
+    townSlug?: string | null;
+    currency?: string | null;
+    customerName?: string | null;
+  }) {
     const phone = String(input.phoneNumber ?? '').trim();
     if (!phone) {
       this.logger.warn(`No phone number for order ${input.orderId}. SMS skipped.`);
@@ -44,17 +48,47 @@ export class NotificationsService {
     const townSlug = input.townSlug || 'order';
     const currency = input.currency || 'GHS';
     const orderUrl = this.buildOrderUrl(townSlug, input.orderId);
+    const firstName = this.firstName(input.customerName);
 
-    const firstName =
-  input.customerName?.split(' ')[0] || 'Customer';
+    const message =
+      `Hi ${firstName},\n\n` +
+      `Your Somame order is confirmed.\n` +
+      `Ref: ${input.orderId}\n` +
+      `Total: ${currency} ${this.money(input.totalAmount)}\n\n` +
+      `Track order:\n${orderUrl}\n\n` +
+      `Pay on delivery`;
 
-const message =
-  `Hi ${firstName},\n\n` +
-  `Your Somame order is confirmed.\n` +
-  `Ref: ${input.orderId}\n` +
-  `Total: ${currency} ${this.money(input.totalAmount)}\n\n` +
-  `Track order:\n${orderUrl}\n\n` +
-  `Pay on delivery`;
+    return this.sms.sendSms(phone, message);
+  }
+
+  async sendOrderAvailabilityConfirmedSms(input: {
+    phoneNumber?: string | null;
+    orderId: string;
+    totalAmount: number;
+    townSlug?: string | null;
+    currency?: string | null;
+    customerName?: string | null;
+  }) {
+    const phone = String(input.phoneNumber ?? '').trim();
+    if (!phone) {
+      this.logger.warn(
+        `No phone number for availability-confirmed SMS on order ${input.orderId}. SMS skipped.`,
+      );
+      return { ok: false, reason: 'missing_phone' };
+    }
+
+    const townSlug = input.townSlug || 'order';
+    const currency = input.currency || 'GHS';
+    const orderUrl = this.buildOrderUrl(townSlug, input.orderId);
+    const firstName = this.firstName(input.customerName);
+
+    const message =
+      `Hi ${firstName},\n\n` +
+      `Your Somame order has been confirmed and is now being prepared.\n` +
+      `Ref: ${input.orderId}\n` +
+      `Total: ${currency} ${this.money(input.totalAmount)}\n\n` +
+      `Track order:\n${orderUrl}\n\n` +
+      `We will notify you again when your driver is assigned.`;
 
     return this.sms.sendSms(phone, message);
   }
