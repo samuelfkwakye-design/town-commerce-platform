@@ -58,12 +58,14 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
 
           <nav className="space-y-1">
             <NavItem href="/ops/dashboard" label="Dashboard" />
-            <NavItem href="/ops/orders" label="Orders" />
+<NavItem href="/ops/orders" label="Orders" />
 
-            {/* ✅ NEW CUSTOMERS TAB */}
-            <NavItem href="/ops/customers" label="Customers" />
+{/* ✅ NEW CUSTOMERS TAB */}
+<NavItem href="/ops/customers" label="Customers" />
 
-            <NavItem href="/ops/stock" label="Stock" />
+<NavItem href="/ops/drivers" label="Drivers" />
+
+<NavItem href="/ops/stock" label="Stock" />
             <NavItem href="/ops/reports" label="Reports" />
 
             {/* NEW PROMOS MENU ITEM */}
