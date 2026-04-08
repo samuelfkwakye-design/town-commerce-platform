@@ -1259,65 +1259,172 @@ return fullOrder;
   }
 
     async confirmOrder(orderId: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: true, town: true },
-    });
+  const order = await this.prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: true, town: true },
+  });
 
-    if (!order) throw new NotFoundException(`Order not found: ${orderId}`);
+  if (!order) throw new NotFoundException(`Order not found: ${orderId}`);
 
-    if (order.status !== OrderStatus.DRAFT) {
-      throw new BadRequestException('Only DRAFT orders can be confirmed');
-    }
-
-    if (order.items.length === 0) {
-      throw new BadRequestException('Cannot confirm an empty order');
-    }
-
-    if (!order.customerEmail && !order.customerPhone && !order.deliveryPhone) {
-      throw new BadRequestException(
-        'Order confirmation requires at least an email or phone number',
-      );
-    }
-
-    await this.recalculateTotals(orderId);
-
-    const code = this.generateDeliveryCode();
-    const deliveryCodeHash = this.hashCode(code);
-    const deliveryCodeExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: OrderStatus.CONFIRMED,
-        deliveryCodeHash,
-        deliveryCodeExpiresAt,
-      },
-      include: {
-        town: true,
-      },
-    });
-
-    try {
-      await this.notificationsService.sendOrderAvailabilityConfirmedSms({
-        phoneNumber: updated.customerPhone ?? updated.deliveryPhone ?? null,
-        orderId: String(updated.id),
-        totalAmount: Number(updated.total ?? 0),
-        townSlug: updated.town?.slug ?? null,
-        currency: 'GHS',
-        customerName: updated.deliveryRecipientName || null,
-      });
-    } catch (error) {
-      this.logger.warn(
-        `Failed to send availability-confirmed SMS for order ${orderId}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
-
-    return { ...updated, deliveryCode: code };
+  if (order.status !== OrderStatus.DRAFT) {
+    throw new BadRequestException('Only DRAFT orders can be confirmed');
   }
 
+  if (order.items.length === 0) {
+    throw new BadRequestException('Cannot confirm an empty order');
+  }
+
+  if (!order.customerEmail && !order.customerPhone && !order.deliveryPhone) {
+    throw new BadRequestException(
+      'Order confirmation requires at least an email or phone number',
+    );
+  }
+
+  await this.recalculateTotals(orderId);
+
+  const code = this.generateDeliveryCode();
+  const deliveryCodeHash = this.hashCode(code);
+  const deliveryCodeExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  const updated = await this.prisma.order.update({
+    where: { id: orderId },
+    data: {
+      status: OrderStatus.CONFIRMED,
+      deliveryCodeHash,
+      deliveryCodeExpiresAt,
+    },
+    include: {
+      town: true,
+    },
+  });
+
+  try {
+    await this.notificationsService.sendOrderAvailabilityConfirmedSms({
+      phoneNumber: updated.customerPhone ?? updated.deliveryPhone ?? null,
+      orderId: String(updated.id),
+      totalAmount: Number(updated.total ?? 0),
+      townSlug: updated.town?.slug ?? null,
+      currency: 'GHS',
+      customerName: updated.deliveryRecipientName || null,
+    });
+  } catch (error) {
+    this.logger.warn(
+      `Failed to send availability-confirmed SMS for order ${orderId}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  try {
+    const candidates = await this.prisma.driver.findMany({
+      where: {
+        townId: updated.townId,
+        isActive: true,
+        availability: 'AVAILABLE',
+      },
+      include: {
+        orders: {
+          where: {
+            status: {
+              in: [OrderStatus.CONFIRMED, OrderStatus.FULFILLED],
+            },
+          },
+          select: { id: true },
+        },
+      },
+    });
+
+    if (candidates.length > 0) {
+      const sortedDrivers = [...candidates].sort((a, b) => {
+        const activeCountA = a.orders.length;
+        const activeCountB = b.orders.length;
+
+        if (activeCountA !== activeCountB) {
+          return activeCountA - activeCountB;
+        }
+
+        if (a.priority !== b.priority) {
+          return a.priority - b.priority;
+        }
+
+        const timeA = a.lastAssignedAt ? new Date(a.lastAssignedAt).getTime() : 0;
+        const timeB = b.lastAssignedAt ? new Date(b.lastAssignedAt).getTime() : 0;
+
+        return timeA - timeB;
+      });
+
+      const selectedDriver = sortedDrivers[0];
+      const now = new Date();
+
+      const reassigned = await this.prisma.order.update({
+        where: { id: orderId },
+        data: {
+          driverId: selectedDriver.id,
+          driverName: selectedDriver.name,
+          driverPhone: selectedDriver.phone,
+          driverAssignedAt: now,
+        },
+        include: {
+          town: true,
+        },
+      });
+
+      await this.prisma.driver.update({
+        where: { id: selectedDriver.id },
+        data: {
+          lastAssignedAt: now,
+        },
+      });
+
+      try {
+        await this.notificationsService.sendDriverAssignmentToDriverSms({
+          phoneNumber: selectedDriver.phone,
+          driverName: selectedDriver.name,
+          orderId: reassigned.id,
+          customerName: reassigned.deliveryRecipientName ?? null,
+          customerPhone:
+            reassigned.customerPhone ?? reassigned.deliveryPhone ?? null,
+          deliveryTown: reassigned.deliveryTown ?? null,
+          deliveryAddressLine1: reassigned.deliveryLine1 ?? null,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Failed to send driver assignment SMS for order ${orderId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+
+      try {
+        await this.notificationsService.sendDriverAssignedSms({
+          phoneNumber:
+            reassigned.customerPhone ?? reassigned.deliveryPhone ?? null,
+          customerName: reassigned.deliveryRecipientName || null,
+          driverName: selectedDriver.name,
+          driverPhone: selectedDriver.phone,
+          orderId: reassigned.id,
+          townSlug: reassigned.town?.slug ?? null,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Failed to send customer driver-assigned SMS for order ${orderId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+
+      return { ...reassigned, deliveryCode: code };
+    }
+  } catch (error) {
+    this.logger.warn(
+      `Auto-assign failed after confirmation for order ${orderId}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  return { ...updated, deliveryCode: code };
+}
   // ✅ UPDATED: deduct stock handles VARIANT like UNIT
   private async deductStockForFulfilment(
     tx: Prisma.TransactionClient,
