@@ -53,22 +53,34 @@ export default function DriversPage() {
   }
 
   async function createDriver() {
-    if (!selectedTown || !newDriver.name || !newDriver.phone) return;
+  if (!selectedTown || !newDriver.name || !newDriver.phone) {
+    alert('Please select a town and enter name and phone.');
+    return;
+  }
 
+  try {
     await apiFetch('/admin/drivers', {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         townId: selectedTown,
-        name: newDriver.name,
-        phone: newDriver.phone,
+        name: newDriver.name.trim(),
+        phone: newDriver.phone.trim(),
         priority: Number(newDriver.priority),
+        availability: 'AVAILABLE',
       }),
     });
 
     setNewDriver({ name: '', phone: '', priority: 100 });
     await loadDrivers(selectedTown);
+    alert('Driver added successfully.');
+  } catch (error) {
+    console.error('Failed to create driver', error);
+    alert('Failed to add driver. Check browser console and backend logs.');
   }
-
+}
   async function setAvailability(id: string, availability: Driver['availability']) {
     await apiFetch(`/admin/drivers/${id}/availability`, {
       method: 'PATCH',
