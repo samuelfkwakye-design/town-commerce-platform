@@ -43,6 +43,15 @@ export class AdminDriversController {
     return this.service.getById(id);
   }
 
+  @Get(':id/orders')
+  async getDriverOrders(@Param('id') id: string) {
+    if (!id) {
+      throw new BadRequestException('id is required');
+    }
+
+    return this.service.getOrders(id);
+  }
+
   @Post()
   async create(@Body() dto: CreateDriverDto) {
     return this.service.create(dto);

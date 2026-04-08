@@ -59,6 +59,33 @@ export class AdminDriversService {
     return driver;
   }
 
+  async getOrders(driverId: string) {
+    await this.ensureDriverExists(driverId);
+
+    return this.prisma.order.findMany({
+      where: {
+        driverId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+  id: true,
+  status: true,
+  total: true,
+  createdAt: true,
+  town: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+    },
+  },
+},
+      take: 50,
+    });
+  }
+
   async create(dto: CreateDriverDto) {
     const town = await this.prisma.town.findUnique({
       where: { id: dto.townId },
