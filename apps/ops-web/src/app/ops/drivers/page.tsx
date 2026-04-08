@@ -25,6 +25,8 @@ export default function DriversPage() {
   const [selectedTown, setSelectedTown] = useState<string>('');
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const [newDriver, setNewDriver] = useState({
     name: '',
@@ -33,70 +35,102 @@ export default function DriversPage() {
   });
 
   async function loadTowns() {
-  const res = await apiFetch<Town[]>('/towns');
-  setTowns(res || []);
-  if (res?.length) {
-    setSelectedTown(res[0].id);
+    const res = await apiFetch<Town[]>('/towns');
+    setTowns(res || []);
+    if (res?.length) {
+      setSelectedTown(res[0].id);
+    }
   }
-}
 
   async function loadDrivers(townId: string) {
     setLoading(true);
+    setErrorMessage('');
     try {
-      const res = await apiFetch<Driver[]>(
-        `/admin/drivers?townId=${townId}`,
-      );
+      const res = await apiFetch<Driver[]>(`/admin/drivers?townId=${townId}`);
       setDrivers(res || []);
+    } catch (error) {
+      console.error('Failed to load drivers', error);
+      setErrorMessage('Failed to load drivers.');
     } finally {
       setLoading(false);
     }
   }
 
   async function createDriver() {
-  if (!selectedTown || !newDriver.name || !newDriver.phone) {
-    alert('Please select a town and enter name and phone.');
-    return;
+    setSuccessMessage('');
+    setErrorMessage('');
+
+    if (!selectedTown || !newDriver.name || !newDriver.phone) {
+      setErrorMessage('Please select a town and enter name and phone.');
+      return;
+    }
+
+    try {
+      await apiFetch('/admin/drivers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          townId: selectedTown,
+          name: newDriver.name.trim(),
+          phone: newDriver.phone.trim(),
+          priority: Number(newDriver.priority),
+          availability: 'AVAILABLE',
+        }),
+      });
+
+      setNewDriver({ name: '', phone: '', priority: 100 });
+      await loadDrivers(selectedTown);
+      setSuccessMessage('Driver added successfully.');
+    } catch (error) {
+      console.error('Failed to create driver', error);
+      setErrorMessage('Failed to add driver. Please try again.');
+    }
   }
 
-  try {
-    await apiFetch('/admin/drivers', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        townId: selectedTown,
-        name: newDriver.name.trim(),
-        phone: newDriver.phone.trim(),
-        priority: Number(newDriver.priority),
-        availability: 'AVAILABLE',
-      }),
-    });
-
-    setNewDriver({ name: '', phone: '', priority: 100 });
-    await loadDrivers(selectedTown);
-    alert('Driver added successfully.');
-  } catch (error) {
-    console.error('Failed to create driver', error);
-    alert('Failed to add driver. Check browser console and backend logs.');
-  }
-}
   async function setAvailability(id: string, availability: Driver['availability']) {
-    await apiFetch(`/admin/drivers/${id}/availability`, {
-      method: 'PATCH',
-      body: JSON.stringify({ availability }),
-    });
+    setSuccessMessage('');
+    setErrorMessage('');
 
-    await loadDrivers(selectedTown);
+    try {
+      await apiFetch(`/admin/drivers/${id}/availability`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ availability }),
+      });
+
+      await loadDrivers(selectedTown);
+      setSuccessMessage(`Driver marked ${availability.toLowerCase()}.`);
+    } catch (error) {
+      console.error('Failed to update availability', error);
+      setErrorMessage('Failed to update driver availability.');
+    }
   }
 
   async function toggleActive(id: string, isActive: boolean) {
-    await apiFetch(`/admin/drivers/${id}/active`, {
-      method: 'PATCH',
-      body: JSON.stringify({ isActive }),
-    });
+    setSuccessMessage('');
+    setErrorMessage('');
 
-    await loadDrivers(selectedTown);
+    try {
+      await apiFetch(`/admin/drivers/${id}/active`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isActive }),
+      });
+
+      await loadDrivers(selectedTown);
+      setSuccessMessage(
+        isActive ? 'Driver activated successfully.' : 'Driver deactivated successfully.',
+      );
+    } catch (error) {
+      console.error('Failed to update driver active status', error);
+      setErrorMessage('Failed to update driver active status.');
+    }
   }
 
   useEffect(() => {
@@ -113,7 +147,18 @@ export default function DriversPage() {
     <div className="p-6">
       <h1 className="mb-4 text-xl font-semibold">Drivers</h1>
 
-      {/* Town Selector */}
+      {successMessage ? (
+        <div className="mb-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          {successMessage}
+        </div>
+      ) : null}
+
+      {errorMessage ? (
+        <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {errorMessage}
+        </div>
+      ) : null}
+
       <div className="mb-4">
         <select
           value={selectedTown}
@@ -128,7 +173,6 @@ export default function DriversPage() {
         </select>
       </div>
 
-      {/* Add Driver */}
       <div className="mb-6 rounded border bg-white p-4">
         <h2 className="mb-2 font-semibold">Add Driver</h2>
 
@@ -173,7 +217,6 @@ export default function DriversPage() {
         </div>
       </div>
 
-      {/* Drivers List */}
       <div className="rounded border bg-white p-4">
         {loading ? (
           <div>Loading...</div>
@@ -195,10 +238,8 @@ export default function DriversPage() {
                 <tr key={d.id} className="border-t">
                   <td>{d.name}</td>
                   <td>{d.phone}</td>
-
                   <td>{d.availability}</td>
                   <td>{d.priority}</td>
-
                   <td>{d.isActive ? 'Yes' : 'No'}</td>
 
                   <td className="space-x-2">
