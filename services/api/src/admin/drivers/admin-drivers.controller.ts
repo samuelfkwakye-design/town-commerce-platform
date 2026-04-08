@@ -34,6 +34,15 @@ export class AdminDriversController {
     return this.service.listByTown(townId, includeInactiveValue);
   }
 
+  @Get(':id')
+  async getOne(@Param('id') id: string) {
+    if (!id) {
+      throw new BadRequestException('id is required');
+    }
+
+    return this.service.getById(id);
+  }
+
   @Post()
   async create(@Body() dto: CreateDriverDto) {
     return this.service.create(dto);

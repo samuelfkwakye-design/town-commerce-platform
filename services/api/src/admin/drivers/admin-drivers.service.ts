@@ -34,6 +34,31 @@ export class AdminDriversService {
     });
   }
 
+  async getById(id: string) {
+    if (!id) {
+      throw new BadRequestException('id is required');
+    }
+
+    const driver = await this.prisma.driver.findUnique({
+      where: { id },
+      include: {
+        town: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Driver not found');
+    }
+
+    return driver;
+  }
+
   async create(dto: CreateDriverDto) {
     const town = await this.prisma.town.findUnique({
       where: { id: dto.townId },

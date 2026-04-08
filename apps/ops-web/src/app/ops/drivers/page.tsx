@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 
@@ -236,7 +237,14 @@ export default function DriversPage() {
             <tbody>
               {drivers.map((d) => (
                 <tr key={d.id} className="border-t">
-                  <td>{d.name}</td>
+                  <td>
+                    <Link
+                      href={`/ops/drivers/${d.id}`}
+                      className="font-medium text-blue-700 hover:underline"
+                    >
+                      {d.name}
+                    </Link>
+                  </td>
                   <td>{d.phone}</td>
                   <td>{d.availability}</td>
                   <td>{d.priority}</td>
