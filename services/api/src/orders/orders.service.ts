@@ -1704,7 +1704,58 @@ if (tp.pricingModel === PricingModel.VARIANT) {
       return tx.order.findUnique({ where: { id: orderId } });
     });
   }
+async assignDriver(
+  orderId: string,
+  driverName: string,
+  driverPhone: string,
+) {
+  const order = await this.prisma.order.findUnique({
+    where: { id: orderId },
+  });
 
+  if (!order) {
+    throw new NotFoundException(`Order not found: ${orderId}`);
+  }
+
+  if (
+    order.status !== OrderStatus.CONFIRMED &&
+    order.status !== OrderStatus.FULFILLED &&
+    order.status !== OrderStatus.SETTLED &&
+    order.status !== OrderStatus.PARTIALLY_REFUNDED
+  ) {
+    throw new BadRequestException(
+      'Driver can only be assigned after order confirmation',
+    );
+  }
+
+  const updated = await this.prisma.order.update({
+  where: { id: orderId },
+  data: {
+    driverName: driverName.trim(),
+    driverPhone: driverPhone.trim(),
+    driverAssignedAt: new Date(),
+  },
+});
+
+   try {
+    await this.notificationsService.sendDriverAssignedSms({
+      phoneNumber: updated.customerPhone ?? updated.deliveryPhone ?? null,
+      customerName: updated.deliveryRecipientName || null,
+      driverName: driverName.trim(),
+      driverPhone: driverPhone.trim(),
+      orderId: updated.id,
+      townSlug: null,
+    });
+  } catch (error) {
+    this.logger.warn(
+      `Failed to send driver SMS for order ${orderId}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  return updated;
+}
   async markCodCollected(orderId: string, note?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },

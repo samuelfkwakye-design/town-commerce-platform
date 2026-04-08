@@ -21,6 +21,7 @@ import { CodCollectedDto } from './dto/cod-collected.dto';
 import { PayGoodsDto } from './dto/pay-goods.dto';
 import { RefundItemsDto } from './dto/refund-items.dto';
 import { QuoteOrderDto } from './dto/quote-order.dto';
+import { AssignDriverDto } from './dto/assign-driver.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -82,7 +83,11 @@ export class OrdersController {
   adminConfirm(@Param('id') id: string) {
     return this.service.confirmOrder(id);
   }
-
+// PATCH /api/v1/orders/:id/assign-driver
+@Patch(':id/assign-driver')
+assignDriver(@Param('id') id: string, @Body() dto: AssignDriverDto) {
+  return this.service.assignDriver(id, dto.driverName, dto.driverPhone);
+}
   // PATCH /api/v1/orders/:id/complete
   @Patch(':id/complete')
   complete(@Param('id') id: string, @Body() dto: CompleteOrderDto) {

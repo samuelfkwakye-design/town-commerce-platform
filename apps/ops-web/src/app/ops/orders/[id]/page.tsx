@@ -85,8 +85,7 @@ function hasCodCollectedPayment(order: any) {
   return payments.some(
     (p: any) =>
       (p?.method ?? '').toUpperCase() === 'COD' &&
-      (p?.status ?? '').toUpperCase() === 'SUCCESS' &&
-      true,
+      (p?.status ?? '').toUpperCase() === 'SUCCESS',
   );
 }
 
@@ -165,6 +164,9 @@ export default function OrderDetailPage() {
     Record<string, number>
   >({});
 
+  const [driverName, setDriverName] = useState('');
+  const [driverPhone, setDriverPhone] = useState('');
+
   const currency = useMemo(() => {
     const p0 = order?.payments?.[0];
     return p0?.currency ?? 'GHS';
@@ -183,6 +185,8 @@ export default function OrderDetailPage() {
 
       const o = await apiFetch<any>(`/admin/orders/${id}`);
       setOrder(o);
+      setDriverName(o?.driverName ?? '');
+      setDriverPhone(o?.driverPhone ?? '');
 
       try {
         const res = await apiFetch<any>(`/orders/${id}/stock-movements?limit=50`);
@@ -241,6 +245,11 @@ export default function OrderDetailPage() {
   }, [paymentsSorted]);
 
   const canConfirmAvailability = (order?.status || '').toUpperCase() === 'DRAFT';
+  const canAssignDriver = ['CONFIRMED', 'FULFILLED', 'SETTLED', 'PARTIALLY_REFUNDED'].includes(
+    (order?.status || '').toUpperCase(),
+  );
+  const hasAssignedDriver = Boolean(order?.driverName || order?.driverPhone);
+
   const canForceSettle = (order?.status || '').toUpperCase() === 'FULFILLED';
   const canCancel = ['DRAFT', 'CONFIRMED'].includes((order?.status || '').toUpperCase());
   const canRefund = ['SETTLED', 'FULFILLED', 'PARTIALLY_REFUNDED'].includes(
@@ -307,6 +316,42 @@ export default function OrderDetailPage() {
       setTimeout(() => setActionOk(null), 2500);
     } catch (e: any) {
       setActionErr(e?.message ?? 'Confirm availability failed');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function assignDriver() {
+    if (!id) return;
+
+    if (!driverName.trim()) {
+      setActionErr('Please enter driver name.');
+      return;
+    }
+
+    if (!driverPhone.trim()) {
+      setActionErr('Please enter driver phone.');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      setActionErr(null);
+      setActionOk(null);
+
+      await apiFetch(`/orders/${id}/assign-driver`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          driverName: driverName.trim(),
+          driverPhone: driverPhone.trim(),
+        }),
+      });
+
+      setActionOk('Driver assigned successfully.');
+      await load();
+      setTimeout(() => setActionOk(null), 2500);
+    } catch (e: any) {
+      setActionErr(e?.message ?? 'Assign driver failed');
     } finally {
       setActionLoading(false);
     }
@@ -455,7 +500,6 @@ export default function OrderDetailPage() {
 
   return (
     <div className="space-y-6 bg-[#fffaf5] p-6">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <div className="text-sm text-slate-600">
@@ -500,7 +544,6 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Customer + delivery */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-3 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
           <div className="flex items-center justify-between gap-3">
@@ -588,7 +631,66 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Quick actions */}
+      <div className="space-y-4 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold text-[#0f172a]">Assigned driver</h2>
+          {hasAssignedDriver ? (
+            <span className="rounded-full border border-green-200 bg-green-50 px-2 py-1 text-xs text-green-800">
+              Driver assigned
+            </span>
+          ) : (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
+              No driver assigned
+            </span>
+          )}
+        </div>
+
+        {hasAssignedDriver ? (
+          <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-600">Driver name</span>
+              <span className="text-right font-semibold text-[#0f172a]">{order.driverName ?? '—'}</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-600">Driver phone</span>
+              <span className="text-right font-semibold text-[#0f172a]">{order.driverPhone ?? '—'}</span>
+            </div>
+            <div className="flex justify-between gap-4 sm:col-span-2">
+              <span className="text-slate-600">Assigned at</span>
+              <span className="text-right font-semibold text-[#0f172a]">{formatDate(order.driverAssignedAt)}</span>
+            </div>
+          </div>
+        ) : null}
+
+        {canAssignDriver ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <input
+              value={driverName}
+              onChange={(e) => setDriverName(e.target.value)}
+              placeholder="Driver name"
+              className="rounded-xl border px-3 py-2 text-sm"
+            />
+            <input
+              value={driverPhone}
+              onChange={(e) => setDriverPhone(e.target.value)}
+              placeholder="Driver phone"
+              className="rounded-xl border px-3 py-2 text-sm"
+            />
+            <button
+              onClick={assignDriver}
+              disabled={actionLoading}
+              className="rounded-xl bg-[#f97316] px-4 py-2 text-sm font-semibold text-white hover:bg-[#ea6a0a] disabled:opacity-50"
+            >
+              {actionLoading ? 'Saving…' : hasAssignedDriver ? 'Update driver' : 'Assign driver'}
+            </button>
+          </div>
+        ) : (
+          <div className="text-sm text-slate-600">
+            Driver can be assigned after the order has been confirmed.
+          </div>
+        )}
+      </div>
+
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           {canConfirmAvailability ? (
@@ -670,7 +772,6 @@ export default function OrderDetailPage() {
         {actionOk ? <div className="text-sm text-green-700">{actionOk}</div> : null}
       </div>
 
-      {/* Totals */}
       <div className="rounded-2xl border border-[#0f172a]/10 bg-white p-4">
         <h2 className="mb-3 font-semibold text-[#0f172a]">Totals</h2>
         <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
@@ -705,7 +806,6 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Items */}
       <div className="space-y-3 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
         <h2 className="font-semibold text-[#0f172a]">Items</h2>
         <div className="overflow-hidden rounded-xl border">
@@ -771,7 +871,6 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Payments timeline */}
       <div id="payments" className="space-y-4 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-[#0f172a]">Payments</h2>
@@ -781,18 +880,24 @@ export default function OrderDetailPage() {
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
           <div className="rounded-xl border bg-white p-3">
             <div className="text-xs text-slate-500">Paid (SUCCESS)</div>
-            <div className="text-sm font-semibold text-[#0f172a]">{formatMoney(paymentsSummary.paidTotal, currency)}</div>
+            <div className="text-sm font-semibold text-[#0f172a]">
+              {formatMoney(paymentsSummary.paidTotal, currency)}
+            </div>
           </div>
 
           <div className="rounded-xl border bg-white p-3">
             <div className="text-xs text-slate-500">Refunded</div>
-            <div className="text-sm font-semibold text-[#0f172a]">{formatMoney(paymentsSummary.refundedTotal, currency)}</div>
+            <div className="text-sm font-semibold text-[#0f172a]">
+              {formatMoney(paymentsSummary.refundedTotal, currency)}
+            </div>
             <div className="text-xs text-slate-500">{paymentsSummary.refundsCount} refund(s)</div>
           </div>
 
           <div className="rounded-xl border bg-white p-3">
             <div className="text-xs text-slate-500">Net</div>
-            <div className="text-sm font-semibold text-[#0f172a]">{formatMoney(paymentsSummary.net, currency)}</div>
+            <div className="text-sm font-semibold text-[#0f172a]">
+              {formatMoney(paymentsSummary.net, currency)}
+            </div>
           </div>
 
           <div className="rounded-xl border bg-white p-3">
@@ -810,7 +915,7 @@ export default function OrderDetailPage() {
 
               return (
                 <div key={p.id} className="relative pl-7">
-                  <div className="absolute bottom-0 left-2 top-0 w-px bg-slate-200" />
+                  <div className="absolute left-2 top-0 bottom-0 w-px bg-slate-200" />
                   <div className="absolute left-0 top-4 h-4 w-4 rounded-full border bg-white" />
 
                   <div className="space-y-3 rounded-xl border bg-white p-3">
@@ -867,7 +972,7 @@ export default function OrderDetailPage() {
                         <div className="mt-3 space-y-3">
                           {refunds.map((r: any) => (
                             <div key={r.id} className="relative pl-6">
-                              <div className="absolute bottom-0 left-2 top-0 w-px bg-slate-200" />
+                              <div className="absolute left-2 top-0 bottom-0 w-px bg-slate-200" />
                               <div className="absolute left-0 top-3 h-3 w-3 rounded-full border bg-white" />
 
                               <div className="space-y-2 rounded-xl border bg-slate-50 p-3">
@@ -999,7 +1104,6 @@ export default function OrderDetailPage() {
         )}
       </div>
 
-      {/* Stock movements */}
       <div className="space-y-3 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
         <h2 className="font-semibold text-[#0f172a]">Stock movements</h2>
         {movements.length === 0 ? (
@@ -1036,7 +1140,6 @@ export default function OrderDetailPage() {
         )}
       </div>
 
-      {/* Refund modal */}
       {refundOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={closeRefund} />
@@ -1184,7 +1287,6 @@ export default function OrderDetailPage() {
         </div>
       ) : null}
 
-      {/* Confirm modal */}
       {confirmOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={closeConfirm} />
