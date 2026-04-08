@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type ListQuery = {
   status?: string;
@@ -17,7 +18,67 @@ type ListQuery = {
 
 @Injectable()
 export class AdminOrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
+
+  private async notifyDriverAssignmentChange(input: {
+    previousDriverName?: string | null;
+    previousDriverPhone?: string | null;
+    newDriverName?: string | null;
+    newDriverPhone?: string | null;
+    order: {
+      id: string;
+      customerPhone?: string | null;
+      deliveryPhone?: string | null;
+      deliveryRecipientName?: string | null;
+      deliveryTown?: string | null;
+      deliveryLine1?: string | null;
+      town?: { id?: string; name?: string; slug?: string } | null;
+    };
+  }) {
+    const previousPhone = String(input.previousDriverPhone ?? '').trim();
+    const previousName = String(input.previousDriverName ?? '').trim();
+    const newPhone = String(input.newDriverPhone ?? '').trim();
+    const newName = String(input.newDriverName ?? '').trim();
+
+    const driverChanged =
+      previousPhone !== newPhone || previousName !== newName;
+
+    if (!driverChanged) {
+      return;
+    }
+
+    if (previousPhone) {
+      try {
+        await this.notificationsService.sendDriverUnassignedSms({
+          phoneNumber: previousPhone,
+          driverName: previousName || null,
+          orderId: input.order.id,
+        });
+      } catch {
+        // do not fail assignment because SMS failed
+      }
+    }
+
+    if (newPhone) {
+      try {
+        await this.notificationsService.sendDriverAssignmentToDriverSms({
+          phoneNumber: newPhone,
+          driverName: newName || null,
+          orderId: input.order.id,
+          customerName: input.order.deliveryRecipientName ?? null,
+          customerPhone:
+            input.order.customerPhone ?? input.order.deliveryPhone ?? null,
+          deliveryTown: input.order.deliveryTown ?? null,
+          deliveryAddressLine1: input.order.deliveryLine1 ?? null,
+        });
+      } catch {
+        // do not fail assignment because SMS failed
+      }
+    }
+  }
 
   async list(q: ListQuery) {
     const limit = Math.min(Math.max(Number(q.limit ?? 20), 1), 100);
@@ -172,6 +233,17 @@ export class AdminOrdersService {
         id: true,
         townId: true,
         status: true,
+        customerPhone: true,
+        deliveryPhone: true,
+        deliveryRecipientName: true,
+        deliveryTown: true,
+        deliveryLine1: true,
+        driverId: true,
+        driverName: true,
+        driverPhone: true,
+        town: {
+          select: { id: true, name: true, slug: true },
+        },
       },
     });
 
@@ -207,6 +279,9 @@ export class AdminOrdersService {
 
     const now = new Date();
 
+    const previousDriverName = order.driverName ?? null;
+    const previousDriverPhone = order.driverPhone ?? null;
+
     const updatedOrder = await this.prisma.order.update({
       where: { id: orderId },
       data: {
@@ -237,6 +312,36 @@ export class AdminOrdersService {
         lastAssignedAt: now,
       },
     });
+
+    await this.notifyDriverAssignmentChange({
+      previousDriverName,
+      previousDriverPhone,
+      newDriverName: driver.name,
+      newDriverPhone: driver.phone,
+      order: {
+        id: updatedOrder.id,
+        customerPhone: updatedOrder.customerPhone ?? null,
+        deliveryPhone: updatedOrder.deliveryPhone ?? null,
+        deliveryRecipientName: updatedOrder.deliveryRecipientName ?? null,
+        deliveryTown: updatedOrder.deliveryTown ?? null,
+        deliveryLine1: updatedOrder.deliveryLine1 ?? null,
+        town: updatedOrder.town ?? null,
+      },
+    });
+
+    try {
+      await this.notificationsService.sendDriverAssignedSms({
+        phoneNumber:
+          updatedOrder.customerPhone ?? updatedOrder.deliveryPhone ?? null,
+        customerName: updatedOrder.deliveryRecipientName ?? null,
+        driverName: driver.name,
+        driverPhone: driver.phone,
+        orderId: updatedOrder.id,
+        townSlug: updatedOrder.town?.slug ?? null,
+      });
+    } catch {
+      // do not fail assignment because SMS failed
+    }
 
     return updatedOrder;
   }
@@ -310,7 +415,20 @@ export class AdminOrdersService {
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      select: { id: true },
+      select: {
+        id: true,
+        customerPhone: true,
+        deliveryPhone: true,
+        deliveryRecipientName: true,
+        deliveryTown: true,
+        deliveryLine1: true,
+        driverId: true,
+        driverName: true,
+        driverPhone: true,
+        town: {
+          select: { id: true, name: true, slug: true },
+        },
+      },
     });
 
     if (!order) {
@@ -324,7 +442,10 @@ export class AdminOrdersService {
       throw new BadRequestException('driverName and driverPhone are required');
     }
 
-    return this.prisma.order.update({
+    const previousDriverName = order.driverName ?? null;
+    const previousDriverPhone = order.driverPhone ?? null;
+
+    const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: {
         driverId: null,
@@ -332,20 +453,63 @@ export class AdminOrdersService {
         driverPhone: cleanedPhone,
         driverAssignedAt: new Date(),
       },
+      include: {
+        town: {
+          select: { id: true, name: true, slug: true },
+        },
+      },
     });
+
+    await this.notifyDriverAssignmentChange({
+      previousDriverName,
+      previousDriverPhone,
+      newDriverName: cleanedName,
+      newDriverPhone: cleanedPhone,
+      order: {
+        id: updated.id,
+        customerPhone: updated.customerPhone ?? null,
+        deliveryPhone: updated.deliveryPhone ?? null,
+        deliveryRecipientName: updated.deliveryRecipientName ?? null,
+        deliveryTown: updated.deliveryTown ?? null,
+        deliveryLine1: updated.deliveryLine1 ?? null,
+        town: updated.town ?? null,
+      },
+    });
+
+    try {
+      await this.notificationsService.sendDriverAssignedSms({
+        phoneNumber: updated.customerPhone ?? updated.deliveryPhone ?? null,
+        customerName: updated.deliveryRecipientName ?? null,
+        driverName: cleanedName,
+        driverPhone: cleanedPhone,
+        orderId: updated.id,
+        townSlug: updated.town?.slug ?? null,
+      });
+    } catch {
+      // do not fail assignment because SMS failed
+    }
+
+    return updated;
   }
 
   async clearDriver(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      select: { id: true },
+      select: {
+        id: true,
+        driverName: true,
+        driverPhone: true,
+      },
     });
 
     if (!order) {
       throw new NotFoundException(`Order not found: ${orderId}`);
     }
 
-    return this.prisma.order.update({
+    const previousDriverName = order.driverName ?? null;
+    const previousDriverPhone = order.driverPhone ?? null;
+
+    const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: {
         driverId: null,
@@ -354,6 +518,20 @@ export class AdminOrdersService {
         driverAssignedAt: null,
       },
     });
+
+    if (previousDriverPhone) {
+      try {
+        await this.notificationsService.sendDriverUnassignedSms({
+          phoneNumber: previousDriverPhone,
+          driverName: previousDriverName,
+          orderId: updated.id,
+        });
+      } catch {
+        // do not fail clear because SMS failed
+      }
+    }
+
+    return updated;
   }
 
   async markCodCollected(orderId: string, note?: string | null) {

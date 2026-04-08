@@ -599,6 +599,70 @@ private normalizeTownText(value?: string | null) {
   private hashCode(code: string): string {
     return crypto.createHash('sha256').update(code).digest('hex');
   }
+    private async notifyDriverAssignmentChange(input: {
+    previousDriverName?: string | null;
+    previousDriverPhone?: string | null;
+    newDriverName?: string | null;
+    newDriverPhone?: string | null;
+    order: {
+      id: string;
+      customerPhone?: string | null;
+      deliveryPhone?: string | null;
+      deliveryRecipientName?: string | null;
+      deliveryTown?: string | null;
+      deliveryLine1?: string | null;
+      town?: { slug?: string | null } | null;
+    };
+  }) {
+    const previousPhone = String(input.previousDriverPhone ?? '').trim();
+    const previousName = String(input.previousDriverName ?? '').trim();
+    const newPhone = String(input.newDriverPhone ?? '').trim();
+    const newName = String(input.newDriverName ?? '').trim();
+
+    const driverChanged =
+      previousPhone !== newPhone || previousName !== newName;
+
+    if (!driverChanged) {
+      return;
+    }
+
+    if (previousPhone) {
+      try {
+        await this.notificationsService.sendDriverUnassignedSms({
+          phoneNumber: previousPhone,
+          driverName: previousName || null,
+          orderId: input.order.id,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Failed to send old-driver unassigned SMS for order ${input.order.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+
+    if (newPhone) {
+      try {
+        await this.notificationsService.sendDriverAssignmentToDriverSms({
+          phoneNumber: newPhone,
+          driverName: newName || null,
+          orderId: input.order.id,
+          customerName: input.order.deliveryRecipientName ?? null,
+          customerPhone:
+            input.order.customerPhone ?? input.order.deliveryPhone ?? null,
+          deliveryTown: input.order.deliveryTown ?? null,
+          deliveryAddressLine1: input.order.deliveryLine1 ?? null,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Failed to send new-driver assignment SMS for order ${input.order.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+  }
 
   // ✅ NEW: shared add item logic (transaction-safe)
   private async addItemTx(
@@ -1704,58 +1768,98 @@ if (tp.pricingModel === PricingModel.VARIANT) {
       return tx.order.findUnique({ where: { id: orderId } });
     });
   }
-async assignDriver(
-  orderId: string,
-  driverName: string,
-  driverPhone: string,
-) {
-  const order = await this.prisma.order.findUnique({
-    where: { id: orderId },
-  });
-
-  if (!order) {
-    throw new NotFoundException(`Order not found: ${orderId}`);
-  }
-
-  if (
-    order.status !== OrderStatus.CONFIRMED &&
-    order.status !== OrderStatus.FULFILLED &&
-    order.status !== OrderStatus.SETTLED &&
-    order.status !== OrderStatus.PARTIALLY_REFUNDED
+  async assignDriver(
+    orderId: string,
+    driverName: string,
+    driverPhone: string,
   ) {
-    throw new BadRequestException(
-      'Driver can only be assigned after order confirmation',
-    );
-  }
-
-  const updated = await this.prisma.order.update({
-  where: { id: orderId },
-  data: {
-    driverName: driverName.trim(),
-    driverPhone: driverPhone.trim(),
-    driverAssignedAt: new Date(),
-  },
-});
-
-   try {
-    await this.notificationsService.sendDriverAssignedSms({
-      phoneNumber: updated.customerPhone ?? updated.deliveryPhone ?? null,
-      customerName: updated.deliveryRecipientName || null,
-      driverName: driverName.trim(),
-      driverPhone: driverPhone.trim(),
-      orderId: updated.id,
-      townSlug: null,
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        town: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
     });
-  } catch (error) {
-    this.logger.warn(
-      `Failed to send driver SMS for order ${orderId}: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-  }
 
-  return updated;
-}
+    if (!order) {
+      throw new NotFoundException(`Order not found: ${orderId}`);
+    }
+
+    if (
+      order.status !== OrderStatus.CONFIRMED &&
+      order.status !== OrderStatus.FULFILLED &&
+      order.status !== OrderStatus.SETTLED &&
+      order.status !== OrderStatus.PARTIALLY_REFUNDED
+    ) {
+      throw new BadRequestException(
+        'Driver can only be assigned after order confirmation',
+      );
+    }
+
+    const trimmedDriverName = driverName.trim();
+    const trimmedDriverPhone = driverPhone.trim();
+
+    const previousDriverName = order.driverName ?? null;
+    const previousDriverPhone = order.driverPhone ?? null;
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        driverName: trimmedDriverName,
+        driverPhone: trimmedDriverPhone,
+        driverAssignedAt: new Date(),
+      },
+      include: {
+        town: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
+    });
+
+    await this.notifyDriverAssignmentChange({
+      previousDriverName,
+      previousDriverPhone,
+      newDriverName: trimmedDriverName,
+      newDriverPhone: trimmedDriverPhone,
+      order: {
+        id: updated.id,
+        customerPhone: updated.customerPhone ?? null,
+        deliveryPhone: updated.deliveryPhone ?? null,
+        deliveryRecipientName: updated.deliveryRecipientName ?? null,
+        deliveryTown: updated.deliveryTown ?? null,
+        deliveryLine1: updated.deliveryLine1 ?? null,
+        town: updated.town ?? null,
+      },
+    });
+
+    try {
+      await this.notificationsService.sendDriverAssignedSms({
+        phoneNumber: updated.customerPhone ?? updated.deliveryPhone ?? null,
+        customerName: updated.deliveryRecipientName || null,
+        driverName: trimmedDriverName,
+        driverPhone: trimmedDriverPhone,
+        orderId: updated.id,
+        townSlug: updated.town?.slug ?? null,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to send customer driver-assigned SMS for order ${orderId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    return updated;
+  }
   async markCodCollected(orderId: string, note?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
