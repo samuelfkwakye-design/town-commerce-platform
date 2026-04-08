@@ -10,17 +10,20 @@ import { AdminExportsService } from './admin.exports.service';
 import { AdminTownProductsService } from '../town-products/admin.town-products.service';
 import { AdminTownsController } from './admin.towns.controller';
 
-// ✅ existing
+// existing
 import { AdminRefundsModule } from './refunds/admin.refunds.module';
 
-// ✅ product images admin endpoints
+// product images admin endpoints
 import { AdminProductImagesModule } from './product-images/admin.product-images.module';
 
-// ✅ IMPORTANT: use the controller from town-products (this is the one that was serving /admin/town-products)
+// serve /admin/town-products
 import { AdminTownProductsController } from '../town-products/admin.town-products.controller';
 
-// ✅ variants controller
+// variants controller
 import { AdminTownProductVariantsController } from '../town-products/admin.town-product-variants.controller';
+
+// NEW: drivers admin module
+import { AdminDriversModule } from './drivers/admin-drivers.module';
 
 @Module({
   imports: [
@@ -28,15 +31,13 @@ import { AdminTownProductVariantsController } from '../town-products/admin.town-
     ReportsModule,
     AdminRefundsModule,
     AdminProductImagesModule,
+    AdminDriversModule,
   ],
   controllers: [
     AdminOrdersController,
     AdminExportsController,
 
-    // ✅ serve /api/v1/admin/town-products from here now
     AdminTownProductsController,
-
-    // ✅ serve /api/v1/admin/town-products/:id/variants
     AdminTownProductVariantsController,
 
     AdminTownsController,

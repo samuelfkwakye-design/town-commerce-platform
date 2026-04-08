@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 type ListQuery = {
@@ -35,6 +39,9 @@ export class AdminOrdersService {
               { id: { contains: q.q, mode: 'insensitive' } },
               { customerPhone: { contains: q.q, mode: 'insensitive' } },
               { customerEmail: { contains: q.q, mode: 'insensitive' } },
+              { deliveryRecipientName: { contains: q.q, mode: 'insensitive' } },
+              { driverName: { contains: q.q, mode: 'insensitive' } },
+              { driverPhone: { contains: q.q, mode: 'insensitive' } },
             ],
           }
         : {}),
@@ -45,7 +52,7 @@ export class AdminOrdersService {
       take: limit + 1,
       ...(q.cursor ? { skip: 1, cursor: { id: q.cursor } } : {}),
       orderBy: { createdAt: 'desc' },
-            select: {
+      select: {
         id: true,
         createdAt: true,
         updatedAt: true,
@@ -54,9 +61,16 @@ export class AdminOrdersService {
         customerId: true,
         customerPhone: true,
         customerEmail: true,
-       
 
-        // totals
+        deliveryRecipientName: true,
+        deliveryPhone: true,
+        deliveryTown: true,
+
+        driverId: true,
+        driverName: true,
+        driverPhone: true,
+        driverAssignedAt: true,
+
         subtotal: true,
         total: true,
         payNowTotal: true,
@@ -64,10 +78,10 @@ export class AdminOrdersService {
 
         goodsPaymentMethod: true,
 
-        // attach town name/slug for UI
-        town: { select: { name: true, slug: true } },
+        town: {
+          select: { id: true, name: true, slug: true },
+        },
 
-        // include lightweight customer info for registered/guest label
         customer: {
           select: {
             id: true,
@@ -77,7 +91,6 @@ export class AdminOrdersService {
           },
         },
 
-        // latest payment snapshot (if any)
         payments: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -115,6 +128,17 @@ export class AdminOrdersService {
       where: { id },
       include: {
         town: { select: { id: true, name: true, slug: true } },
+        driver: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            availability: true,
+            isActive: true,
+            priority: true,
+            lastAssignedAt: true,
+          },
+        },
         items: {
           include: {
             townProduct: {
@@ -123,6 +147,7 @@ export class AdminOrdersService {
                 town: { select: { id: true, name: true, slug: true } },
               },
             },
+            variant: true,
           },
         },
         payments: {
@@ -133,18 +158,211 @@ export class AdminOrdersService {
       },
     });
 
-    if (!order) throw new NotFoundException(`Order not found: ${id}`);
+    if (!order) {
+      throw new NotFoundException(`Order not found: ${id}`);
+    }
 
     return order;
   }
-  async markCodCollected(orderId: string, note?: string | null) {
-  return this.prisma.order.update({
-    where: { id: orderId },
-    data: {
-      // (only if your existing markCodCollected does more than this,
-      // call the shared OrdersService instead — see 3B)
-    },
-  });
-}
 
+  async assignDriverById(orderId: string, driverId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        townId: true,
+        status: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order not found: ${orderId}`);
+    }
+
+    const driver = await this.prisma.driver.findUnique({
+      where: { id: driverId },
+      select: {
+        id: true,
+        townId: true,
+        name: true,
+        phone: true,
+        isActive: true,
+        availability: true,
+      },
+    });
+
+    if (!driver) {
+      throw new NotFoundException(`Driver not found: ${driverId}`);
+    }
+
+    if (!driver.isActive) {
+      throw new BadRequestException('Selected driver is inactive');
+    }
+
+    if (driver.townId !== order.townId) {
+      throw new BadRequestException(
+        'Driver cannot be assigned to an order from a different town',
+      );
+    }
+
+    const now = new Date();
+
+    const updatedOrder = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        driverId: driver.id,
+        driverName: driver.name,
+        driverPhone: driver.phone,
+        driverAssignedAt: now,
+      },
+      include: {
+        town: { select: { id: true, name: true, slug: true } },
+        driver: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            availability: true,
+            isActive: true,
+            priority: true,
+            lastAssignedAt: true,
+          },
+        },
+      },
+    });
+
+    await this.prisma.driver.update({
+      where: { id: driver.id },
+      data: {
+        lastAssignedAt: now,
+      },
+    });
+
+    return updatedOrder;
+  }
+
+  async autoAssignDriver(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        townId: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order not found: ${orderId}`);
+    }
+
+    const activeOrderStatuses = ['CONFIRMED', 'FULFILLED'];
+
+    const drivers = await this.prisma.driver.findMany({
+      where: {
+        townId: order.townId,
+        isActive: true,
+        availability: 'AVAILABLE',
+      },
+      include: {
+        orders: {
+          where: {
+            status: {
+              in: activeOrderStatuses as any,
+            },
+          },
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (!drivers.length) {
+      throw new BadRequestException('No available drivers found for this town');
+    }
+
+    const sortedDrivers = [...drivers].sort((a, b) => {
+      const activeCountA = a.orders.length;
+      const activeCountB = b.orders.length;
+
+      if (activeCountA !== activeCountB) {
+        return activeCountA - activeCountB;
+      }
+
+      if (a.priority !== b.priority) {
+        return a.priority - b.priority;
+      }
+
+      const timeA = a.lastAssignedAt ? new Date(a.lastAssignedAt).getTime() : 0;
+      const timeB = b.lastAssignedAt ? new Date(b.lastAssignedAt).getTime() : 0;
+
+      return timeA - timeB;
+    });
+
+    const selectedDriver = sortedDrivers[0];
+
+    return this.assignDriverById(orderId, selectedDriver.id);
+  }
+
+  async assignDriverManual(
+    orderId: string,
+    driverName: string,
+    driverPhone: string,
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order not found: ${orderId}`);
+    }
+
+    const cleanedName = driverName?.trim();
+    const cleanedPhone = driverPhone?.trim();
+
+    if (!cleanedName || !cleanedPhone) {
+      throw new BadRequestException('driverName and driverPhone are required');
+    }
+
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        driverId: null,
+        driverName: cleanedName,
+        driverPhone: cleanedPhone,
+        driverAssignedAt: new Date(),
+      },
+    });
+  }
+
+  async clearDriver(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order not found: ${orderId}`);
+    }
+
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        driverId: null,
+        driverName: null,
+        driverPhone: null,
+        driverAssignedAt: null,
+      },
+    });
+  }
+
+  async markCodCollected(orderId: string, note?: string | null) {
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        // keep your existing COD collected logic here if you already had more
+        // behaviour wired elsewhere
+      },
+    });
+  }
 }

@@ -92,4 +92,27 @@ export class NotificationsService {
 
     return this.sms.sendSms(phone, message);
   }
+  async sendDriverAssignedSms(input: {
+  phoneNumber?: string | null;
+  customerName?: string | null;
+  driverName: string;
+  driverPhone: string;
+  orderId: string;
+  townSlug?: string | null;
+}) {
+  const phone = String(input.phoneNumber ?? '').trim();
+  if (!phone) return;
+
+  const firstName =
+    input.customerName?.split(' ')[0] || 'Customer';
+
+  const message =
+    `Hi ${firstName},\n\n` +
+    `Your Somame order is on the way 🚚\n\n` +
+    `Driver: ${input.driverName}\n` +
+    `Phone: ${input.driverPhone}\n\n` +
+    `Ref: ${input.orderId}`;
+
+  return this.sms.sendSms(phone, message);
+}
 }
