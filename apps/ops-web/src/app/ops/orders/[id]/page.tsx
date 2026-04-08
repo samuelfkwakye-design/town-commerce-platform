@@ -5,6 +5,17 @@ import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 
+type Driver = {
+  id: string;
+  townId: string;
+  name: string;
+  phone: string;
+  isActive: boolean;
+  availability: 'AVAILABLE' | 'BUSY' | 'OFFLINE';
+  priority: number;
+  lastAssignedAt?: string | null;
+};
+
 function toNumber(v: any): number | null {
   if (v == null) return null;
   const n = typeof v === 'number' ? v : Number(v);
@@ -145,6 +156,10 @@ export default function OrderDetailPage() {
 
   const [order, setOrder] = useState<any>(null);
   const [movements, setMovements] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [selectedDriverId, setSelectedDriverId] = useState('');
+  const [loadingDrivers, setLoadingDrivers] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -177,6 +192,32 @@ export default function OrderDetailPage() {
   const deliveryAddress = useMemo(() => getDeliveryAddress(order), [order]);
   const registeredCustomer = useMemo(() => isRegisteredCustomer(order), [order]);
 
+  async function loadDrivers(townId?: string) {
+    if (!townId) {
+      setDrivers([]);
+      setSelectedDriverId('');
+      return;
+    }
+
+    try {
+      setLoadingDrivers(true);
+      const rows = await apiFetch<Driver[]>(`/admin/drivers?townId=${encodeURIComponent(townId)}`);
+      const list = Array.isArray(rows) ? rows : [];
+      setDrivers(list);
+
+      if (order?.driverId && list.some((d) => d.id === order.driverId)) {
+        setSelectedDriverId(order.driverId);
+      } else {
+        setSelectedDriverId('');
+      }
+    } catch {
+      setDrivers([]);
+      setSelectedDriverId('');
+    } finally {
+      setLoadingDrivers(false);
+    }
+  }
+
   async function load() {
     if (!id) return;
     try {
@@ -195,6 +236,8 @@ export default function OrderDetailPage() {
       } catch {
         setMovements([]);
       }
+
+      await loadDrivers(o?.town?.id ?? o?.townId);
     } catch (e: any) {
       setErr(e?.message ?? 'Failed to load order');
     } finally {
@@ -218,7 +261,8 @@ export default function OrderDetailPage() {
       const refunds = [...(pay?.Refund ?? [])];
       refunds.sort(
         (a, b) =>
-          (new Date(b.createdAt ?? 0).getTime() || 0) - (new Date(a.createdAt ?? 0).getTime() || 0),
+          (new Date(b.createdAt ?? 0).getTime() || 0) -
+          (new Date(a.createdAt ?? 0).getTime() || 0),
       );
       return { ...pay, Refund: refunds };
     });
@@ -321,7 +365,59 @@ export default function OrderDetailPage() {
     }
   }
 
-  async function assignDriver() {
+  async function assignSelectedDriver() {
+    if (!id) return;
+
+    if (!selectedDriverId) {
+      setActionErr('Please select a driver from the list.');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      setActionErr(null);
+      setActionOk(null);
+
+      await apiFetch(`/admin/orders/${id}/assign-driver`, {
+        method: 'POST',
+        body: JSON.stringify({
+          driverId: selectedDriverId,
+        }),
+      });
+
+      setActionOk('Driver assigned successfully.');
+      await load();
+      setTimeout(() => setActionOk(null), 2500);
+    } catch (e: any) {
+      setActionErr(e?.message ?? 'Assign driver failed');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function autoAssignDriver() {
+    if (!id) return;
+
+    try {
+      setActionLoading(true);
+      setActionErr(null);
+      setActionOk(null);
+
+      await apiFetch(`/admin/orders/${id}/auto-assign-driver`, {
+        method: 'POST',
+      });
+
+      setActionOk('Driver auto-assigned successfully.');
+      await load();
+      setTimeout(() => setActionOk(null), 2500);
+    } catch (e: any) {
+      setActionErr(e?.message ?? 'Auto assign driver failed');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function assignDriverManual() {
     if (!id) return;
 
     if (!driverName.trim()) {
@@ -339,19 +435,44 @@ export default function OrderDetailPage() {
       setActionErr(null);
       setActionOk(null);
 
-      await apiFetch(`/orders/${id}/assign-driver`, {
-        method: 'PATCH',
+      await apiFetch(`/admin/orders/${id}/assign-driver-manual`, {
+        method: 'POST',
         body: JSON.stringify({
           driverName: driverName.trim(),
           driverPhone: driverPhone.trim(),
         }),
       });
 
-      setActionOk('Driver assigned successfully.');
+      setActionOk('Driver saved manually.');
       await load();
       setTimeout(() => setActionOk(null), 2500);
     } catch (e: any) {
-      setActionErr(e?.message ?? 'Assign driver failed');
+      setActionErr(e?.message ?? 'Manual driver assignment failed');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function clearDriver() {
+    if (!id) return;
+
+    try {
+      setActionLoading(true);
+      setActionErr(null);
+      setActionOk(null);
+
+      await apiFetch(`/admin/orders/${id}/clear-driver`, {
+        method: 'PATCH',
+      });
+
+      setActionOk('Driver cleared.');
+      setDriverName('');
+      setDriverPhone('');
+      setSelectedDriverId('');
+      await load();
+      setTimeout(() => setActionOk(null), 2500);
+    } catch (e: any) {
+      setActionErr(e?.message ?? 'Clear driver failed');
     } finally {
       setActionLoading(false);
     }
@@ -572,7 +693,9 @@ export default function OrderDetailPage() {
 
             <div className="flex justify-between gap-4">
               <span className="text-slate-600">Email</span>
-              <span className="text-right font-semibold text-[#0f172a]">{order.customerEmail ?? '—'}</span>
+              <span className="text-right font-semibold text-[#0f172a]">
+                {order.customerEmail ?? '—'}
+              </span>
             </div>
 
             <div className="flex justify-between gap-4">
@@ -590,27 +713,37 @@ export default function OrderDetailPage() {
           <div className="grid grid-cols-1 gap-2 text-sm">
             <div className="flex justify-between gap-4">
               <span className="text-slate-600">Recipient</span>
-              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.recipientName}</span>
+              <span className="text-right font-semibold text-[#0f172a]">
+                {deliveryAddress.recipientName}
+              </span>
             </div>
 
             <div className="flex justify-between gap-4">
               <span className="text-slate-600">Phone</span>
-              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.phone}</span>
+              <span className="text-right font-semibold text-[#0f172a]">
+                {deliveryAddress.phone}
+              </span>
             </div>
 
             <div className="flex justify-between gap-4">
               <span className="text-slate-600">Address line 1</span>
-              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.line1}</span>
+              <span className="text-right font-semibold text-[#0f172a]">
+                {deliveryAddress.line1}
+              </span>
             </div>
 
             <div className="flex justify-between gap-4">
               <span className="text-slate-600">Address line 2</span>
-              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.line2 || '—'}</span>
+              <span className="text-right font-semibold text-[#0f172a]">
+                {deliveryAddress.line2 || '—'}
+              </span>
             </div>
 
             <div className="flex justify-between gap-4">
               <span className="text-slate-600">Area</span>
-              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.area || '—'}</span>
+              <span className="text-right font-semibold text-[#0f172a]">
+                {deliveryAddress.area || '—'}
+              </span>
             </div>
 
             <div className="flex justify-between gap-4">
@@ -620,12 +753,16 @@ export default function OrderDetailPage() {
 
             <div className="flex justify-between gap-4">
               <span className="text-slate-600">Landmark</span>
-              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.landmark || '—'}</span>
+              <span className="text-right font-semibold text-[#0f172a]">
+                {deliveryAddress.landmark || '—'}
+              </span>
             </div>
 
             <div className="flex justify-between gap-4">
               <span className="text-slate-600">Notes</span>
-              <span className="text-right font-semibold text-[#0f172a]">{deliveryAddress.notes || '—'}</span>
+              <span className="text-right font-semibold text-[#0f172a]">
+                {deliveryAddress.notes || '—'}
+              </span>
             </div>
           </div>
         </div>
@@ -649,40 +786,126 @@ export default function OrderDetailPage() {
           <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
             <div className="flex justify-between gap-4">
               <span className="text-slate-600">Driver name</span>
-              <span className="text-right font-semibold text-[#0f172a]">{order.driverName ?? '—'}</span>
+              <span className="text-right font-semibold text-[#0f172a]">
+                {order.driverName ?? '—'}
+              </span>
             </div>
+
             <div className="flex justify-between gap-4">
               <span className="text-slate-600">Driver phone</span>
-              <span className="text-right font-semibold text-[#0f172a]">{order.driverPhone ?? '—'}</span>
+              <span className="text-right font-semibold text-[#0f172a]">
+                {order.driverPhone ?? '—'}
+              </span>
             </div>
-            <div className="flex justify-between gap-4 sm:col-span-2">
+
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-600">Driver source</span>
+              <span className="text-right font-semibold text-[#0f172a]">
+                {order.driverId ? 'Driver list' : 'Manual override'}
+              </span>
+            </div>
+
+            <div className="flex justify-between gap-4">
               <span className="text-slate-600">Assigned at</span>
-              <span className="text-right font-semibold text-[#0f172a]">{formatDate(order.driverAssignedAt)}</span>
+              <span className="text-right font-semibold text-[#0f172a]">
+                {formatDate(order.driverAssignedAt)}
+              </span>
             </div>
           </div>
         ) : null}
 
         {canAssignDriver ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <input
-              value={driverName}
-              onChange={(e) => setDriverName(e.target.value)}
-              placeholder="Driver name"
-              className="rounded-xl border px-3 py-2 text-sm"
-            />
-            <input
-              value={driverPhone}
-              onChange={(e) => setDriverPhone(e.target.value)}
-              placeholder="Driver phone"
-              className="rounded-xl border px-3 py-2 text-sm"
-            />
-            <button
-              onClick={assignDriver}
-              disabled={actionLoading}
-              className="rounded-xl bg-[#f97316] px-4 py-2 text-sm font-semibold text-white hover:bg-[#ea6a0a] disabled:opacity-50"
-            >
-              {actionLoading ? 'Saving…' : hasAssignedDriver ? 'Update driver' : 'Assign driver'}
-            </button>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-[#0f172a]/10 bg-slate-50 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[#0f172a]">Assign from driver list</div>
+                  <div className="text-xs text-slate-500">
+                    Town drivers only. Auto assign uses availability, active load, priority, and last assignment.
+                  </div>
+                </div>
+                <div className="text-xs text-slate-500">
+                  {loadingDrivers ? 'Loading drivers…' : `${drivers.length} driver(s)`}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_auto]">
+                <select
+                  value={selectedDriverId}
+                  onChange={(e) => setSelectedDriverId(e.target.value)}
+                  className="rounded-xl border px-3 py-2 text-sm"
+                  disabled={actionLoading || loadingDrivers}
+                >
+                  <option value="">Select driver</option>
+                  {drivers.map((driver) => (
+                    <option key={driver.id} value={driver.id}>
+                      {driver.name} • {driver.phone} • {driver.availability} • P{driver.priority}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  onClick={assignSelectedDriver}
+                  disabled={actionLoading || loadingDrivers || !selectedDriverId}
+                  className="rounded-xl bg-[#0f172a] px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
+                >
+                  {actionLoading ? 'Saving…' : 'Assign selected'}
+                </button>
+
+                <button
+                  onClick={autoAssignDriver}
+                  disabled={actionLoading || loadingDrivers}
+                  className="rounded-xl border border-[#0f172a]/15 bg-white px-4 py-2 text-sm font-semibold text-[#0f172a] hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {actionLoading ? 'Working…' : 'Auto assign'}
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="mb-3">
+                <div className="text-sm font-semibold text-amber-900">Manual override</div>
+                <div className="text-xs text-amber-800">
+                  Use this only when the driver is not yet in the database or you need to override the normal assignment flow.
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <input
+                  value={driverName}
+                  onChange={(e) => setDriverName(e.target.value)}
+                  placeholder="Driver name"
+                  className="rounded-xl border px-3 py-2 text-sm"
+                />
+                <input
+                  value={driverPhone}
+                  onChange={(e) => setDriverPhone(e.target.value)}
+                  placeholder="Driver phone"
+                  className="rounded-xl border px-3 py-2 text-sm"
+                />
+                <button
+                  onClick={assignDriverManual}
+                  disabled={actionLoading}
+                  className="rounded-xl bg-[#f97316] px-4 py-2 text-sm font-semibold text-white hover:bg-[#ea6a0a] disabled:opacity-50"
+                >
+                  {actionLoading ? 'Saving…' : order?.driverId ? 'Override manually' : 'Save manual driver'}
+                </button>
+              </div>
+            </div>
+
+            {hasAssignedDriver ? (
+              <div className="flex justify-end">
+                <button
+                  onClick={() =>
+                    openConfirm('Clear the current driver assignment?', clearDriver)
+                  }
+                  disabled={actionLoading}
+                  className="rounded-xl border border-red-500 bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100 disabled:opacity-50"
+                >
+                  Clear driver
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="text-sm text-slate-600">
@@ -777,31 +1000,45 @@ export default function OrderDetailPage() {
         <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           <div className="flex justify-between">
             <span className="text-slate-600">Subtotal</span>
-            <span className="font-semibold text-[#0f172a]">{formatMoney(order.subtotal, currency)}</span>
+            <span className="font-semibold text-[#0f172a]">
+              {formatMoney(order.subtotal, currency)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-600">Items subtotal</span>
-            <span className="font-semibold text-[#0f172a]">{formatMoney(order.itemsSubtotal, currency)}</span>
+            <span className="font-semibold text-[#0f172a]">
+              {formatMoney(order.itemsSubtotal, currency)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-600">Delivery fee</span>
-            <span className="font-semibold text-[#0f172a]">{formatMoney(order.deliveryFee, currency)}</span>
+            <span className="font-semibold text-[#0f172a]">
+              {formatMoney(order.deliveryFee, currency)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-600">Service fee</span>
-            <span className="font-semibold text-[#0f172a]">{formatMoney(order.serviceFee, currency)}</span>
+            <span className="font-semibold text-[#0f172a]">
+              {formatMoney(order.serviceFee, currency)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-600">Pay now</span>
-            <span className="font-semibold text-[#0f172a]">{formatMoney(order.payNowTotal, currency)}</span>
+            <span className="font-semibold text-[#0f172a]">
+              {formatMoney(order.payNowTotal, currency)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-600">Pay on delivery</span>
-            <span className="font-semibold text-[#0f172a]">{formatMoney(order.payOnDeliveryTotal, currency)}</span>
+            <span className="font-semibold text-[#0f172a]">
+              {formatMoney(order.payOnDeliveryTotal, currency)}
+            </span>
           </div>
           <div className="flex justify-between sm:col-span-2">
             <span className="text-slate-600">Order total</span>
-            <span className="font-semibold text-[#0f172a]">{formatMoney(order.total, currency)}</span>
+            <span className="font-semibold text-[#0f172a]">
+              {formatMoney(order.total, currency)}
+            </span>
           </div>
         </div>
       </div>
@@ -902,7 +1139,9 @@ export default function OrderDetailPage() {
 
           <div className="rounded-xl border bg-white p-3">
             <div className="text-xs text-slate-500">Events</div>
-            <div className="text-sm font-semibold text-[#0f172a]">{paymentsSummary.paymentsCount} payment(s)</div>
+            <div className="text-sm font-semibold text-[#0f172a]">
+              {paymentsSummary.paymentsCount} payment(s)
+            </div>
           </div>
         </div>
 
@@ -1014,12 +1253,16 @@ export default function OrderDetailPage() {
                                 <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                                   <div className="flex justify-between">
                                     <span className="text-slate-600">Restock</span>
-                                    <span className="font-semibold text-[#0f172a]">{String(r.restock)}</span>
+                                    <span className="font-semibold text-[#0f172a]">
+                                      {String(r.restock)}
+                                    </span>
                                   </div>
 
                                   <div className="flex justify-between sm:col-span-2">
                                     <span className="text-slate-600">Reason</span>
-                                    <span className="font-semibold text-[#0f172a]">{r.reason ?? '—'}</span>
+                                    <span className="font-semibold text-[#0f172a]">
+                                      {r.reason ?? '—'}
+                                    </span>
                                   </div>
                                 </div>
 
