@@ -14,8 +14,12 @@ type Driver = {
   availability: 'AVAILABLE' | 'BUSY' | 'OFFLINE';
   priority: number;
   lastAssignedAt?: string | null;
+  town?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
 };
-
 function toNumber(v: any): number | null {
   if (v == null) return null;
   const n = typeof v === 'number' ? v : Number(v);
@@ -105,6 +109,30 @@ function kgLabelFromGrams(grams: any) {
   const n = Number(grams);
   if (!Number.isFinite(n)) return '—';
   return `${(n / 1000).toFixed(3)} kg`;
+}
+function formatLastAssignedShort(iso?: string | null) {
+  if (!iso) return 'never';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'unknown';
+  return d.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function driverAvailabilityBadgeClass(availability: Driver['availability']) {
+  switch (availability) {
+    case 'AVAILABLE':
+      return 'border-green-200 bg-green-50 text-green-800';
+    case 'BUSY':
+      return 'border-amber-200 bg-amber-50 text-amber-800';
+    case 'OFFLINE':
+      return 'border-slate-200 bg-slate-100 text-slate-700';
+    default:
+      return 'border-slate-200 bg-slate-100 text-slate-700';
+  }
 }
 
 function isRegisteredCustomer(order: any) {
@@ -603,6 +631,22 @@ export default function OrderDetailPage() {
     }
     return m;
   }, [order?.items]);
+    const availableDrivers = useMemo(
+    () =>
+      drivers.filter((d) => d.isActive && d.availability === 'AVAILABLE'),
+    [drivers],
+  );
+
+  const unavailableDrivers = useMemo(
+    () =>
+      drivers.filter((d) => !d.isActive || d.availability !== 'AVAILABLE'),
+    [drivers],
+  );
+
+  const selectedDriver = useMemo(
+    () => drivers.find((d) => d.id === selectedDriverId) ?? null,
+    [drivers, selectedDriverId],
+  );
 
   if (loading) return <div className="p-6">Loading…</div>;
 
@@ -829,36 +873,92 @@ export default function OrderDetailPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_auto]">
-                <select
-                  value={selectedDriverId}
-                  onChange={(e) => setSelectedDriverId(e.target.value)}
-                  className="rounded-xl border px-3 py-2 text-sm"
-                  disabled={actionLoading || loadingDrivers}
-                >
-                  <option value="">Select driver</option>
-                  {drivers.map((driver) => (
-                    <option key={driver.id} value={driver.id}>
-                      {driver.name} • {driver.phone} • {driver.availability} • P{driver.priority}
-                    </option>
-                  ))}
-                </select>
+                            <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_auto]">
+                  <select
+                    value={selectedDriverId}
+                    onChange={(e) => setSelectedDriverId(e.target.value)}
+                    className="rounded-xl border px-3 py-2 text-sm"
+                    disabled={actionLoading || loadingDrivers}
+                  >
+                    <option value="">Select driver</option>
 
-                <button
-                  onClick={assignSelectedDriver}
-                  disabled={actionLoading || loadingDrivers || !selectedDriverId}
-                  className="rounded-xl bg-[#0f172a] px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
-                >
-                  {actionLoading ? 'Saving…' : 'Assign selected'}
-                </button>
+                    {availableDrivers.length > 0 ? (
+                      <optgroup label="Available drivers">
+                        {availableDrivers.map((driver) => (
+                          <option key={driver.id} value={driver.id}>
+                            {driver.name} • {driver.phone} • AVAILABLE • P{driver.priority}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
 
-                <button
-                  onClick={autoAssignDriver}
-                  disabled={actionLoading || loadingDrivers}
-                  className="rounded-xl border border-[#0f172a]/15 bg-white px-4 py-2 text-sm font-semibold text-[#0f172a] hover:bg-slate-50 disabled:opacity-50"
-                >
-                  {actionLoading ? 'Working…' : 'Auto assign'}
-                </button>
+                    {unavailableDrivers.length > 0 ? (
+                      <optgroup label="Busy / offline / inactive">
+                        {unavailableDrivers.map((driver) => (
+                          <option key={driver.id} value={driver.id}>
+                            {driver.name} • {driver.phone} • {driver.availability} • P{driver.priority}
+                            {!driver.isActive ? ' • INACTIVE' : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                  </select>
+
+                  <button
+                    onClick={assignSelectedDriver}
+                    disabled={actionLoading || loadingDrivers || !selectedDriverId}
+                    className="rounded-xl bg-[#0f172a] px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
+                  >
+                    {actionLoading ? 'Saving…' : 'Assign selected'}
+                  </button>
+
+                  <button
+                    onClick={autoAssignDriver}
+                    disabled={actionLoading || loadingDrivers || availableDrivers.length === 0}
+                    className="rounded-xl border border-[#0f172a]/15 bg-white px-4 py-2 text-sm font-semibold text-[#0f172a] hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {actionLoading ? 'Working…' : 'Auto assign best driver'}
+                  </button>
+                </div>
+
+                {selectedDriver ? (
+                  <div className="rounded-xl border border-[#0f172a]/10 bg-white p-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-[#0f172a]">
+                            {selectedDriver.name}
+                          </span>
+                          <span
+                            className={`rounded-full border px-2 py-1 text-xs ${driverAvailabilityBadgeClass(
+                              selectedDriver.availability,
+                            )}`}
+                          >
+                            {selectedDriver.availability}
+                          </span>
+                          {!selectedDriver.isActive ? (
+                            <span className="rounded-full border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700">
+                              INACTIVE
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="text-sm text-slate-600">
+                          {selectedDriver.phone} • Priority {selectedDriver.priority} • Last assigned{' '}
+                          {formatLastAssignedShort(selectedDriver.lastAssignedAt)}
+                        </div>
+                      </div>
+
+                      <Link
+                        href={`/ops/drivers/${selectedDriver.id}`}
+                        className="text-sm font-medium text-blue-700 hover:underline"
+                      >
+                        View driver →
+                      </Link>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
 
