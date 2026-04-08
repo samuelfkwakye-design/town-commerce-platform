@@ -33,12 +33,12 @@ export default function DriversPage() {
   });
 
   async function loadTowns() {
-    const res = await apiFetch<{ towns: Town[] }>('/towns');
-    setTowns(res.towns || []);
-    if (res.towns?.length) {
-      setSelectedTown(res.towns[0].id);
-    }
+  const res = await apiFetch<Town[]>('/towns');
+  setTowns(res || []);
+  if (res?.length) {
+    setSelectedTown(res[0].id);
   }
+}
 
   async function loadDrivers(townId: string) {
     setLoading(true);
