@@ -476,6 +476,25 @@ model PromoUsage {
   @@index([phone])
 }
 
+model AdminUser {
+  id                     String      @id @default(cuid())
+  email                  String      @unique
+  username               String      @unique
+  passwordHash           String
+  firstName              String?
+  lastName               String?
+  phone                  String?
+  role                   AdminRole   @default(WAREHOUSE_ADMIN)
+  isActive               Boolean     @default(true)
+  resetPasswordCodeHash  String?
+  resetPasswordExpiresAt DateTime?
+  lastLoginAt            DateTime?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+
+  @@index([role])
+  @@index([isActive])
+}
 model Driver {
   id             String              @id @default(cuid())
   townId         String
@@ -504,6 +523,12 @@ enum PromoType {
   FIXED
 }
 
+enum AdminRole {
+  SUPER_ADMIN
+  OPS_ADMIN
+  WAREHOUSE_ADMIN
+  DRIVER
+}
 enum PricingModel {
   UNIT
   WEIGHT

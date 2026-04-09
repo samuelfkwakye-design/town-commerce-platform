@@ -20,6 +20,8 @@ import { PromosModule } from './promos/promos.module';
 import { PromosAdminModule } from './admin/promos/promos.admin.module';
 import { AdminCustomersModule } from './admin/customers/admin-customers.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AdminAuthModule } from './admin-auth/admin-auth.module';
+
 @Module({
   imports: [
     HealthModule,
@@ -41,6 +43,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     PromosAdminModule,
     AdminCustomersModule,
     NotificationsModule,
+    AdminAuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
