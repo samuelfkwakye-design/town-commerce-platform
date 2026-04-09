@@ -207,8 +207,13 @@ export default function OrderDetailPage() {
     Record<string, number>
   >({});
 
-  const [driverName, setDriverName] = useState('');
+   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
+
+  const [editCustomerPhone, setEditCustomerPhone] = useState('');
+  const [editCustomerEmail, setEditCustomerEmail] = useState('');
+  const [editDeliveryRecipientName, setEditDeliveryRecipientName] = useState('');
+  const [editDeliveryPhone, setEditDeliveryPhone] = useState('');
 
   const currency = useMemo(() => {
     const p0 = order?.payments?.[0];
@@ -252,10 +257,15 @@ export default function OrderDetailPage() {
       setLoading(true);
       setErr(null);
 
-      const o = await apiFetch<any>(`/admin/orders/${id}`);
+            const o = await apiFetch<any>(`/admin/orders/${id}`);
       setOrder(o);
       setDriverName(o?.driverName ?? '');
       setDriverPhone(o?.driverPhone ?? '');
+
+      setEditCustomerPhone(o?.customerPhone ?? '');
+      setEditCustomerEmail(o?.customerEmail ?? '');
+      setEditDeliveryRecipientName(o?.deliveryRecipientName ?? '');
+      setEditDeliveryPhone(o?.deliveryPhone ?? '');
 
       try {
         const res = await apiFetch<any>(`/orders/${id}/stock-movements?limit=50`);
@@ -481,6 +491,36 @@ export default function OrderDetailPage() {
     }
   }
 
+    async function saveOrderDetails() {
+    if (!id) return;
+
+    try {
+      setActionLoading(true);
+      setActionErr(null);
+      setActionOk(null);
+
+      await apiFetch(`/orders/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerPhone: editCustomerPhone.trim() || null,
+          customerEmail: editCustomerEmail.trim() || null,
+          deliveryRecipientName: editDeliveryRecipientName.trim() || null,
+          deliveryPhone: editDeliveryPhone.trim() || null,
+        }),
+      });
+
+      setActionOk('Order details updated successfully.');
+      await load();
+      setTimeout(() => setActionOk(null), 2500);
+    } catch (e: any) {
+      setActionErr(e?.message ?? 'Failed to update order details');
+    } finally {
+      setActionLoading(false);
+    }
+  }
   async function clearDriver() {
     if (!id) return;
 
@@ -708,7 +748,74 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
+      <div className="space-y-4 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold text-[#0f172a]">Edit order details</h2>
+          <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-800">
+            Admin update
+          </span>
+        </div>
 
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Customer phone
+            </label>
+            <input
+              value={editCustomerPhone}
+              onChange={(e) => setEditCustomerPhone(e.target.value)}
+              placeholder="Customer phone"
+              className="w-full rounded-xl border px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Customer email
+            </label>
+            <input
+              value={editCustomerEmail}
+              onChange={(e) => setEditCustomerEmail(e.target.value)}
+              placeholder="Customer email"
+              className="w-full rounded-xl border px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Delivery recipient name
+            </label>
+            <input
+              value={editDeliveryRecipientName}
+              onChange={(e) => setEditDeliveryRecipientName(e.target.value)}
+              placeholder="Delivery recipient name"
+              className="w-full rounded-xl border px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Delivery phone
+            </label>
+            <input
+              value={editDeliveryPhone}
+              onChange={(e) => setEditDeliveryPhone(e.target.value)}
+              placeholder="Delivery phone"
+              className="w-full rounded-xl border px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            onClick={saveOrderDetails}
+            disabled={actionLoading}
+            className="rounded-xl bg-[#0f172a] px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
+          >
+            {actionLoading ? 'Saving…' : 'Save order details'}
+          </button>
+        </div>
+      </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-3 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
           <div className="flex items-center justify-between gap-3">
