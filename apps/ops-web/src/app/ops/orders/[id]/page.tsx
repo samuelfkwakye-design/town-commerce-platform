@@ -207,14 +207,19 @@ export default function OrderDetailPage() {
     Record<string, number>
   >({});
 
-   const [driverName, setDriverName] = useState('');
+     const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
 
   const [editCustomerPhone, setEditCustomerPhone] = useState('');
   const [editCustomerEmail, setEditCustomerEmail] = useState('');
   const [editDeliveryRecipientName, setEditDeliveryRecipientName] = useState('');
   const [editDeliveryPhone, setEditDeliveryPhone] = useState('');
-
+  const [editDeliveryLine1, setEditDeliveryLine1] = useState('');
+  const [editDeliveryLine2, setEditDeliveryLine2] = useState('');
+  const [editDeliveryArea, setEditDeliveryArea] = useState('');
+  const [editDeliveryTown, setEditDeliveryTown] = useState('');
+  const [editDeliveryLandmark, setEditDeliveryLandmark] = useState('');
+  const [editDeliveryNotes, setEditDeliveryNotes] = useState('');
   const currency = useMemo(() => {
     const p0 = order?.payments?.[0];
     return p0?.currency ?? 'GHS';
@@ -266,7 +271,12 @@ export default function OrderDetailPage() {
       setEditCustomerEmail(o?.customerEmail ?? '');
       setEditDeliveryRecipientName(o?.deliveryRecipientName ?? '');
       setEditDeliveryPhone(o?.deliveryPhone ?? '');
-
+      setEditDeliveryLine1(o?.deliveryLine1 ?? '');
+      setEditDeliveryLine2(o?.deliveryLine2 ?? '');
+      setEditDeliveryArea(o?.deliveryArea ?? '');
+      setEditDeliveryTown(o?.deliveryTown ?? '');
+      setEditDeliveryLandmark(o?.deliveryLandmark ?? '');
+      setEditDeliveryNotes(o?.deliveryNotes ?? '');
       try {
         const res = await apiFetch<any>(`/orders/${id}/stock-movements?limit=50`);
         const rows = Array.isArray(res) ? res : res?.items ?? res?.rows ?? [];
@@ -504,11 +514,17 @@ export default function OrderDetailPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
+                body: JSON.stringify({
           customerPhone: editCustomerPhone.trim() || null,
           customerEmail: editCustomerEmail.trim() || null,
           deliveryRecipientName: editDeliveryRecipientName.trim() || null,
           deliveryPhone: editDeliveryPhone.trim() || null,
+          deliveryLine1: editDeliveryLine1.trim() || null,
+          deliveryLine2: editDeliveryLine2.trim() || null,
+          deliveryArea: editDeliveryArea.trim() || null,
+          deliveryTown: editDeliveryTown.trim() || null,
+          deliveryLandmark: editDeliveryLandmark.trim() || null,
+          deliveryNotes: editDeliveryNotes.trim() || null,
         }),
       });
 
@@ -804,6 +820,77 @@ export default function OrderDetailPage() {
               className="w-full rounded-xl border px-3 py-2 text-sm"
             />
           </div>
+          <div>
+  <label className="mb-1 block text-sm font-medium text-slate-700">
+    Address line 1
+  </label>
+  <input
+    value={editDeliveryLine1}
+    onChange={(e) => setEditDeliveryLine1(e.target.value)}
+    placeholder="Address line 1"
+    className="w-full rounded-xl border px-3 py-2 text-sm"
+  />
+</div>
+
+<div>
+  <label className="mb-1 block text-sm font-medium text-slate-700">
+    Address line 2
+  </label>
+  <input
+    value={editDeliveryLine2}
+    onChange={(e) => setEditDeliveryLine2(e.target.value)}
+    placeholder="Address line 2"
+    className="w-full rounded-xl border px-3 py-2 text-sm"
+  />
+</div>
+
+<div>
+  <label className="mb-1 block text-sm font-medium text-slate-700">
+    Area
+  </label>
+  <input
+    value={editDeliveryArea}
+    onChange={(e) => setEditDeliveryArea(e.target.value)}
+    placeholder="Area"
+    className="w-full rounded-xl border px-3 py-2 text-sm"
+  />
+</div>
+
+<div>
+  <label className="mb-1 block text-sm font-medium text-slate-700">
+    Town
+  </label>
+  <input
+    value={editDeliveryTown}
+    onChange={(e) => setEditDeliveryTown(e.target.value)}
+    placeholder="Town"
+    className="w-full rounded-xl border px-3 py-2 text-sm"
+  />
+</div>
+
+<div>
+  <label className="mb-1 block text-sm font-medium text-slate-700">
+    Landmark
+  </label>
+  <input
+    value={editDeliveryLandmark}
+    onChange={(e) => setEditDeliveryLandmark(e.target.value)}
+    placeholder="Landmark"
+    className="w-full rounded-xl border px-3 py-2 text-sm"
+  />
+</div>
+
+<div>
+  <label className="mb-1 block text-sm font-medium text-slate-700">
+    Notes
+  </label>
+  <input
+    value={editDeliveryNotes}
+    onChange={(e) => setEditDeliveryNotes(e.target.value)}
+    placeholder="Notes"
+    className="w-full rounded-xl border px-3 py-2 text-sm"
+  />
+</div>
         </div>
 
         <div className="flex justify-end">

@@ -1206,58 +1206,111 @@ return fullOrder;
     return created;
   }
 
-  async updateOrder(orderId: string, dto: UpdateOrderDto) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-    });
-    if (!order) throw new NotFoundException(`Order not found: ${orderId}`);
+async updateOrder(orderId: string, dto: UpdateOrderDto) {
+  const order = await this.prisma.order.findUnique({
+    where: { id: orderId },
+  });
+  if (!order) throw new NotFoundException(`Order not found: ${orderId}`);
 
-    const isDraft = order.status === OrderStatus.DRAFT;
-    const isConfirmed = order.status === OrderStatus.CONFIRMED;
+  const status = order.status;
+  const canEditContactAndAddress =
+    status !== OrderStatus.CANCELLED && status !== OrderStatus.REFUNDED;
 
-    if (!isDraft && !isConfirmed) {
-      throw new BadRequestException(
-        'Only DRAFT or CONFIRMED orders can be updated',
-      );
-    }
+  const isDraft = status === OrderStatus.DRAFT;
+  const isConfirmed = status === OrderStatus.CONFIRMED;
 
-    const hasEmail = dto.customerEmail !== undefined;
-    const hasPhone = dto.customerPhone !== undefined;
-    const hasDeliveryFee = dto.deliveryFee !== undefined;
-    const hasServiceFee = dto.serviceFee !== undefined;
+  const hasEmail = dto.customerEmail !== undefined;
+  const hasPhone = dto.customerPhone !== undefined;
+  const hasDeliveryRecipientName = dto.deliveryRecipientName !== undefined;
+  const hasDeliveryPhone = dto.deliveryPhone !== undefined;
+  const hasDeliveryLine1 = dto.deliveryLine1 !== undefined;
+  const hasDeliveryLine2 = dto.deliveryLine2 !== undefined;
+  const hasDeliveryArea = dto.deliveryArea !== undefined;
+  const hasDeliveryTown = dto.deliveryTown !== undefined;
+  const hasDeliveryLandmark = dto.deliveryLandmark !== undefined;
+  const hasDeliveryNotes = dto.deliveryNotes !== undefined;
+  const hasDeliveryFee = dto.deliveryFee !== undefined;
+  const hasServiceFee = dto.serviceFee !== undefined;
 
-    if (!hasEmail && !hasPhone && !hasDeliveryFee && !hasServiceFee) {
-      throw new BadRequestException(
-        'Provide customerEmail, customerPhone, deliveryFee and/or serviceFee',
-      );
-    }
-
-    if (isConfirmed && (hasDeliveryFee || hasServiceFee)) {
-      throw new BadRequestException(
-        'Fees cannot be changed after order confirmation',
-      );
-    }
-
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        customerEmail: hasEmail ? (dto.customerEmail ?? null) : undefined,
-        customerPhone: hasPhone ? (dto.customerPhone ?? null) : undefined,
-
-        deliveryFee:
-          isDraft && hasDeliveryFee ? this.dec(dto.deliveryFee!) : undefined,
-        serviceFee:
-          isDraft && hasServiceFee ? this.dec(dto.serviceFee!) : undefined,
-      },
-    });
-
-    if (isDraft && (hasDeliveryFee || hasServiceFee)) {
-      await this.recalculateTotals(orderId);
-    }
-
-    return this.getOrder(orderId);
+  if (
+    !hasEmail &&
+    !hasPhone &&
+    !hasDeliveryRecipientName &&
+    !hasDeliveryPhone &&
+    !hasDeliveryLine1 &&
+    !hasDeliveryLine2 &&
+    !hasDeliveryArea &&
+    !hasDeliveryTown &&
+    !hasDeliveryLandmark &&
+    !hasDeliveryNotes &&
+    !hasDeliveryFee &&
+    !hasServiceFee
+  ) {
+    throw new BadRequestException(
+      'Provide at least one editable order field',
+    );
   }
 
+  if (!canEditContactAndAddress) {
+    throw new BadRequestException(
+      'Cancelled or fully refunded orders cannot be edited',
+    );
+  }
+
+  if (!isDraft && !isConfirmed && (hasDeliveryFee || hasServiceFee)) {
+    throw new BadRequestException(
+      'Fees can only be changed while order is DRAFT or CONFIRMED',
+    );
+  }
+
+  await this.prisma.order.update({
+    where: { id: orderId },
+    data: {
+      customerEmail: hasEmail ? (dto.customerEmail ?? null) : undefined,
+      customerPhone: hasPhone ? (dto.customerPhone?.trim() || null) : undefined,
+
+      deliveryRecipientName: hasDeliveryRecipientName
+        ? dto.deliveryRecipientName?.trim() || null
+        : undefined,
+      deliveryPhone: hasDeliveryPhone
+        ? dto.deliveryPhone?.trim() || null
+        : undefined,
+      deliveryLine1: hasDeliveryLine1
+        ? dto.deliveryLine1?.trim() || null
+        : undefined,
+      deliveryLine2: hasDeliveryLine2
+        ? dto.deliveryLine2?.trim() || null
+        : undefined,
+      deliveryArea: hasDeliveryArea
+        ? dto.deliveryArea?.trim() || null
+        : undefined,
+      deliveryTown: hasDeliveryTown
+        ? dto.deliveryTown?.trim() || null
+        : undefined,
+      deliveryLandmark: hasDeliveryLandmark
+        ? dto.deliveryLandmark?.trim() || null
+        : undefined,
+      deliveryNotes: hasDeliveryNotes
+        ? dto.deliveryNotes?.trim() || null
+        : undefined,
+
+      deliveryFee:
+        (isDraft || isConfirmed) && hasDeliveryFee
+          ? this.dec(dto.deliveryFee!)
+          : undefined,
+      serviceFee:
+        (isDraft || isConfirmed) && hasServiceFee
+          ? this.dec(dto.serviceFee!)
+          : undefined,
+    },
+  });
+
+  if ((isDraft || isConfirmed) && (hasDeliveryFee || hasServiceFee)) {
+    await this.recalculateTotals(orderId);
+  }
+
+  return this.getOrder(orderId);
+}
     async confirmOrder(orderId: string) {
   const order = await this.prisma.order.findUnique({
     where: { id: orderId },

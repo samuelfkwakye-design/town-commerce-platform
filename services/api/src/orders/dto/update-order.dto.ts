@@ -1,4 +1,9 @@
-import { IsEmail, IsNumberString, IsOptional, IsString } from 'class-validator';
+import {
+  IsEmail,
+  IsNumberString,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class UpdateOrderDto {
   @IsOptional()
@@ -9,7 +14,38 @@ export class UpdateOrderDto {
   @IsString()
   customerPhone?: string;
 
-  // Fees (stored as decimals in DB, sent as strings like "15.00")
+  @IsOptional()
+  @IsString()
+  deliveryRecipientName?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryLine1?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryLine2?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryArea?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryTown?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryLandmark?: string;
+
+  @IsOptional()
+  @IsString()
+  deliveryNotes?: string;
+
   @IsOptional()
   @IsNumberString()
   deliveryFee?: string;
