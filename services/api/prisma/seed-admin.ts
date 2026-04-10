@@ -10,28 +10,38 @@ async function main() {
 
   const passwordHash = await bcrypt.hash('ChangeMe123!', 10);
 
-  await prisma.adminUser.upsert({
-    where: { email: 'samuelfkwakye@gmail.com' },
-    update: {
-      username: 'admin',
-      firstName: 'Samuel',
-      lastName: 'Forson',
-      role: 'SUPER_ADMIN',
-      isActive: true,
-      passwordHash,
-    },
-    create: {
-      email: 'samuelfkwakye@gmail.com',
-      username: 'admin',
-      passwordHash,
-      firstName: 'Samuel',
-      lastName: 'Forson',
-      role: 'SUPER_ADMIN',
-      isActive: true,
-    },
+  const existingAdmin = await prisma.adminUser.findUnique({
+    where: { username: 'admin' },
   });
 
-  console.log('Super admin seeded');
+  if (existingAdmin) {
+    await prisma.adminUser.update({
+      where: { id: existingAdmin.id },
+      data: {
+        email: 'samuelfkwakye@gmail.com',
+        username: 'admin',
+        firstName: 'Samuel',
+        lastName: 'Forson',
+        role: 'SUPER_ADMIN',
+        isActive: true,
+        passwordHash,
+      },
+    });
+  } else {
+    await prisma.adminUser.create({
+      data: {
+        email: 'samuelfkwakye@gmail.com',
+        username: 'admin',
+        passwordHash,
+        firstName: 'Samuel',
+        lastName: 'Forson',
+        role: 'SUPER_ADMIN',
+        isActive: true,
+      },
+    });
+  }
+
+  console.log('Super admin seeded/updated');
 
   await app.close();
 }

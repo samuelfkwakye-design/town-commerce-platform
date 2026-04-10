@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AdminAuthController } from './admin-auth.controller';
 import { AdminAuthService } from './admin-auth.service';
 import { RolesGuard } from './guards/roles.guard';
+import { EmailService } from '../notifications/email.service';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { RolesGuard } from './guards/roles.guard';
     }),
   ],
   controllers: [AdminAuthController],
-  providers: [PrismaService, AdminAuthService, RolesGuard],
+  providers: [PrismaService, AdminAuthService, RolesGuard, EmailService],
   exports: [JwtModule, AdminAuthService, RolesGuard],
 })
 export class AdminAuthModule {}

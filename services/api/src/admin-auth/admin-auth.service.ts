@@ -10,12 +10,14 @@ import * as crypto from 'crypto';
 import { AdminLoginDto } from './dto/admin-login.dto';
 import { RequestAdminPasswordResetDto } from './dto/request-admin-password-reset.dto';
 import { ResetAdminPasswordDto } from './dto/reset-admin-password.dto';
+import { EmailService } from '../notifications/email.service';
 
 @Injectable()
 export class AdminAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
   ) {}
 
   async login(dto: AdminLoginDto) {
@@ -105,12 +107,9 @@ export class AdminAuthService {
       },
     });
 
-    return {
-      ok: true,
-      ...(process.env.NODE_ENV !== 'production'
-        ? { devResetCode: rawCode }
-        : {}),
-    };
+    await this.emailService.sendAdminPasswordResetEmail(user.email, rawCode);
+
+    return { ok: true };
   }
 
   async resetPassword(dto: ResetAdminPasswordDto) {
