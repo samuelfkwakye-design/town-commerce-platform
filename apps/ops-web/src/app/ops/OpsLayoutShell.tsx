@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 type OpsDashboardResponse = {
   productsMissingImages: number;
@@ -42,19 +43,34 @@ export default function OpsLayoutShell({
   missingImages: number;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+
   const isLoginPage = pathname === '/ops/login';
 
+  // 🔐 PROTECT ROUTES
+  useEffect(() => {
+    const token = localStorage.getItem('admin_token');
+
+    if (!token && !isLoginPage) {
+      router.push('/ops/login');
+    }
+  }, [pathname]);
+
+  // ✅ LOGIN PAGE (NO SIDEBAR)
   if (isLoginPage) {
     return <div className="min-h-screen bg-gray-50">{children}</div>;
   }
 
+  // ✅ MAIN LAYOUT
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="flex">
         <aside className="w-64 border-r bg-white p-4">
           <div className="mb-4">
             <div className="text-lg font-semibold">Ops</div>
-            <div className="text-xs text-gray-500">Town Commerce Platform</div>
+            <div className="text-xs text-gray-500">
+              Town Commerce Platform
+            </div>
           </div>
 
           <nav className="space-y-1">
@@ -90,6 +106,17 @@ export default function OpsLayoutShell({
               <NavItem href="/ops/categories" label="Categories" />
             </div>
           </nav>
+
+          {/* 🔥 LOGOUT BUTTON */}
+          <button
+            onClick={() => {
+              localStorage.removeItem('admin_token');
+              window.location.href = '/ops/login';
+            }}
+            className="mt-6 w-full rounded bg-red-500 py-2 text-sm text-white"
+          >
+            Logout
+          </button>
 
           <div className="mt-6 text-xs text-gray-500">
             {missingImages > 0 ? (
