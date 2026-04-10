@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -33,7 +34,6 @@ export default function AdminLoginPage() {
       }
 
       localStorage.setItem('admin_token', data.token);
-
       router.push('/ops');
     } catch (err: any) {
       setError(err.message || 'Login error');
@@ -43,12 +43,15 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <form
         onSubmit={handleLogin}
         className="w-full max-w-md rounded-2xl bg-white p-6 shadow"
       >
-        <h1 className="mb-4 text-xl font-bold">Admin Login</h1>
+        <h1 className="mb-1 text-2xl font-bold text-slate-900">Admin Login</h1>
+        <p className="mb-5 text-sm text-slate-500">
+          Sign in to access the operations dashboard.
+        </p>
 
         <input
           placeholder="Email or Username"
@@ -62,12 +65,19 @@ export default function AdminLoginPage() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="mb-3 w-full rounded border px-3 py-2"
+          className="mb-2 w-full rounded border px-3 py-2"
         />
 
-        {error && (
-          <p className="mb-3 text-sm text-red-500">{error}</p>
-        )}
+        <div className="mb-4 text-right">
+          <Link
+            href="/ops/forgot-password"
+            className="text-sm text-slate-600 hover:text-slate-900"
+          >
+            Forgot password?
+          </Link>
+        </div>
+
+        {error && <p className="mb-3 text-sm text-red-500">{error}</p>}
 
         <button
           type="submit"

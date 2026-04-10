@@ -129,24 +129,24 @@ export default async function OpsHomePage() {
         </div>
 
         <div className="mt-8 grid gap-4 xl:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">Today’s Focus</h3>
-            <div className="mt-4 space-y-3 text-sm text-slate-600">
-              <div>Check confirmed orders waiting too long for fulfillment.</div>
-              <div>Review driver availability before peak order times.</div>
-              <div>Resolve missing catalog images to improve customer confidence.</div>
-            </div>
-          </div>
+  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <h3 className="text-lg font-semibold text-slate-900">Today’s Focus</h3>
+    <div className="mt-4 space-y-3 text-sm text-slate-600">
+      <div>Check confirmed orders waiting too long for fulfillment.</div>
+      <div>Review driver availability before peak order times.</div>
+      <div>Resolve missing catalog images to improve customer confidence.</div>
+    </div>
+  </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">Next Build Phase</h3>
-            <div className="mt-4 space-y-3 text-sm text-slate-600">
-              <div>Role-based access for Super Admin and Warehouse Admin.</div>
-              <div>Protect action buttons based on role permissions.</div>
-              <div>Driver-facing login and delivery workflow.</div>
-            </div>
-          </div>
-        </div>
+  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <h3 className="text-lg font-semibold text-slate-900">System Status</h3>
+    <div className="mt-4 space-y-3 text-sm text-slate-600">
+      <div>Orders, drivers, stock, and catalog tools are available from the left menu.</div>
+      <div>Use this dashboard as the starting point for day-to-day operations.</div>
+      <div>Report any login or permissions issue to the platform administrator.</div>
+    </div>
+  </div>
+</div>
       </div>
     </div>
   );
