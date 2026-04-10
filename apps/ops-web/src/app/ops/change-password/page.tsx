@@ -22,7 +22,7 @@ export default function ChangePasswordPage() {
       }
 
       if (newPassword !== confirmNewPassword) {
-        throw new Error('New password and confirm password do not match');
+        throw new Error('Passwords do not match');
       }
 
       const token = localStorage.getItem('admin_token');
@@ -49,13 +49,10 @@ export default function ChangePasswordPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        const msg = Array.isArray(data.message)
-          ? data.message.join(', ')
-          : data.message || 'Failed to change password';
-        throw new Error(msg);
+        throw new Error(data.message || 'Failed to change password');
       }
 
-      setMessage('Password changed successfully.');
+      setMessage('Password changed successfully');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmNewPassword('');
@@ -67,71 +64,48 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-bold text-slate-900">Change Password</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Update your admin password securely.
-        </p>
+    <div className="mx-auto max-w-2xl p-6">
+      <div className="rounded-2xl border bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-semibold">Change Password</h1>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Current Password
-            </label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-3 py-2"
-              placeholder="Enter current password"
-            />
-          </div>
+          <input
+            type="password"
+            placeholder="Current password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            className="w-full rounded-xl border px-3 py-2"
+          />
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              New Password
-            </label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-3 py-2"
-              placeholder="Enter new password"
-            />
-          </div>
+          <input
+            type="password"
+            placeholder="New password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="w-full rounded-xl border px-3 py-2"
+          />
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Confirm New Password
-            </label>
-            <input
-              type="password"
-              value={confirmNewPassword}
-              onChange={(e) => setConfirmNewPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-3 py-2"
-              placeholder="Re-enter new password"
-            />
-          </div>
+          <input
+            type="password"
+            placeholder="Confirm new password"
+            value={confirmNewPassword}
+            onChange={(e) => setConfirmNewPassword(e.target.value)}
+            className="w-full rounded-xl border px-3 py-2"
+          />
 
-          {message ? (
-            <div className="rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-              {message}
-            </div>
-          ) : null}
+          {message && (
+            <div className="text-green-600 text-sm">{message}</div>
+          )}
 
-          {error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </div>
-          ) : null}
+          {error && (
+            <div className="text-red-600 text-sm">{error}</div>
+          )}
 
           <button
-            type="submit"
             disabled={loading}
-            className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+            className="w-full rounded-xl bg-black text-white py-2"
           >
-            {loading ? 'Saving...' : 'Change Password'}
+            {loading ? 'Updating...' : 'Change Password'}
           </button>
         </form>
       </div>
