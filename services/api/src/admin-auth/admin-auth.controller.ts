@@ -10,6 +10,7 @@ import { AdminAuthService } from './admin-auth.service';
 import { AdminLoginDto } from './dto/admin-login.dto';
 import { RequestAdminPasswordResetDto } from './dto/request-admin-password-reset.dto';
 import { ResetAdminPasswordDto } from './dto/reset-admin-password.dto';
+import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
 import { AdminJwtGuard } from './guards/admin-jwt.guard';
 
 @Controller('admin-auth')
@@ -35,5 +36,11 @@ export class AdminAuthController {
   @Post('forgot-password/reset')
   resetPassword(@Body() dto: ResetAdminPasswordDto) {
     return this.adminAuthService.resetPassword(dto);
+  }
+
+  @UseGuards(AdminJwtGuard)
+  @Post('change-password')
+  changePassword(@Req() req: any, @Body() dto: ChangeAdminPasswordDto) {
+    return this.adminAuthService.changePassword(req.adminUser, dto);
   }
 }

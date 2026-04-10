@@ -10,6 +10,7 @@ import * as crypto from 'crypto';
 import { AdminLoginDto } from './dto/admin-login.dto';
 import { RequestAdminPasswordResetDto } from './dto/request-admin-password-reset.dto';
 import { ResetAdminPasswordDto } from './dto/reset-admin-password.dto';
+import { ChangeAdminPasswordDto } from './dto/change-admin-password.dto';
 import { EmailService } from '../notifications/email.service';
 
 @Injectable()
@@ -125,6 +126,39 @@ export class AdminAuthService {
 
     if (!user) {
       throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.prisma.adminUser.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        resetPasswordCodeHash: null,
+        resetPasswordExpiresAt: null,
+      },
+    });
+
+    return { ok: true };
+  }
+
+  async changePassword(adminUser: { sub: string }, dto: ChangeAdminPasswordDto) {
+    const user = await this.prisma.adminUser.findUnique({
+      where: { id: adminUser.sub },
+    });
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Admin user not found');
+    }
+
+    const passwordOk = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+
+    if (!passwordOk) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    if (dto.currentPassword === dto.newPassword) {
+      throw new BadRequestException('New password must be different from current password');
     }
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
