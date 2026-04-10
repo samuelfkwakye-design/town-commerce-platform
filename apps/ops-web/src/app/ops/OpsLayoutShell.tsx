@@ -4,12 +4,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
-type OpsDashboardResponse = {
-  productsMissingImages: number;
-  lowStockCount: number;
-  confirmedStaleCount: number;
-};
-
 function NavItem({
   href,
   label,
@@ -45,32 +39,34 @@ export default function OpsLayoutShell({
   const pathname = usePathname();
   const router = useRouter();
 
-  const isLoginPage = pathname === '/ops/login';
+  const isAuthPage =
+    pathname === '/ops/login' ||
+    pathname === '/ops/forgot-password' ||
+    pathname === '/ops/reset-password';
 
-  // 🔐 PROTECT ROUTES
   useEffect(() => {
     const token = localStorage.getItem('admin_token');
 
-    if (!token && !isLoginPage) {
+    if (!token && !isAuthPage) {
       router.push('/ops/login');
     }
-  }, [pathname]);
 
-  // ✅ LOGIN PAGE (NO SIDEBAR)
-  if (isLoginPage) {
+    if (token && pathname === '/ops/login') {
+      router.push('/ops');
+    }
+  }, [pathname, isAuthPage, router]);
+
+  if (isAuthPage) {
     return <div className="min-h-screen bg-gray-50">{children}</div>;
   }
 
-  // ✅ MAIN LAYOUT
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="flex">
         <aside className="w-64 border-r bg-white p-4">
           <div className="mb-4">
             <div className="text-lg font-semibold">Ops</div>
-            <div className="text-xs text-gray-500">
-              Town Commerce Platform
-            </div>
+            <div className="text-xs text-gray-500">Town Commerce Platform</div>
           </div>
 
           <nav className="space-y-1">
@@ -107,16 +103,24 @@ export default function OpsLayoutShell({
             </div>
           </nav>
 
-          {/* 🔥 LOGOUT BUTTON */}
-          <button
-            onClick={() => {
-              localStorage.removeItem('admin_token');
-              window.location.href = '/ops/login';
-            }}
-            className="mt-6 w-full rounded bg-red-500 py-2 text-sm text-white"
-          >
-            Logout
-          </button>
+          <div className="mt-6 space-y-2">
+            <Link
+              href="/ops/change-password"
+              className="block w-full rounded border border-slate-300 px-3 py-2 text-center text-sm text-slate-700 hover:bg-slate-50"
+            >
+              Change Password
+            </Link>
+
+            <button
+              onClick={() => {
+                localStorage.removeItem('admin_token');
+                window.location.href = '/ops/login';
+              }}
+              className="w-full rounded bg-red-500 py-2 text-sm text-white"
+            >
+              Logout
+            </button>
+          </div>
 
           <div className="mt-6 text-xs text-gray-500">
             {missingImages > 0 ? (

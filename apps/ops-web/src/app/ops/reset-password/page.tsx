@@ -2,9 +2,13 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function AdminForgotPasswordPage() {
-  const [email, setEmail] = useState('');
+export default function AdminResetPasswordPage() {
+  const router = useRouter();
+
+  const [code, setCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -17,25 +21,24 @@ export default function AdminForgotPasswordPage() {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/admin-auth/forgot-password/request`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/admin-auth/forgot-password/reset`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ code, newPassword }),
         }
       );
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || 'Failed to request password reset');
+        throw new Error(data.message || 'Failed to reset password');
       }
 
-      if (data.devResetCode) {
-        setMessage(`Reset code generated: ${data.devResetCode}`);
-      } else {
-        setMessage('If that email exists, a password reset code has been issued.');
-      }
+      setMessage('Password reset successful. Redirecting to login...');
+      setTimeout(() => {
+        router.push('/ops/login');
+      }, 1200);
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
     } finally {
@@ -49,17 +52,24 @@ export default function AdminForgotPasswordPage() {
         onSubmit={handleSubmit}
         className="w-full max-w-md rounded-2xl bg-white p-6 shadow"
       >
-        <h1 className="mb-1 text-2xl font-bold text-slate-900">Forgot Password</h1>
+        <h1 className="mb-1 text-2xl font-bold text-slate-900">Reset Password</h1>
         <p className="mb-5 text-sm text-slate-500">
-          Enter your admin email to request a reset code.
+          Enter the reset code and your new password.
         </p>
 
         <input
-          type="email"
-          placeholder="Admin email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="mb-4 w-full rounded border px-3 py-2"
+          placeholder="Reset code"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          className="mb-3 w-full rounded border px-3 py-2"
+        />
+
+        <input
+          type="password"
+          placeholder="New password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          className="mb-3 w-full rounded border px-3 py-2"
         />
 
         {message && <p className="mb-3 text-sm text-green-600">{message}</p>}
@@ -70,22 +80,15 @@ export default function AdminForgotPasswordPage() {
           disabled={loading}
           className="w-full rounded bg-black py-2 text-white"
         >
-          {loading ? 'Submitting...' : 'Request Reset Code'}
+          {loading ? 'Resetting...' : 'Reset Password'}
         </button>
 
-        <div className="mt-4 flex justify-between text-sm">
+        <div className="mt-4 text-center">
           <Link
             href="/ops/login"
-            className="text-slate-600 hover:text-slate-900"
+            className="text-sm text-slate-600 hover:text-slate-900"
           >
             Back to login
-          </Link>
-
-          <Link
-            href="/ops/reset-password"
-            className="text-slate-600 hover:text-slate-900"
-          >
-            Already have a code?
           </Link>
         </div>
       </form>
