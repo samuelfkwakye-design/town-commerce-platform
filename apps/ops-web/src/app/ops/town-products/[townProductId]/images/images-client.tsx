@@ -1,7 +1,33 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { apiFetch } from '@/lib/api';
+
+type AdminRole =
+  | 'GLOBAL_SUPER_ADMIN'
+  | 'TOWN_SUPER_ADMIN'
+  | 'WAREHOUSE_ADMIN';
+
+type CurrentAdmin = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  role: AdminRole;
+  townId?: string | null;
+};
+
+type TownProductLite = {
+  id: string;
+  townId?: string | null;
+  town?: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+  product?: {
+    name?: string | null;
+  } | null;
+};
 
 type TownProductImage = {
   id: string;
@@ -21,24 +47,29 @@ type CloudinarySignature = {
 };
 
 export default function ImagesClient({ townProductId }: { townProductId: string }) {
+  const [currentAdmin, setCurrentAdmin] = useState<CurrentAdmin | null>(null);
+  const [productMeta, setProductMeta] = useState<TownProductLite | null>(null);
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+
   const [images, setImages] = useState<TownProductImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
-  const [alt, setAlt] = useState("");
+  const [alt, setAlt] = useState('');
   const [uploading, setUploading] = useState(false);
 
-  // ✅ Success feedback
   const [success, setSuccess] = useState<string | null>(null);
 
-  // ✅ Preview
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // ✅ Auto-scroll to uploaded image
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [scrollToId, setScrollToId] = useState<string | null>(null);
+
+  const isGlobalAdmin = currentAdmin?.role === 'GLOBAL_SUPER_ADMIN';
+  const isTownScopedAdmin = currentAdmin?.role === 'TOWN_SUPER_ADMIN';
 
   useEffect(() => {
     if (!file) {
@@ -50,34 +81,94 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  // Auto-hide success after 3 seconds
   useEffect(() => {
     if (!success) return;
     const t = setTimeout(() => setSuccess(null), 3000);
     return () => clearTimeout(t);
   }, [success]);
 
-  // When scrollToId is set, scroll that row into view
   useEffect(() => {
     if (!scrollToId) return;
     const el = rowRefs.current[scrollToId];
     if (!el) return;
 
-    // slight delay so DOM paints updated list
     const t = setTimeout(() => {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setScrollToId(null);
     }, 100);
 
     return () => clearTimeout(t);
   }, [scrollToId, images]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrapAccess() {
+      try {
+        setError(null);
+
+        const [admin, townProduct] = await Promise.all([
+          apiFetch<CurrentAdmin>('/admin/auth/me'),
+          apiFetch<TownProductLite>(`/admin/town-products/${townProductId}`, {
+            method: 'GET',
+          }),
+        ]);
+
+        if (cancelled) return;
+
+        setCurrentAdmin(admin ?? null);
+        setProductMeta(townProduct ?? null);
+
+        const productTownId = townProduct?.townId ?? townProduct?.town?.id ?? null;
+
+        if (!admin) {
+          setAccessDenied(true);
+          setError('Admin session not found.');
+          setAccessChecked(true);
+          return;
+        }
+
+        if (admin.role === 'TOWN_SUPER_ADMIN') {
+          if (!admin.townId || !productTownId || admin.townId !== productTownId) {
+            setAccessDenied(true);
+            setError('You do not have access to manage images for this town product.');
+            setAccessChecked(true);
+            return;
+          }
+        }
+
+        if (admin.role === 'WAREHOUSE_ADMIN') {
+          setAccessDenied(true);
+          setError('Your role does not allow managing town product images.');
+          setAccessChecked(true);
+          return;
+        }
+
+        setAccessDenied(false);
+        setAccessChecked(true);
+      } catch (e: any) {
+        if (cancelled) return;
+        setAccessDenied(true);
+        setAccessChecked(true);
+        setError(e?.message ?? 'Failed to validate access for this town product.');
+      }
+    }
+
+    bootstrapAccess();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [townProductId]);
+
   async function refresh() {
+    if (!accessChecked || accessDenied) return;
+
     setError(null);
     setLoading(true);
     try {
       const data = await apiFetch<TownProductImage[]>(
-        `/admin/town-products/${townProductId}/images`
+        `/admin/town-products/${townProductId}/images`,
       );
       setImages(data ?? []);
     } catch (e: any) {
@@ -88,12 +179,16 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
   }
 
   useEffect(() => {
+    if (!accessChecked || accessDenied) return;
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [townProductId]);
+  }, [townProductId, accessChecked, accessDenied]);
 
   const canMoveUp = useMemo(() => new Set(images.slice(1).map((i) => i.id)), [images]);
-  const canMoveDown = useMemo(() => new Set(images.slice(0, -1).map((i) => i.id)), [images]);
+  const canMoveDown = useMemo(
+    () => new Set(images.slice(0, -1).map((i) => i.id)),
+    [images],
+  );
 
   async function setPrimary(imageId: string) {
     setBusyId(imageId);
@@ -101,10 +196,10 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
     try {
       const data = await apiFetch<TownProductImage[]>(
         `/admin/town-product-images/${imageId}/set-primary`,
-        { method: "POST" }
+        { method: 'POST' },
       );
       setImages(data ?? []);
-      setSuccess("Primary image updated.");
+      setSuccess('Primary image updated.');
       setScrollToId(imageId);
     } catch (e: any) {
       setError(String(e?.message ?? e));
@@ -114,16 +209,16 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
   }
 
   async function remove(imageId: string) {
-    if (!window.confirm("Delete this image?")) return;
+    if (!window.confirm('Delete this image?')) return;
     setBusyId(imageId);
     setError(null);
     try {
       const data = await apiFetch<TownProductImage[]>(
         `/admin/town-product-images/${imageId}`,
-        { method: "DELETE" }
+        { method: 'DELETE' },
       );
       setImages(data ?? []);
-      setSuccess("Image deleted.");
+      setSuccess('Image deleted.');
     } catch (e: any) {
       setError(String(e?.message ?? e));
     } finally {
@@ -140,10 +235,10 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
       const data = await apiFetch<TownProductImage[]>(
         `/admin/town-products/${townProductId}/images/reorder`,
         {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ orderedImageIds }),
-        }
+        },
       );
       setImages(data ?? next);
     } catch (e: any) {
@@ -152,7 +247,6 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
     }
   }
 
-  // ✅ Disable reorder while uploading (guard)
   function moveUp(id: string) {
     if (uploading) return;
     const idx = images.findIndex((x) => x.id === id);
@@ -180,21 +274,19 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
     const fileName = file.name;
 
     try {
-      // 1) get signature from API
       const sig = await apiFetch<CloudinarySignature>(
-        `/admin/uploads/cloudinary-signature?folder=town-products/${townProductId}`
+        `/admin/uploads/cloudinary-signature?folder=town-products/${townProductId}`,
       );
 
-      // 2) upload directly to Cloudinary
       const uploadUrl = `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`;
       const form = new FormData();
-      form.append("file", file);
-      form.append("api_key", sig.apiKey);
-      form.append("timestamp", String(sig.timestamp));
-      form.append("signature", sig.signature);
-      form.append("folder", sig.folder);
+      form.append('file', file);
+      form.append('api_key', sig.apiKey);
+      form.append('timestamp', String(sig.timestamp));
+      form.append('signature', sig.signature);
+      form.append('folder', sig.folder);
 
-      const upRes = await fetch(uploadUrl, { method: "POST", body: form });
+      const upRes = await fetch(uploadUrl, { method: 'POST', body: form });
       if (!upRes.ok) {
         const txt = await upRes.text();
         throw new Error(`Cloudinary upload failed: ${upRes.status} ${txt}`);
@@ -202,36 +294,31 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
 
       const upJson: any = await upRes.json();
       const secureUrl = upJson?.secure_url ?? upJson?.url;
-      if (!secureUrl) throw new Error("Upload succeeded but no secure_url returned");
+      if (!secureUrl) throw new Error('Upload succeeded but no secure_url returned');
 
-      // 3) attach URL to TownProductImage
       const updated = await apiFetch<TownProductImage[]>(
         `/admin/town-products/${townProductId}/images`,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: secureUrl, alt: alt.trim() || null }),
-        }
+        },
       );
 
       const nextImages = updated ?? [];
       setImages(nextImages);
 
-      // ✅ Success badge
       setSuccess(`✅ Image uploaded successfully (${fileName})`);
 
-      // ✅ auto-scroll to the new image
       const newOne = nextImages.find((x) => x.url === secureUrl);
       if (newOne?.id) {
         setScrollToId(newOne.id);
       } else if (nextImages[0]?.id) {
-        // fallback: scroll to primary
         setScrollToId(nextImages[0].id);
       }
 
-      // reset inputs
       setFile(null);
-      setAlt("");
+      setAlt('');
       setPreviewUrl(null);
     } catch (e: any) {
       setError(String(e?.message ?? e));
@@ -242,8 +329,46 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
 
   const isBusy = uploading || !!busyId;
 
+  if (!accessChecked) {
+    return <div className="text-sm text-slate-600">Checking access…</div>;
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="space-y-3 rounded-2xl border border-red-200 bg-red-50 p-4">
+        <div className="text-sm font-semibold text-red-800">Access denied</div>
+        <div className="text-sm text-red-700">
+          {error ?? 'You do not have permission to manage images for this town product.'}
+        </div>
+        {productMeta?.town?.name ? (
+          <div className="text-xs text-red-700">
+            Product town: {productMeta.town.name} ({productMeta.town.slug})
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
+      {productMeta?.town?.name || productMeta?.product?.name ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+          <div>
+            <span className="font-medium">Product:</span>{' '}
+            {productMeta?.product?.name ?? '—'}
+          </div>
+          <div>
+            <span className="font-medium">Town:</span>{' '}
+            {productMeta?.town?.name ?? '—'}
+            {productMeta?.town?.slug ? ` (${productMeta.town.slug})` : ''}
+          </div>
+          <div>
+            <span className="font-medium">Scope:</span>{' '}
+            {isGlobalAdmin ? 'Global admin access' : isTownScopedAdmin ? 'Town-scoped access' : 'Restricted'}
+          </div>
+        </div>
+      ) : null}
+
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">
           {error}
@@ -256,10 +381,9 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
         </div>
       ) : null}
 
-      <div className="rounded-2xl border bg-white p-4 space-y-3">
+      <div className="space-y-3 rounded-2xl border bg-white p-4">
         <div className="font-semibold">Upload new image</div>
 
-        {/* ✅ Preview before upload */}
         {previewUrl ? (
           <div className="flex items-center gap-3">
             <div className="h-20 w-20 overflow-hidden rounded-xl border bg-slate-50">
@@ -292,14 +416,13 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
             disabled={!file || uploading}
             className="rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {/* ✅ Spinner during upload */}
             {uploading ? (
               <span className="inline-flex items-center gap-2">
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                 Uploading...
               </span>
             ) : (
-              "Upload & attach"
+              'Upload & attach'
             )}
           </button>
         </div>
@@ -343,18 +466,20 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
                     <div className="flex items-center gap-3">
                       <div className="h-16 w-16 overflow-hidden rounded-lg bg-slate-100">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img.url} alt={img.alt ?? ""} className="h-full w-full object-cover" />
+                        <img src={img.url} alt={img.alt ?? ''} className="h-full w-full object-cover" />
                       </div>
 
                       <div>
                         <div className="text-sm font-semibold">
-                          {isPrimary ? "Primary" : `Image ${idx + 1}`}
+                          {isPrimary ? 'Primary' : `Image ${idx + 1}`}
                           <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
                             sortOrder {img.sortOrder}
                           </span>
                         </div>
-                        <div className="mt-1 text-xs text-slate-500 break-all">{img.url}</div>
-                        {img.alt ? <div className="mt-1 text-xs text-slate-600">Alt: {img.alt}</div> : null}
+                        <div className="mt-1 break-all text-xs text-slate-500">{img.url}</div>
+                        {img.alt ? (
+                          <div className="mt-1 text-xs text-slate-600">Alt: {img.alt}</div>
+                        ) : null}
                       </div>
                     </div>
 
@@ -363,7 +488,7 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
                         onClick={() => moveUp(img.id)}
                         disabled={!canMoveUp.has(img.id) || busyRow || uploading}
                         className="rounded-xl border px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
-                        title={uploading ? "Disabled while uploading" : "Move up"}
+                        title={uploading ? 'Disabled while uploading' : 'Move up'}
                       >
                         ↑
                       </button>
@@ -371,7 +496,7 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
                         onClick={() => moveDown(img.id)}
                         disabled={!canMoveDown.has(img.id) || busyRow || uploading}
                         className="rounded-xl border px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
-                        title={uploading ? "Disabled while uploading" : "Move down"}
+                        title={uploading ? 'Disabled while uploading' : 'Move down'}
                       >
                         ↓
                       </button>

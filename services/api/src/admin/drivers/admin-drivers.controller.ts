@@ -1,85 +1,60 @@
 import {
-  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { AdminDriversService } from './admin-drivers.service';
-import { AdminKeyGuard } from '../../auth/admin-key.guard';
-import { CreateDriverDto } from './dto/create-driver.dto';
-import { UpdateDriverDto } from './dto/update-driver.dto';
+import { AdminJwtGuard } from '../../admin-auth/guards/admin-jwt.guard';
+import { RolesGuard } from '../../common/auth/roles.guard';
+import { Roles, AdminRole } from '../../common/auth/roles.decorator';
 
 @Controller('admin/drivers')
-@UseGuards(AdminKeyGuard)
+@UseGuards(AdminJwtGuard, RolesGuard)
 export class AdminDriversController {
   constructor(private readonly service: AdminDriversService) {}
 
   @Get()
-  async list(
-    @Query('townId') townId: string,
-    @Query('includeInactive') includeInactive?: string,
-  ) {
-    if (!townId) {
-      throw new BadRequestException('townId is required');
-    }
-
-    const includeInactiveValue =
-      includeInactive === undefined ? true : includeInactive === 'true';
-
-    return this.service.listByTown(townId, includeInactiveValue);
+  @Roles(
+    AdminRole.GLOBAL_SUPER_ADMIN,
+    AdminRole.TOWN_SUPER_ADMIN,
+    AdminRole.WAREHOUSE_ADMIN,
+  )
+  list(@Query('townId') townId: string, @Req() req: any) {
+    return this.service.list(townId, req.adminUser);
   }
 
   @Get(':id')
-  async getOne(@Param('id') id: string) {
-    if (!id) {
-      throw new BadRequestException('id is required');
-    }
-
-    return this.service.getById(id);
-  }
-
-  @Get(':id/orders')
-  async getDriverOrders(@Param('id') id: string) {
-    if (!id) {
-      throw new BadRequestException('id is required');
-    }
-
-    return this.service.getOrders(id);
+  @Roles(
+    AdminRole.GLOBAL_SUPER_ADMIN,
+    AdminRole.TOWN_SUPER_ADMIN,
+    AdminRole.WAREHOUSE_ADMIN,
+  )
+  get(@Param('id') id: string, @Req() req: any) {
+    return this.service.get(id, req.adminUser);
   }
 
   @Post()
-  async create(@Body() dto: CreateDriverDto) {
-    return this.service.create(dto);
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
+  create(@Body() body: any, @Req() req: any) {
+    return this.service.create(body, req.adminUser);
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateDriverDto) {
-    return this.service.update(id, dto);
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
+  update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.service.update(id, body, req.adminUser);
   }
 
-  @Patch(':id/availability')
-  async setAvailability(
-    @Param('id') id: string,
-    @Body('availability') availability: 'AVAILABLE' | 'BUSY' | 'OFFLINE',
-  ) {
-    if (!availability) {
-      throw new BadRequestException('availability is required');
-    }
-
-    return this.service.setAvailability(id, availability);
-  }
-
-  @Patch(':id/active')
-  async setActive(@Param('id') id: string, @Body('isActive') isActive: boolean) {
-    if (typeof isActive !== 'boolean') {
-      throw new BadRequestException('isActive must be a boolean');
-    }
-
-    return this.service.setActive(id, isActive);
+  @Delete(':id')
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN)
+  remove(@Param('id') id: string, @Req() req: any) {
+    return this.service.remove(id, req.adminUser);
   }
 }

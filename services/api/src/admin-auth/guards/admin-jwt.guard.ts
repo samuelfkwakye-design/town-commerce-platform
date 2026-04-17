@@ -23,7 +23,11 @@ export class AdminJwtGuard implements CanActivate {
 
     try {
       const payload = await this.jwtService.verifyAsync(token);
-      req.adminUser = payload;
+
+      // 🔥 IMPORTANT: attach to BOTH (for compatibility)
+      req.user = payload;        // used by RolesGuard
+      req.adminUser = payload;  // used by your existing code
+
       return true;
     } catch {
       throw new UnauthorizedException('Invalid or expired admin token');

@@ -1,10 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+type AdminRole =
+  | 'GLOBAL_SUPER_ADMIN'
+  | 'TOWN_SUPER_ADMIN'
+  | 'WAREHOUSE_ADMIN';
 
+type CurrentAdmin = {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  role: AdminRole;
+  townId?: string | null;
+  isActive?: boolean;
+};
 type Driver = {
   id: string;
   townId: string;
@@ -20,6 +34,7 @@ type Driver = {
     slug: string;
   };
 };
+
 function toNumber(v: any): number | null {
   if (v == null) return null;
   const n = typeof v === 'number' ? v : Number(v);
@@ -110,6 +125,7 @@ function kgLabelFromGrams(grams: any) {
   if (!Number.isFinite(n)) return '—';
   return `${(n / 1000).toFixed(3)} kg`;
 }
+
 function formatLastAssignedShort(iso?: string | null) {
   if (!iso) return 'never';
   const d = new Date(iso);
@@ -179,8 +195,12 @@ function getDeliveryAddress(order: any) {
 }
 
 export default function OrderDetailPage() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params?.id;
+
+  const [currentAdmin, setCurrentAdmin] = useState<CurrentAdmin | null>(null);
+  const [adminChecked, setAdminChecked] = useState(false);
 
   const [order, setOrder] = useState<any>(null);
   const [movements, setMovements] = useState<any[]>([]);
@@ -207,7 +227,7 @@ export default function OrderDetailPage() {
     Record<string, number>
   >({});
 
-     const [driverName, setDriverName] = useState('');
+  const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
 
   const [editCustomerPhone, setEditCustomerPhone] = useState('');
@@ -220,6 +240,10 @@ export default function OrderDetailPage() {
   const [editDeliveryTown, setEditDeliveryTown] = useState('');
   const [editDeliveryLandmark, setEditDeliveryLandmark] = useState('');
   const [editDeliveryNotes, setEditDeliveryNotes] = useState('');
+
+  const isGlobalSuperAdmin = currentAdmin?.role === 'GLOBAL_SUPER_ADMIN';
+
+
   const currency = useMemo(() => {
     const p0 = order?.payments?.[0];
     return p0?.currency ?? 'GHS';
@@ -262,7 +286,7 @@ export default function OrderDetailPage() {
       setLoading(true);
       setErr(null);
 
-            const o = await apiFetch<any>(`/admin/orders/${id}`);
+      const o = await apiFetch<any>(`/admin/orders/${id}`);
       setOrder(o);
       setDriverName(o?.driverName ?? '');
       setDriverPhone(o?.driverPhone ?? '');
@@ -277,6 +301,7 @@ export default function OrderDetailPage() {
       setEditDeliveryTown(o?.deliveryTown ?? '');
       setEditDeliveryLandmark(o?.deliveryLandmark ?? '');
       setEditDeliveryNotes(o?.deliveryNotes ?? '');
+
       try {
         const res = await apiFetch<any>(`/orders/${id}/stock-movements?limit=50`);
         const rows = Array.isArray(res) ? res : res?.items ?? res?.rows ?? [];
@@ -293,10 +318,42 @@ export default function OrderDetailPage() {
     }
   }
 
+   useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrapAdmin() {
+      try {
+        const admin = await apiFetch<CurrentAdmin>('/admin/auth/me');
+
+        if (cancelled) return;
+
+        if (!admin) {
+          localStorage.removeItem('admin_token');
+          router.push('/ops/login');
+          return;
+        }
+
+        setCurrentAdmin(admin);
+        setAdminChecked(true);
+      } catch {
+        if (cancelled) return;
+        localStorage.removeItem('admin_token');
+        router.push('/ops/login');
+      }
+    }
+
+    bootstrapAdmin();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
   useEffect(() => {
+    if (!adminChecked) return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, adminChecked]);
 
   const paymentsSorted = useMemo(() => {
     const p = [...(order?.payments ?? [])];
@@ -501,8 +558,13 @@ export default function OrderDetailPage() {
     }
   }
 
-    async function saveOrderDetails() {
+  async function saveOrderDetails() {
     if (!id) return;
+
+    if (!isGlobalSuperAdmin) {
+      setActionErr('Only super admin can edit order details.');
+      return;
+    }
 
     try {
       setActionLoading(true);
@@ -514,7 +576,7 @@ export default function OrderDetailPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-                body: JSON.stringify({
+        body: JSON.stringify({
           customerPhone: editCustomerPhone.trim() || null,
           customerEmail: editCustomerEmail.trim() || null,
           deliveryRecipientName: editDeliveryRecipientName.trim() || null,
@@ -537,6 +599,7 @@ export default function OrderDetailPage() {
       setActionLoading(false);
     }
   }
+
   async function clearDriver() {
     if (!id) return;
 
@@ -687,15 +750,14 @@ export default function OrderDetailPage() {
     }
     return m;
   }, [order?.items]);
-    const availableDrivers = useMemo(
-    () =>
-      drivers.filter((d) => d.isActive && d.availability === 'AVAILABLE'),
+
+  const availableDrivers = useMemo(
+    () => drivers.filter((d) => d.isActive && d.availability === 'AVAILABLE'),
     [drivers],
   );
 
   const unavailableDrivers = useMemo(
-    () =>
-      drivers.filter((d) => !d.isActive || d.availability !== 'AVAILABLE'),
+    () => drivers.filter((d) => !d.isActive || d.availability !== 'AVAILABLE'),
     [drivers],
   );
 
@@ -704,6 +766,7 @@ export default function OrderDetailPage() {
     [drivers, selectedDriverId],
   );
 
+  if (!adminChecked) return <div className="p-6">Checking admin session…</div>;
   if (loading) return <div className="p-6">Loading…</div>;
 
   if (err) {
@@ -734,6 +797,11 @@ export default function OrderDetailPage() {
             <span className={`rounded-full border px-2 py-1 text-xs ${statusBadgeClass(order.status)}`}>
               {order.status}
             </span>
+            {currentAdmin?.role ? (
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700">
+                {currentAdmin.role}
+              </span>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2">
@@ -764,145 +832,155 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
-      <div className="space-y-4 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-[#0f172a]">Edit order details</h2>
-          <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-800">
-            Admin update
-          </span>
+
+      {isGlobalSuperAdmin ? (
+        <div className="space-y-4 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold text-[#0f172a]">Edit order details</h2>
+            <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-800">
+              Super admin only
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Customer phone
+              </label>
+              <input
+                value={editCustomerPhone}
+                onChange={(e) => setEditCustomerPhone(e.target.value)}
+                placeholder="Customer phone"
+                className="w-full rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Customer email
+              </label>
+              <input
+                value={editCustomerEmail}
+                onChange={(e) => setEditCustomerEmail(e.target.value)}
+                placeholder="Customer email"
+                className="w-full rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Delivery recipient name
+              </label>
+              <input
+                value={editDeliveryRecipientName}
+                onChange={(e) => setEditDeliveryRecipientName(e.target.value)}
+                placeholder="Delivery recipient name"
+                className="w-full rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Delivery phone
+              </label>
+              <input
+                value={editDeliveryPhone}
+                onChange={(e) => setEditDeliveryPhone(e.target.value)}
+                placeholder="Delivery phone"
+                className="w-full rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Address line 1
+              </label>
+              <input
+                value={editDeliveryLine1}
+                onChange={(e) => setEditDeliveryLine1(e.target.value)}
+                placeholder="Address line 1"
+                className="w-full rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Address line 2
+              </label>
+              <input
+                value={editDeliveryLine2}
+                onChange={(e) => setEditDeliveryLine2(e.target.value)}
+                placeholder="Address line 2"
+                className="w-full rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Area
+              </label>
+              <input
+                value={editDeliveryArea}
+                onChange={(e) => setEditDeliveryArea(e.target.value)}
+                placeholder="Area"
+                className="w-full rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Town
+              </label>
+              <input
+                value={editDeliveryTown}
+                onChange={(e) => setEditDeliveryTown(e.target.value)}
+                placeholder="Town"
+                className="w-full rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Landmark
+              </label>
+              <input
+                value={editDeliveryLandmark}
+                onChange={(e) => setEditDeliveryLandmark(e.target.value)}
+                placeholder="Landmark"
+                className="w-full rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Notes
+              </label>
+              <input
+                value={editDeliveryNotes}
+                onChange={(e) => setEditDeliveryNotes(e.target.value)}
+                placeholder="Notes"
+                className="w-full rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              onClick={saveOrderDetails}
+              disabled={actionLoading}
+              className="rounded-xl bg-[#0f172a] px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
+            >
+              {actionLoading ? 'Saving…' : 'Save order details'}
+            </button>
+          </div>
         </div>
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Customer phone
-            </label>
-            <input
-              value={editCustomerPhone}
-              onChange={(e) => setEditCustomerPhone(e.target.value)}
-              placeholder="Customer phone"
-              className="w-full rounded-xl border px-3 py-2 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Customer email
-            </label>
-            <input
-              value={editCustomerEmail}
-              onChange={(e) => setEditCustomerEmail(e.target.value)}
-              placeholder="Customer email"
-              className="w-full rounded-xl border px-3 py-2 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Delivery recipient name
-            </label>
-            <input
-              value={editDeliveryRecipientName}
-              onChange={(e) => setEditDeliveryRecipientName(e.target.value)}
-              placeholder="Delivery recipient name"
-              className="w-full rounded-xl border px-3 py-2 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Delivery phone
-            </label>
-            <input
-              value={editDeliveryPhone}
-              onChange={(e) => setEditDeliveryPhone(e.target.value)}
-              placeholder="Delivery phone"
-              className="w-full rounded-xl border px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-  <label className="mb-1 block text-sm font-medium text-slate-700">
-    Address line 1
-  </label>
-  <input
-    value={editDeliveryLine1}
-    onChange={(e) => setEditDeliveryLine1(e.target.value)}
-    placeholder="Address line 1"
-    className="w-full rounded-xl border px-3 py-2 text-sm"
-  />
-</div>
-
-<div>
-  <label className="mb-1 block text-sm font-medium text-slate-700">
-    Address line 2
-  </label>
-  <input
-    value={editDeliveryLine2}
-    onChange={(e) => setEditDeliveryLine2(e.target.value)}
-    placeholder="Address line 2"
-    className="w-full rounded-xl border px-3 py-2 text-sm"
-  />
-</div>
-
-<div>
-  <label className="mb-1 block text-sm font-medium text-slate-700">
-    Area
-  </label>
-  <input
-    value={editDeliveryArea}
-    onChange={(e) => setEditDeliveryArea(e.target.value)}
-    placeholder="Area"
-    className="w-full rounded-xl border px-3 py-2 text-sm"
-  />
-</div>
-
-<div>
-  <label className="mb-1 block text-sm font-medium text-slate-700">
-    Town
-  </label>
-  <input
-    value={editDeliveryTown}
-    onChange={(e) => setEditDeliveryTown(e.target.value)}
-    placeholder="Town"
-    className="w-full rounded-xl border px-3 py-2 text-sm"
-  />
-</div>
-
-<div>
-  <label className="mb-1 block text-sm font-medium text-slate-700">
-    Landmark
-  </label>
-  <input
-    value={editDeliveryLandmark}
-    onChange={(e) => setEditDeliveryLandmark(e.target.value)}
-    placeholder="Landmark"
-    className="w-full rounded-xl border px-3 py-2 text-sm"
-  />
-</div>
-
-<div>
-  <label className="mb-1 block text-sm font-medium text-slate-700">
-    Notes
-  </label>
-  <input
-    value={editDeliveryNotes}
-    onChange={(e) => setEditDeliveryNotes(e.target.value)}
-    placeholder="Notes"
-    className="w-full rounded-xl border px-3 py-2 text-sm"
-  />
-</div>
+      ) : (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          You are signed in as <span className="font-semibold">{currentAdmin?.role}</span>. Editing
+          customer contact and delivery address details is restricted to super admin.
         </div>
+      )}
 
-        <div className="flex justify-end">
-          <button
-            onClick={saveOrderDetails}
-            disabled={actionLoading}
-            className="rounded-xl bg-[#0f172a] px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
-          >
-            {actionLoading ? 'Saving…' : 'Save order details'}
-          </button>
-        </div>
-      </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-3 rounded-2xl border border-[#0f172a]/10 bg-white p-4">
           <div className="flex items-center justify-between gap-3">
@@ -1067,7 +1145,7 @@ export default function OrderDetailPage() {
                 </div>
               </div>
 
-                            <div className="space-y-3">
+              <div className="space-y-3">
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_auto]">
                   <select
                     value={selectedDriverId}

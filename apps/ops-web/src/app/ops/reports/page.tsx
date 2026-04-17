@@ -1,48 +1,58 @@
-'use client';
-
 import Link from 'next/link';
+import RequireAdminRole from '@/components/RequireAdminRole';
 
-export default function ReportsHomePage() {
+export const dynamic = 'force-dynamic';
+
+export default async function ReportsHomePage() {
   return (
-    <div className="p-4 space-y-4">
-      <div>
-        <div className="text-sm text-gray-500">
-          <Link className="underline" href="/ops/orders">
-            Orders
-          </Link>{' '}
-          <span className="mx-1">/</span>
-          <span>Reports</span>
+    <RequireAdminRole
+      allowedRoles={['GLOBAL_SUPER_ADMIN', 'TOWN_SUPER_ADMIN']}
+      requireTownScope={false}
+    >
+      <div className="space-y-6 p-6">
+        <div>
+          <div className="text-sm text-slate-500">
+            <Link className="hover:underline" href="/ops/orders">
+              Orders
+            </Link>
+            <span className="mx-2">/</span>
+            <span>Reports</span>
+          </div>
+
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+            Reports
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Operational and accountant-ready reporting for performance, valuation, and profit.
+          </p>
         </div>
 
-        <h1 className="text-xl font-semibold mt-1">Reports</h1>
-        <div className="text-sm text-gray-600 mt-1">
-          Operational & accountant-ready reporting.
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Link
+            href="/ops/reports/profit"
+            className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:bg-slate-50"
+          >
+            <div className="text-base font-semibold text-slate-900">
+              Profit &amp; Valuation
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              View stock valuation, selling value, cost value, profit, and margin by product.
+            </p>
+          </Link>
+
+          <Link
+            href="/ops/reports/net-profit"
+            className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:bg-slate-50"
+          >
+            <div className="text-base font-semibold text-slate-900">
+              Net Profit Timeseries
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              Track daily, weekly, or monthly net profit, including refund impact.
+            </p>
+          </Link>
         </div>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* Profit & Valuation */}
-        <Link
-          href="/ops/reports/profit"
-          className="rounded border bg-white p-4 hover:bg-gray-50 transition"
-        >
-          <div className="font-medium">Profit & Valuation</div>
-          <div className="text-sm text-gray-600 mt-1">
-            Stock valuation, selling value, cost value, profit and margin by product.
-          </div>
-        </Link>
-
-        {/* Net Profit Timeseries */}
-        <Link
-          href="/ops/reports/net-profit"
-          className="rounded border bg-white p-4 hover:bg-gray-50 transition"
-        >
-          <div className="font-medium">Net Profit Timeseries</div>
-          <div className="text-sm text-gray-600 mt-1">
-            Daily, weekly or monthly net profit including refund impact.
-          </div>
-        </Link>
-      </div>
-    </div>
+    </RequireAdminRole>
   );
 }

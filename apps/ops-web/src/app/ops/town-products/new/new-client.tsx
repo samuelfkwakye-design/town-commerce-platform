@@ -1,9 +1,22 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { apiFetch } from "@/lib/api";
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
+
+type AdminRole =
+  | 'GLOBAL_SUPER_ADMIN'
+  | 'TOWN_SUPER_ADMIN'
+  | 'WAREHOUSE_ADMIN';
+
+type CurrentAdmin = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  role: AdminRole;
+  townId?: string | null;
+};
 
 type TownOption = { id: string; name: string; slug: string };
 type CategoryOption = {
@@ -18,7 +31,7 @@ type TownsResp = { rows: TownOption[] };
 type CategoriesResp = { rows: CategoryOption[] };
 type CreateResp = { id: string };
 
-type PricingModel = "UNIT" | "WEIGHT" | "VARIANT" | "FIXED";
+type PricingModel = 'UNIT' | 'WEIGHT' | 'VARIANT' | 'FIXED';
 
 type VariantRow = {
   name: string;
@@ -37,76 +50,74 @@ function slugify(value: string) {
   return value
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
 }
 
 function extractCreatedCategory(payload: any): CategoryOption | null {
   if (!payload) return null;
 
-  if (payload.id && payload.name) {
-    return payload as CategoryOption;
-  }
-
-  if (payload.row?.id && payload.row?.name) {
-    return payload.row as CategoryOption;
-  }
-
-  if (payload.data?.id && payload.data?.name) {
-    return payload.data as CategoryOption;
-  }
+  if (payload.id && payload.name) return payload as CategoryOption;
+  if (payload.row?.id && payload.row?.name) return payload.row as CategoryOption;
+  if (payload.data?.id && payload.data?.name) return payload.data as CategoryOption;
 
   return null;
 }
 
 export default function NewTownProductClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [currentAdmin, setCurrentAdmin] = useState<CurrentAdmin | null>(null);
+  const [adminLoading, setAdminLoading] = useState(true);
 
   const [towns, setTowns] = useState<TownOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loadingTowns, setLoadingTowns] = useState(true);
   const [loadingCategories, setLoadingCategories] = useState(true);
 
-  const [townId, setTownId] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [productName, setProductName] = useState("");
-  const [description, setDescription] = useState("");
-  const [pricingModel, setPricingModel] = useState<PricingModel>("UNIT");
+  const [townId, setTownId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [productName, setProductName] = useState('');
+  const [description, setDescription] = useState('');
+  const [pricingModel, setPricingModel] = useState<PricingModel>('UNIT');
 
-  const [pricePerUnit, setPricePerUnit] = useState("");
-  const [pricePerKg, setPricePerKg] = useState("");
-  const [basePrice, setBasePrice] = useState("");
+  const [pricePerUnit, setPricePerUnit] = useState('');
+  const [pricePerKg, setPricePerKg] = useState('');
+  const [basePrice, setBasePrice] = useState('');
 
-  const [stockQty, setStockQty] = useState("");
-  const [stockWeightGrams, setStockWeightGrams] = useState("");
+  const [stockQty, setStockQty] = useState('');
+  const [stockWeightGrams, setStockWeightGrams] = useState('');
 
   const [isActive, setIsActive] = useState(true);
 
   const [variants, setVariants] = useState<VariantRow[]>([
-    { name: "Small", price: "", isActive: true },
-    { name: "Medium", price: "", isActive: true },
-    { name: "Large", price: "", isActive: true },
+    { name: 'Small', price: '', isActive: true },
+    { name: 'Medium', price: '', isActive: true },
+    { name: 'Large', price: '', isActive: true },
   ]);
 
   const [showNewCategory, setShowNewCategory] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [newCategorySlug, setNewCategorySlug] = useState("");
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategorySlug, setNewCategorySlug] = useState('');
   const [creatingCategory, setCreatingCategory] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isGlobalAdmin = currentAdmin?.role === 'GLOBAL_SUPER_ADMIN';
+  const isTownScopedAdmin = currentAdmin?.role === 'TOWN_SUPER_ADMIN';
+
   async function loadCategories() {
     setLoadingCategories(true);
     try {
-      const resp = await apiFetch<CategoriesResp>(
-        `/admin/town-products/meta/categories`,
-        { method: "GET" }
-      );
+      const resp = await apiFetch<CategoriesResp>('/admin/town-products/meta/categories', {
+        method: 'GET',
+      });
       setCategories(resp?.rows ?? []);
     } catch (e: any) {
-      setError((prev) => prev ?? e?.message ?? "Failed to load categories");
+      setError((prev) => prev ?? e?.message ?? 'Failed to load categories');
     } finally {
       setLoadingCategories(false);
     }
@@ -117,15 +128,57 @@ export default function NewTownProductClient() {
 
     (async () => {
       try {
-        setLoadingTowns(true);
-        const resp = await apiFetch<TownsResp>(`/admin/reports/towns`, {
-          method: "GET",
-        });
+        setAdminLoading(true);
+        const admin = await apiFetch<CurrentAdmin>('/admin/auth/me');
         if (!alive) return;
-        setTowns(resp?.rows ?? []);
+        setCurrentAdmin(admin ?? null);
+
+        const townIdFromUrl = searchParams.get('townId') ?? '';
+
+        if (admin?.role === 'TOWN_SUPER_ADMIN') {
+          setTownId(admin.townId ?? '');
+        } else if (townIdFromUrl) {
+          setTownId(townIdFromUrl);
+        }
       } catch (e: any) {
         if (!alive) return;
-        setError(e?.message ?? "Failed to load towns");
+        setError(e?.message ?? 'Failed to load admin session');
+      } finally {
+        if (!alive) return;
+        setAdminLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [searchParams]);
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        setLoadingTowns(true);
+
+        const resp = await apiFetch<TownsResp>('/admin/reports/towns', {
+          method: 'GET',
+        });
+
+        if (!alive) return;
+
+        const rows = resp?.rows ?? [];
+        setTowns(rows);
+
+        if (!townId && rows.length > 0 && !isTownScopedAdmin) {
+          const townIdFromUrl = searchParams.get('townId') ?? '';
+          if (townIdFromUrl && rows.some((t) => t.id === townIdFromUrl)) {
+            setTownId(townIdFromUrl);
+          }
+        }
+      } catch (e: any) {
+        if (!alive) return;
+        setError(e?.message ?? 'Failed to load towns');
       } finally {
         if (!alive) return;
         setLoadingTowns(false);
@@ -135,7 +188,7 @@ export default function NewTownProductClient() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [searchParams, townId, isTownScopedAdmin]);
 
   useEffect(() => {
     loadCategories();
@@ -144,34 +197,46 @@ export default function NewTownProductClient() {
   useEffect(() => {
     if (!showNewCategory) return;
     if (!newCategoryName.trim()) {
-      setNewCategorySlug("");
+      setNewCategorySlug('');
       return;
     }
     setNewCategorySlug(slugify(newCategoryName));
   }, [newCategoryName, showNewCategory]);
 
+  useEffect(() => {
+    if (isTownScopedAdmin && currentAdmin?.townId && townId !== currentAdmin.townId) {
+      setTownId(currentAdmin.townId);
+    }
+  }, [isTownScopedAdmin, currentAdmin, townId]);
+
+  const selectedTown = useMemo(
+    () => towns.find((t) => t.id === townId) ?? null,
+    [towns, townId],
+  );
+
   const canSubmit = useMemo(() => {
     if (submitting) return false;
+    if (adminLoading) return false;
     if (!townId) return false;
     if (!productName.trim()) return false;
 
-    if ((pricingModel === "UNIT" || pricingModel === "FIXED") && !pricePerUnit.trim()) {
+    if ((pricingModel === 'UNIT' || pricingModel === 'FIXED') && !pricePerUnit.trim()) {
       return false;
     }
 
-    if (pricingModel === "WEIGHT" && !pricePerKg.trim()) {
+    if (pricingModel === 'WEIGHT' && !pricePerKg.trim()) {
       return false;
     }
 
-    if (pricingModel === "VARIANT") {
+    if (pricingModel === 'VARIANT') {
       const validVariantCount = variants.filter(
-        (v) => v.name.trim() && !isNaN(Number(v.price))
+        (v) => v.name.trim() && !isNaN(Number(v.price)),
       ).length;
       if (validVariantCount === 0) return false;
     }
 
     return true;
-  }, [submitting, townId, productName, pricingModel, pricePerUnit, pricePerKg, variants]);
+  }, [submitting, adminLoading, townId, productName, pricingModel, pricePerUnit, pricePerKg, variants]);
 
   async function handleCreateCategory() {
     setError(null);
@@ -180,30 +245,27 @@ export default function NewTownProductClient() {
     const slug = slugify(newCategorySlug || newCategoryName);
 
     if (!name) {
-      setError("New category name is required");
+      setError('New category name is required');
       return;
     }
 
     if (!slug) {
-      setError("New category slug is required");
+      setError('New category slug is required');
       return;
     }
 
     try {
       setCreatingCategory(true);
 
-      const createdPayload = await apiFetch<any>(
-        `/admin/town-products/meta/categories`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            name,
-            slug,
-            isActive: true,
-            sortOrder: 0,
-          }),
-        }
-      );
+      const createdPayload = await apiFetch<any>('/admin/town-products/meta/categories', {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          slug,
+          isActive: true,
+          sortOrder: 0,
+        }),
+      });
 
       const createdCategory = extractCreatedCategory(createdPayload);
 
@@ -212,10 +274,9 @@ export default function NewTownProductClient() {
       if (createdCategory?.id) {
         setCategoryId(createdCategory.id);
       } else {
-        const refreshed = await apiFetch<CategoriesResp>(
-          `/admin/town-products/meta/categories`,
-          { method: "GET" }
-        );
+        const refreshed = await apiFetch<CategoriesResp>('/admin/town-products/meta/categories', {
+          method: 'GET',
+        });
 
         const rows = refreshed?.rows ?? [];
         setCategories(rows);
@@ -230,10 +291,10 @@ export default function NewTownProductClient() {
       }
 
       setShowNewCategory(false);
-      setNewCategoryName("");
-      setNewCategorySlug("");
+      setNewCategoryName('');
+      setNewCategorySlug('');
     } catch (e: any) {
-      setError(e?.message ?? "Failed to create category");
+      setError(e?.message ?? 'Failed to create category');
     } finally {
       setCreatingCategory(false);
     }
@@ -243,8 +304,15 @@ export default function NewTownProductClient() {
     e.preventDefault();
     setError(null);
 
+    const effectiveTownId = isTownScopedAdmin ? currentAdmin?.townId ?? '' : townId;
+
+    if (!effectiveTownId) {
+      setError('Town is required');
+      return;
+    }
+
     const payload: Record<string, any> = {
-      townId,
+      townId: effectiveTownId,
       productName: productName.trim(),
       description: description.trim() || null,
       pricingModel,
@@ -259,28 +327,27 @@ export default function NewTownProductClient() {
     const qty = toNumberOrNull(stockQty);
     const grams = toNumberOrNull(stockWeightGrams);
 
-    if (pricingModel === "UNIT" || pricingModel === "FIXED") {
+    if (pricingModel === 'UNIT' || pricingModel === 'FIXED') {
       if (ppu === null) {
-        setError("Price per unit is required");
+        setError('Price per unit is required');
         return;
       }
       payload.pricePerUnit = ppu;
     }
 
-    if (pricingModel === "WEIGHT") {
+    if (pricingModel === 'WEIGHT') {
       if (ppk === null) {
-        setError("Price per kg is required");
+        setError('Price per kg is required');
         return;
       }
       payload.pricePerKg = ppk;
     }
 
     if (bp !== null) payload.basePrice = bp;
-
     if (qty !== null) payload.stockQty = Math.trunc(qty);
     if (grams !== null) payload.stockWeightGrams = Math.trunc(grams);
 
-    if (pricingModel === "VARIANT") {
+    if (pricingModel === 'VARIANT') {
       const cleaned = variants
         .map((v, i) => ({
           label: v.name.trim(),
@@ -291,7 +358,7 @@ export default function NewTownProductClient() {
         .filter((v) => v.label && !isNaN(v.unitPrice));
 
       if (cleaned.length === 0) {
-        setError("At least one valid variant is required");
+        setError('At least one valid variant is required');
         return;
       }
 
@@ -301,18 +368,18 @@ export default function NewTownProductClient() {
     try {
       setSubmitting(true);
 
-      const created = await apiFetch<CreateResp>(`/admin/town-products`, {
-        method: "POST",
+      const created = await apiFetch<CreateResp>('/admin/town-products', {
+        method: 'POST',
         body: JSON.stringify(payload),
       });
 
       if (!created?.id) {
-        throw new Error("Create succeeded but no id returned.");
+        throw new Error('Create succeeded but no id returned.');
       }
 
       router.push(`/ops/town-products/${created.id}/images`);
     } catch (e: any) {
-      setError(e?.message ?? "Failed to create product");
+      setError(e?.message ?? 'Failed to create product');
       setSubmitting(false);
     }
   }
@@ -325,6 +392,11 @@ export default function NewTownProductClient() {
           <p className="text-sm text-gray-500">
             Create a town listing, assign or create a category, then upload images.
           </p>
+          {isTownScopedAdmin ? (
+            <p className="mt-1 text-sm text-blue-700">
+              Your product creation is restricted to your assigned town.
+            </p>
+          ) : null}
         </div>
 
         <Link className="text-sm text-blue-600 hover:underline" href="/ops/town-products">
@@ -332,32 +404,41 @@ export default function NewTownProductClient() {
         </Link>
       </div>
 
-      {error && (
+      {error ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           {error}
         </div>
-      )}
+      ) : null}
 
       <form onSubmit={onSubmit} className="space-y-4 rounded-lg border bg-white p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="block text-sm text-gray-600">Town</label>
-            <select
-              value={townId}
-              onChange={(e) => setTownId(e.target.value)}
-              className="mt-1 w-full rounded-md border bg-white px-3 py-2"
-              disabled={loadingTowns}
-              required
-            >
-              <option value="">
-                {loadingTowns ? "Loading towns..." : "Select a town"}
-              </option>
-              {towns.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.slug})
+
+            {isTownScopedAdmin ? (
+              <input
+                value={selectedTown ? `${selectedTown.name} (${selectedTown.slug})` : ''}
+                disabled
+                className="mt-1 w-full rounded-md border bg-gray-100 px-3 py-2"
+              />
+            ) : (
+              <select
+                value={townId}
+                onChange={(e) => setTownId(e.target.value)}
+                className="mt-1 w-full rounded-md border bg-white px-3 py-2"
+                disabled={loadingTowns || adminLoading}
+                required
+              >
+                <option value="">
+                  {loadingTowns ? 'Loading towns...' : 'Select a town'}
                 </option>
-              ))}
-            </select>
+                {towns.map((town) => (
+                  <option key={town.id} value={town.id}>
+                    {town.name} ({town.slug})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div>
@@ -389,13 +470,11 @@ export default function NewTownProductClient() {
               disabled={loadingCategories}
             >
               <option value="">
-                {loadingCategories
-                  ? "Loading categories..."
-                  : "Select a category (optional)"}
+                {loadingCategories ? 'Loading categories...' : 'Select a category (optional)'}
               </option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
                 </option>
               ))}
             </select>
@@ -405,10 +484,10 @@ export default function NewTownProductClient() {
               className="text-sm text-blue-600 hover:underline"
               onClick={() => setShowNewCategory((s) => !s)}
             >
-              {showNewCategory ? "Cancel new category" : "+ Create new category"}
+              {showNewCategory ? 'Cancel new category' : '+ Create new category'}
             </button>
 
-            {showNewCategory && (
+            {showNewCategory ? (
               <div className="space-y-3 rounded-md border bg-gray-50 p-3">
                 <div>
                   <label className="block text-sm text-gray-600">New category name</label>
@@ -437,11 +516,11 @@ export default function NewTownProductClient() {
                     disabled={creatingCategory}
                     className="rounded-md bg-slate-800 px-4 py-2 text-white hover:bg-slate-900 disabled:opacity-50"
                   >
-                    {creatingCategory ? "Creating..." : "Create category"}
+                    {creatingCategory ? 'Creating...' : 'Create category'}
                   </button>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div>
@@ -458,7 +537,7 @@ export default function NewTownProductClient() {
             </select>
           </div>
 
-          {(pricingModel === "UNIT" || pricingModel === "FIXED") && (
+          {(pricingModel === 'UNIT' || pricingModel === 'FIXED') ? (
             <div>
               <label className="block text-sm text-gray-600">Price per unit</label>
               <input
@@ -469,9 +548,9 @@ export default function NewTownProductClient() {
                 placeholder="e.g. 25"
               />
             </div>
-          )}
+          ) : null}
 
-          {pricingModel === "WEIGHT" && (
+          {pricingModel === 'WEIGHT' ? (
             <div>
               <label className="block text-sm text-gray-600">Price per kg</label>
               <input
@@ -482,9 +561,9 @@ export default function NewTownProductClient() {
                 placeholder="e.g. 12.5"
               />
             </div>
-          )}
+          ) : null}
 
-          {pricingModel === "UNIT" && (
+          {pricingModel === 'UNIT' ? (
             <div>
               <label className="block text-sm text-gray-600">Stock quantity</label>
               <input
@@ -495,9 +574,9 @@ export default function NewTownProductClient() {
                 placeholder="e.g. 20"
               />
             </div>
-          )}
+          ) : null}
 
-          {pricingModel === "WEIGHT" && (
+          {pricingModel === 'WEIGHT' ? (
             <div>
               <label className="block text-sm text-gray-600">Stock weight (grams)</label>
               <input
@@ -508,7 +587,7 @@ export default function NewTownProductClient() {
                 placeholder="e.g. 5000"
               />
             </div>
-          )}
+          ) : null}
 
           <div className="flex items-center gap-2 pt-6">
             <input
@@ -520,7 +599,7 @@ export default function NewTownProductClient() {
           </div>
         </div>
 
-        {pricingModel === "VARIANT" && (
+        {pricingModel === 'VARIANT' ? (
           <div className="space-y-3 rounded-md border bg-gray-50 p-4">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold">Variants</div>
@@ -528,24 +607,24 @@ export default function NewTownProductClient() {
                 type="button"
                 className="text-sm text-blue-600 hover:underline"
                 onClick={() =>
-                  setVariants((v) => [...v, { name: "", price: "", isActive: true }])
+                  setVariants((rows) => [...rows, { name: '', price: '', isActive: true }])
                 }
               >
                 + Add variant
               </button>
             </div>
 
-            {variants.map((v, idx) => (
+            {variants.map((variant, idx) => (
               <div key={idx} className="grid grid-cols-4 items-center gap-3">
                 <input
                   className="rounded-md border px-3 py-2"
                   placeholder="Variant name"
-                  value={v.name}
+                  value={variant.name}
                   onChange={(e) =>
                     setVariants((rows) =>
-                      rows.map((r, i) =>
-                        i === idx ? { ...r, name: e.target.value } : r
-                      )
+                      rows.map((row, i) =>
+                        i === idx ? { ...row, name: e.target.value } : row,
+                      ),
                     )
                   }
                 />
@@ -554,12 +633,12 @@ export default function NewTownProductClient() {
                   className="rounded-md border px-3 py-2"
                   inputMode="decimal"
                   placeholder="Price"
-                  value={v.price}
+                  value={variant.price}
                   onChange={(e) =>
                     setVariants((rows) =>
-                      rows.map((r, i) =>
-                        i === idx ? { ...r, price: e.target.value } : r
-                      )
+                      rows.map((row, i) =>
+                        i === idx ? { ...row, price: e.target.value } : row,
+                      ),
                     )
                   }
                 />
@@ -567,12 +646,12 @@ export default function NewTownProductClient() {
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                   <input
                     type="checkbox"
-                    checked={v.isActive}
+                    checked={variant.isActive}
                     onChange={(e) =>
                       setVariants((rows) =>
-                        rows.map((r, i) =>
-                          i === idx ? { ...r, isActive: e.target.checked } : r
-                        )
+                        rows.map((row, i) =>
+                          i === idx ? { ...row, isActive: e.target.checked } : row,
+                        ),
                       )
                     }
                   />
@@ -582,16 +661,14 @@ export default function NewTownProductClient() {
                 <button
                   type="button"
                   className="text-sm text-red-600"
-                  onClick={() =>
-                    setVariants((rows) => rows.filter((_, i) => i !== idx))
-                  }
+                  onClick={() => setVariants((rows) => rows.filter((_, i) => i !== idx))}
                 >
                   Remove
                 </button>
               </div>
             ))}
           </div>
-        )}
+        ) : null}
 
         <div className="flex justify-end">
           <button
@@ -599,7 +676,7 @@ export default function NewTownProductClient() {
             disabled={!canSubmit}
             className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            {submitting ? "Creating..." : "Create product"}
+            {submitting ? 'Creating...' : 'Create product'}
           </button>
         </div>
       </form>

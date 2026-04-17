@@ -21,6 +21,7 @@ import { PromosAdminModule } from './admin/promos/promos.admin.module';
 import { AdminCustomersModule } from './admin/customers/admin-customers.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminAuthModule } from './admin-auth/admin-auth.module';
+import { DriverAuthModule } from './driver-auth/driver-auth.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { AdminAuthModule } from './admin-auth/admin-auth.module';
     AdminCustomersModule,
     NotificationsModule,
     AdminAuthModule,
+    DriverAuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

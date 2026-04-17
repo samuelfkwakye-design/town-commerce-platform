@@ -17,6 +17,10 @@ import { AdminTownProductsController } from '../town-products/admin.town-product
 import { AdminTownProductVariantsController } from '../town-products/admin.town-product-variants.controller';
 import { AdminDriversModule } from './drivers/admin-drivers.module';
 
+import { AdminAuthModule } from '../admin-auth/admin-auth.module';
+import { AdminUsersController } from './admin-users.controller';
+import { AdminUsersService } from './admin-users.service';
+
 @Module({
   imports: [
     OrdersModule,
@@ -25,6 +29,7 @@ import { AdminDriversModule } from './drivers/admin-drivers.module';
     AdminRefundsModule,
     AdminProductImagesModule,
     AdminDriversModule,
+    AdminAuthModule,
   ],
   controllers: [
     AdminOrdersController,
@@ -32,12 +37,14 @@ import { AdminDriversModule } from './drivers/admin-drivers.module';
     AdminTownProductsController,
     AdminTownProductVariantsController,
     AdminTownsController,
+    AdminUsersController,
   ],
   providers: [
     PrismaService,
     AdminOrdersService,
     AdminExportsService,
     AdminTownProductsService,
+    AdminUsersService,
   ],
 })
 export class AdminModule {}

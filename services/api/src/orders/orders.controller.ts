@@ -22,6 +22,9 @@ import { PayGoodsDto } from './dto/pay-goods.dto';
 import { RefundItemsDto } from './dto/refund-items.dto';
 import { QuoteOrderDto } from './dto/quote-order.dto';
 import { AssignDriverDto } from './dto/assign-driver.dto';
+import { AdminJwtGuard } from '../admin-auth/guards/admin-jwt.guard';
+import { RolesGuard } from '../common/auth/roles.guard';
+import { AdminRole, Roles } from '../common/auth/roles.decorator';
 
 @Controller('orders')
 export class OrdersController {
@@ -67,6 +70,9 @@ export class OrdersController {
   }
 
   // PATCH /api/v1/orders/:id
+  // GLOBAL_SUPER_ADMIN only: edit customer/contact/address/order fee details
+  @UseGuards(AdminJwtGuard, RolesGuard)
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN)
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateOrderDto) {
     return this.service.updateOrder(id, dto);
@@ -79,15 +85,24 @@ export class OrdersController {
   }
 
   // PATCH /api/v1/orders/admin/:id/confirm
+  // GLOBAL_SUPER_ADMIN + TOWN_SUPER_ADMIN + WAREHOUSE_ADMIN
+  @UseGuards(AdminJwtGuard, RolesGuard)
+  @Roles(
+    AdminRole.GLOBAL_SUPER_ADMIN,
+    AdminRole.TOWN_SUPER_ADMIN,
+    AdminRole.WAREHOUSE_ADMIN,
+  )
   @Patch('admin/:id/confirm')
   adminConfirm(@Param('id') id: string) {
     return this.service.confirmOrder(id);
   }
-// PATCH /api/v1/orders/:id/assign-driver
-@Patch(':id/assign-driver')
-assignDriver(@Param('id') id: string, @Body() dto: AssignDriverDto) {
-  return this.service.assignDriver(id, dto.driverName, dto.driverPhone);
-}
+
+  // PATCH /api/v1/orders/:id/assign-driver
+  @Patch(':id/assign-driver')
+  assignDriver(@Param('id') id: string, @Body() dto: AssignDriverDto) {
+    return this.service.assignDriver(id, dto.driverName, dto.driverPhone);
+  }
+
   // PATCH /api/v1/orders/:id/complete
   @Patch(':id/complete')
   complete(@Param('id') id: string, @Body() dto: CompleteOrderDto) {
@@ -125,12 +140,22 @@ assignDriver(@Param('id') id: string, @Body() dto: AssignDriverDto) {
   }
 
   // PATCH /api/v1/orders/admin/:id/cod-collected
+  // GLOBAL_SUPER_ADMIN + TOWN_SUPER_ADMIN + WAREHOUSE_ADMIN
+  @UseGuards(AdminJwtGuard, RolesGuard)
+  @Roles(
+    AdminRole.GLOBAL_SUPER_ADMIN,
+    AdminRole.TOWN_SUPER_ADMIN,
+    AdminRole.WAREHOUSE_ADMIN,
+  )
   @Patch('admin/:id/cod-collected')
   adminCodCollected(@Param('id') id: string, @Body() dto: CodCollectedDto) {
     return this.service.markCodCollected(id, dto.note);
   }
 
   // POST /api/v1/orders/:id/dev/force-settle
+  // GLOBAL_SUPER_ADMIN only
+  @UseGuards(AdminJwtGuard, RolesGuard)
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN)
   @Post(':id/dev/force-settle')
   forceSettle(@Param('id') id: string) {
     return this.service.devForceSettle(id);

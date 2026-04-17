@@ -1,54 +1,65 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateDriverDto } from './dto/create-driver.dto';
-import { UpdateDriverDto } from './dto/update-driver.dto';
+import { AdminRole } from '../../common/auth/roles.decorator';
+
+type CurrentAdminUser = {
+  sub: string;
+  role: AdminRole;
+  townId?: string | null;
+};
 
 @Injectable()
 export class AdminDriversService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listByTown(townId: string, includeInactive = true) {
-    if (!townId) {
-      throw new BadRequestException('townId is required');
+  private isGlobal(admin: CurrentAdminUser) {
+    return admin.role === AdminRole.GLOBAL_SUPER_ADMIN;
+  }
+
+  private isTownScoped(admin: CurrentAdminUser) {
+    return (
+      admin.role === AdminRole.TOWN_SUPER_ADMIN ||
+      admin.role === AdminRole.WAREHOUSE_ADMIN
+    );
+  }
+
+  private assertTownAccess(admin: CurrentAdminUser) {
+    if (this.isTownScoped(admin) && !admin.townId) {
+      throw new ForbiddenException('Admin has no town assigned');
     }
+  }
+
+  private getEffectiveTownId(
+    requestedTownId: string | undefined,
+    admin: CurrentAdminUser,
+  ) {
+    if (this.isGlobal(admin)) return requestedTownId;
+    this.assertTownAccess(admin);
+    return admin.townId!;
+  }
+
+  async list(townId: string | undefined, admin: CurrentAdminUser) {
+    const effectiveTownId = this.getEffectiveTownId(townId, admin);
 
     return this.prisma.driver.findMany({
-      where: {
-        townId,
-        ...(includeInactive ? {} : { isActive: true }),
-      },
-      orderBy: [{ priority: 'asc' }, { lastAssignedAt: 'asc' }],
+      where: effectiveTownId ? { townId: effectiveTownId } : {},
+      orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
       include: {
-        town: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
+        town: { select: { id: true, name: true, slug: true } },
       },
     });
   }
 
-  async getById(id: string) {
-    if (!id) {
-      throw new BadRequestException('id is required');
-    }
-
+  async get(id: string, admin: CurrentAdminUser) {
     const driver = await this.prisma.driver.findUnique({
       where: { id },
       include: {
-        town: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
+        town: { select: { id: true, name: true, slug: true } },
       },
     });
 
@@ -56,142 +67,89 @@ export class AdminDriversService {
       throw new NotFoundException('Driver not found');
     }
 
+    if (!this.isGlobal(admin) && driver.townId !== admin.townId) {
+      throw new ForbiddenException('Access denied to this driver');
+    }
+
     return driver;
   }
 
-  async getOrders(driverId: string) {
-    await this.ensureDriverExists(driverId);
-
-    return this.prisma.order.findMany({
-      where: {
-        driverId,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      select: {
-  id: true,
-  status: true,
-  total: true,
-  createdAt: true,
-  town: {
-    select: {
-      id: true,
-      name: true,
-      slug: true,
+  async create(
+    data: {
+      name: string;
+      phone: string;
+      townId?: string;
+      priority?: number;
     },
-  },
-},
-      take: 50,
-    });
-  }
+    admin: CurrentAdminUser,
+  ) {
+    const effectiveTownId = this.getEffectiveTownId(data.townId, admin);
 
-  async create(dto: CreateDriverDto) {
-    const town = await this.prisma.town.findUnique({
-      where: { id: dto.townId },
-      select: { id: true },
-    });
+    if (!effectiveTownId) {
+      throw new BadRequestException('townId is required');
+    }
 
-    if (!town) {
-      throw new NotFoundException('Town not found');
+    if (!data.name?.trim()) {
+      throw new BadRequestException('name is required');
+    }
+
+    if (!data.phone?.trim()) {
+      throw new BadRequestException('phone is required');
     }
 
     return this.prisma.driver.create({
       data: {
-        townId: dto.townId,
-        name: dto.name.trim(),
-        phone: dto.phone.trim(),
-        priority: dto.priority ?? 100,
-        availability: dto.availability ?? 'AVAILABLE',
-        isActive: dto.isActive ?? true,
+        name: data.name.trim(),
+        phone: data.phone.trim(),
+        townId: effectiveTownId,
+        availability: 'AVAILABLE',
+        priority: Number.isFinite(Number(data.priority))
+          ? Number(data.priority)
+          : 100,
       },
       include: {
-        town: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
+        town: { select: { id: true, name: true, slug: true } },
       },
     });
   }
 
-  async update(id: string, dto: UpdateDriverDto) {
-    await this.ensureDriverExists(id);
+  async update(
+    id: string,
+    data: {
+      name?: string;
+      phone?: string;
+      availability?: 'AVAILABLE' | 'BUSY' | 'OFFLINE';
+      priority?: number;
+      isActive?: boolean;
+    },
+    admin: CurrentAdminUser,
+  ) {
+    const existing = await this.get(id, admin);
 
     return this.prisma.driver.update({
       where: { id },
       data: {
-        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-        ...(dto.phone !== undefined ? { phone: dto.phone.trim() } : {}),
-        ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
-        ...(dto.availability !== undefined
-          ? { availability: dto.availability }
-          : {}),
-        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        name: data.name?.trim() ?? existing.name,
+        phone: data.phone?.trim() ?? existing.phone,
+        availability: data.availability ?? existing.availability,
+        priority:
+          data.priority != null ? Number(data.priority) : existing.priority,
+        isActive:
+          typeof data.isActive === 'boolean'
+            ? data.isActive
+            : existing.isActive,
       },
       include: {
-        town: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
+        town: { select: { id: true, name: true, slug: true } },
       },
     });
   }
 
-  async setAvailability(
-    id: string,
-    availability: 'AVAILABLE' | 'BUSY' | 'OFFLINE',
-  ) {
-    await this.ensureDriverExists(id);
+  async remove(id: string, admin: CurrentAdminUser) {
+    await this.get(id, admin);
 
-    return this.prisma.driver.update({
+    return this.prisma.driver.delete({
       where: { id },
-      data: { availability },
-      include: {
-        town: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-      },
     });
-  }
-
-  async setActive(id: string, isActive: boolean) {
-    await this.ensureDriverExists(id);
-
-    return this.prisma.driver.update({
-      where: { id },
-      data: { isActive },
-      include: {
-        town: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-      },
-    });
-  }
-
-  private async ensureDriverExists(id: string) {
-    const driver = await this.prisma.driver.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    if (!driver) {
-      throw new NotFoundException('Driver not found');
-    }
-
-    return driver;
   }
 }

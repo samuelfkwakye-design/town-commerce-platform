@@ -26,6 +26,15 @@ export class AdminAuthService {
       where: {
         OR: [{ email: dto.login }, { username: dto.login }],
       },
+      include: {
+        town: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
     });
 
     if (!user || !user.isActive) {
@@ -48,6 +57,7 @@ export class AdminAuthService {
       email: user.email,
       username: user.username,
       role: user.role,
+      townId: user.townId ?? null,
     });
 
     return {
@@ -59,6 +69,14 @@ export class AdminAuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        townId: user.townId ?? null,
+        town: user.town
+          ? {
+              id: user.town.id,
+              name: user.town.name,
+              slug: user.town.slug,
+            }
+          : null,
       },
     };
   }
@@ -74,9 +92,17 @@ export class AdminAuthService {
         lastName: true,
         phone: true,
         role: true,
+        townId: true,
         isActive: true,
         lastLoginAt: true,
         createdAt: true,
+        town: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
       },
     });
 

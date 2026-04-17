@@ -6,6 +6,19 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { ExportOrdersCsvButton } from '@/components/ExportOrdersCsvButton';
 
+type AdminRole =
+  | 'GLOBAL_SUPER_ADMIN'
+  | 'TOWN_SUPER_ADMIN'
+  | 'WAREHOUSE_ADMIN';
+
+type CurrentAdmin = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  role: AdminRole;
+  townId?: string | null;
+};
+
 type PaymentLite = {
   id: string;
   status: string;
@@ -80,7 +93,7 @@ const LAST_TOWN_STORAGE_KEY = 'opsOrders:lastTownId';
 function badgeClass(status: string) {
   switch (status) {
     case 'DRAFT':
-      return 'bg-gray-100 border-gray-200 text-gray-800';
+      return 'bg-slate-100 border-slate-200 text-slate-800';
     case 'FULFILLED':
       return 'bg-blue-100 border-blue-200 text-blue-900';
     case 'SETTLED':
@@ -92,7 +105,7 @@ function badgeClass(status: string) {
     case 'PARTIALLY_REFUNDED':
       return 'bg-orange-100 border-orange-200 text-orange-900';
     default:
-      return 'bg-gray-100 border-gray-200 text-gray-800';
+      return 'bg-slate-100 border-slate-200 text-slate-800';
   }
 }
 
@@ -197,6 +210,9 @@ export default function OpsOrdersPage() {
   const limitParam = Number(searchParams.get('limit') ?? '20');
   const cursorParam = searchParams.get('cursor');
 
+  const [currentAdmin, setCurrentAdmin] = useState<CurrentAdmin | null>(null);
+  const [adminLoading, setAdminLoading] = useState(true);
+
   const [qInput, setQInput] = useState(qParam);
   const [fromInput, setFromInput] = useState(fromParam);
   const [toInput, setToInput] = useState(toParam);
@@ -239,6 +255,11 @@ export default function OpsOrdersPage() {
   const [err, setErr] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasNext, setHasNext] = useState(false);
+
+  const isGlobalAdmin = currentAdmin?.role === 'GLOBAL_SUPER_ADMIN';
+  const isTownScopedAdmin =
+    currentAdmin?.role === 'TOWN_SUPER_ADMIN' ||
+    currentAdmin?.role === 'WAREHOUSE_ADMIN';
 
   function updateQuery(next: {
     status?: string;
@@ -284,6 +305,22 @@ export default function OpsOrdersPage() {
   }, [debouncedQ]);
 
   useEffect(() => {
+    async function loadAdmin() {
+      try {
+        setAdminLoading(true);
+        const admin = await apiFetch<CurrentAdmin>('/admin/auth/me');
+        setCurrentAdmin(admin ?? null);
+      } catch {
+        setCurrentAdmin(null);
+      } finally {
+        setAdminLoading(false);
+      }
+    }
+
+    loadAdmin();
+  }, []);
+
+  useEffect(() => {
     (async () => {
       try {
         setTownsLoading(true);
@@ -298,7 +335,20 @@ export default function OpsOrdersPage() {
     })();
   }, []);
 
-  // Sync town search input from selected townId
+  useEffect(() => {
+    if (adminLoading) return;
+    if (!currentAdmin) return;
+
+    if (isTownScopedAdmin) {
+      const forcedTownId = currentAdmin.townId ?? '';
+      if (townIdParam !== forcedTownId) {
+        setTownIdInput(forcedTownId);
+        updateQuery({ townId: forcedTownId, cursor: null });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminLoading, currentAdmin, isTownScopedAdmin, townIdParam]);
+
   useEffect(() => {
     if (!townIdParam) {
       setTownSearchInput('');
@@ -309,18 +359,18 @@ export default function OpsOrdersPage() {
     setTownSearchInput(selected?.name ?? '');
   }, [townIdParam, towns]);
 
-  // Remember selected town
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!isGlobalAdmin) return;
 
     if (townIdParam) {
       window.localStorage.setItem(LAST_TOWN_STORAGE_KEY, townIdParam);
     }
-  }, [townIdParam]);
+  }, [townIdParam, isGlobalAdmin]);
 
-  // Auto-restore last selected town when URL has no townId
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!isGlobalAdmin) return;
     if (townsLoading) return;
     if (townIdParam) return;
     if (towns.length === 0) return;
@@ -333,25 +383,39 @@ export default function OpsOrdersPage() {
 
     updateQuery({ townId: savedTownId, cursor: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [townIdParam, townsLoading, towns]);
+  }, [townIdParam, townsLoading, towns, isGlobalAdmin]);
 
   useEffect(() => {
+    if (adminLoading) return;
+
     const safeFrom = isValidDateInput(fromInput) ? fromInput : '';
     const safeTo = isValidDateInput(toInput) ? toInput : '';
 
+    const effectiveTownId = isTownScopedAdmin ? currentAdmin?.townId ?? '' : townIdInput;
+
     const changed =
-      safeFrom !== fromParam || safeTo !== toParam || townIdInput !== townIdParam;
+      safeFrom !== fromParam || safeTo !== toParam || effectiveTownId !== townIdParam;
 
     if (changed) {
       updateQuery({
         from: safeFrom,
         to: safeTo,
-        townId: townIdInput,
+        townId: effectiveTownId,
         cursor: null,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromInput, toInput, townIdInput]);
+  }, [
+    fromInput,
+    toInput,
+    townIdInput,
+    fromParam,
+    toParam,
+    townIdParam,
+    adminLoading,
+    isTownScopedAdmin,
+    currentAdmin,
+  ]);
 
   const activeTowns = useMemo(
     () => towns.filter((t) => t.isActive !== false),
@@ -450,11 +514,11 @@ export default function OpsOrdersPage() {
   }, [items]);
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="space-y-4 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Orders</h1>
-          <div className="text-sm text-gray-600">
+          <h1 className="text-xl font-semibold text-slate-900">Orders</h1>
+          <div className="text-sm text-slate-600">
             {selectedTown
               ? `Focused on ${selectedTown.name}`
               : 'Central view across all towns'}
@@ -463,24 +527,26 @@ export default function OpsOrdersPage() {
 
         <div className="flex items-center gap-3">
           <ExportOrdersCsvButton />
-          <Link className="underline text-sm" href="/ops/login">
+          <Link className="text-sm underline" href="/ops/login">
             Change key
           </Link>
         </div>
       </div>
 
-      <div className="rounded-2xl border p-4 bg-white space-y-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="font-semibold">Town filter</div>
-            <div className="text-sm text-gray-600">
-              Choose a town first so local teams can focus only on their market.
+            <div className="font-semibold text-slate-900">Town filter</div>
+            <div className="text-sm text-slate-600">
+              {isTownScopedAdmin
+                ? 'Your account is restricted to one town.'
+                : 'Choose a town first so local teams can focus only on their market.'}
             </div>
           </div>
 
-          {selectedTown ? (
+          {!isTownScopedAdmin && selectedTown ? (
             <button
-              className="rounded-xl border px-3 py-2 text-sm hover:bg-gray-50"
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
               onClick={() => {
                 setTownSearchInput('');
                 setTownIdInput('');
@@ -493,16 +559,18 @@ export default function OpsOrdersPage() {
           ) : null}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div className="md:col-span-2">
             <input
               list="ops-order-town-options"
-              className="w-full rounded-xl border px-3 py-3 text-sm"
+              className="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm disabled:bg-slate-100"
               placeholder={townsLoading ? 'Loading towns…' : 'Type town name or slug…'}
               value={townSearchInput}
               onChange={(e) => {
                 const value = e.target.value;
                 setTownSearchInput(value);
+
+                if (isTownScopedAdmin) return;
 
                 const trimmed = value.trim();
                 if (!trimmed) {
@@ -518,7 +586,7 @@ export default function OpsOrdersPage() {
 
                 setTownIdInput(exactMatch?.id ?? '');
               }}
-              disabled={townsLoading}
+              disabled={townsLoading || isTownScopedAdmin}
             />
 
             <datalist id="ops-order-town-options">
@@ -529,21 +597,23 @@ export default function OpsOrdersPage() {
               ))}
             </datalist>
 
-            <div className="mt-2 text-xs text-gray-500">
-              Start typing a town name and choose from the suggestions.
+            <div className="mt-2 text-xs text-slate-500">
+              {isTownScopedAdmin
+                ? 'Town is locked by your role.'
+                : 'Start typing a town name and choose from the suggestions.'}
             </div>
           </div>
 
-          <div className="rounded-xl border bg-gray-50 px-3 py-3 text-sm">
-            <div className="text-gray-500">Current scope</div>
-            <div className="font-semibold mt-1">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm">
+            <div className="text-slate-500">Current scope</div>
+            <div className="mt-1 font-semibold text-slate-900">
               {selectedTown ? selectedTown.name : 'All towns'}
             </div>
           </div>
         </div>
       </div>
 
-      {!selectedTown ? (
+      {!selectedTown && isGlobalAdmin ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           You are viewing orders across all towns. For daily local operations, select a town first.
         </div>
@@ -551,43 +621,54 @@ export default function OpsOrdersPage() {
 
       <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
         <input
-          className="w-full rounded-xl border px-3 py-2"
+          className="w-full rounded-xl border border-slate-300 px-3 py-2"
           placeholder="Search phone, email, order ID…"
           value={qInput}
           onChange={(e) => setQInput(e.target.value)}
         />
 
         <input
-          className="w-full rounded-xl border px-3 py-2"
+          className="w-full rounded-xl border border-slate-300 px-3 py-2"
           type="date"
           value={fromInput}
           onChange={(e) => setFromInput(e.target.value)}
         />
 
         <input
-          className="w-full rounded-xl border px-3 py-2"
+          className="w-full rounded-xl border border-slate-300 px-3 py-2"
           type="date"
           value={toInput}
           onChange={(e) => setToInput(e.target.value)}
         />
 
         <button
-          className="rounded-xl border px-3 py-2"
+          className="rounded-xl border border-slate-300 px-3 py-2 hover:bg-slate-50"
           onClick={() => {
+            const resetTownId = isTownScopedAdmin ? currentAdmin?.townId ?? '' : '';
+            const resetTownName =
+              towns.find((t) => t.id === resetTownId)?.name ?? '';
+
             setQInput('');
             setFromInput('');
             setToInput('');
-            setTownSearchInput('');
-            setTownIdInput('');
+            setTownSearchInput(resetTownName);
+            setTownIdInput(resetTownId);
             setCursorStack([null]);
-            updateQuery({ q: '', from: '', to: '', townId: '', status: 'ALL', cursor: null });
+            updateQuery({
+              q: '',
+              from: '',
+              to: '',
+              townId: resetTownId,
+              status: 'ALL',
+              cursor: null,
+            });
           }}
         >
           Clear filters
         </button>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex flex-wrap gap-2">
         {STATUSES.map((s) => (
           <button
             key={s}
@@ -595,8 +676,10 @@ export default function OpsOrdersPage() {
               setCursorStack([null]);
               updateQuery({ status: s, cursor: null });
             }}
-            className={`px-3 py-1 rounded-full border text-sm ${
-              statusParam === s ? 'bg-black text-white' : 'bg-white'
+            className={`rounded-full border px-3 py-1 text-sm ${
+              statusParam === s
+                ? 'bg-slate-900 text-white border-slate-900'
+                : 'bg-white border-slate-300'
             }`}
           >
             {s}
@@ -604,22 +687,36 @@ export default function OpsOrdersPage() {
         ))}
       </div>
 
-      {loading ? <div>Loading…</div> : null}
-      {err ? <div className="text-red-600 text-sm">{err}</div> : null}
+      {adminLoading || loading ? (
+        <div className="text-sm text-slate-600">Loading…</div>
+      ) : null}
+
+      {err ? <div className="text-sm text-red-600">{err}</div> : null}
 
       {activeFiltersText ? (
-        <div className="rounded-xl border bg-gray-50 px-3 py-2 text-sm text-gray-700 flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
           <div className="truncate">Showing results for: {activeFiltersText}</div>
           <button
             className="shrink-0 underline"
             onClick={() => {
+              const resetTownId = isTownScopedAdmin ? currentAdmin?.townId ?? '' : '';
+              const resetTownName =
+                towns.find((t) => t.id === resetTownId)?.name ?? '';
+
               setQInput('');
               setFromInput('');
               setToInput('');
-              setTownSearchInput('');
-              setTownIdInput('');
+              setTownSearchInput(resetTownName);
+              setTownIdInput(resetTownId);
               setCursorStack([null]);
-              updateQuery({ q: '', from: '', to: '', townId: '', status: 'ALL', cursor: null });
+              updateQuery({
+                q: '',
+                from: '',
+                to: '',
+                townId: resetTownId,
+                status: 'ALL',
+                cursor: null,
+              });
             }}
           >
             Clear
@@ -627,17 +724,17 @@ export default function OpsOrdersPage() {
         </div>
       ) : null}
 
-      <div className="border rounded-2xl overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-slate-200">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50">
+          <thead className="bg-slate-50">
             <tr>
-              <th className="text-left p-3">Order</th>
-              <th className="text-left p-3">Customer</th>
-              <th className="text-left p-3">Delivery</th>
-              <th className="text-left p-3">Status</th>
-              <th className="text-left p-3">Total</th>
-              <th className="text-left p-3">Latest Payment</th>
-              <th className="text-left p-3">Created</th>
+              <th className="p-3 text-left">Order</th>
+              <th className="p-3 text-left">Customer</th>
+              <th className="p-3 text-left">Delivery</th>
+              <th className="p-3 text-left">Status</th>
+              <th className="p-3 text-left">Total</th>
+              <th className="p-3 text-left">Latest Payment</th>
+              <th className="p-3 text-left">Created</th>
             </tr>
           </thead>
 
@@ -652,7 +749,7 @@ export default function OpsOrdersPage() {
                 deliveryTown,
                 registeredCustomer,
               }) => (
-                <tr key={o.id} className="border-t align-top">
+                <tr key={o.id} className="border-t border-slate-100 align-top">
                   <td className="p-3">
                     <div className="space-y-1">
                       <div className="font-mono text-xs">
@@ -660,17 +757,17 @@ export default function OpsOrdersPage() {
                           {o.id}
                         </Link>
                       </div>
-                      <div className="text-xs text-gray-600">{o.town?.name ?? '—'}</div>
+                      <div className="text-xs text-slate-600">{o.town?.name ?? '—'}</div>
                     </div>
                   </td>
 
                   <td className="p-3">
                     <div className="space-y-1">
-                      <div className="font-medium">{customerName}</div>
-                      <div className="text-xs text-gray-600">{customerPhone}</div>
+                      <div className="font-medium text-slate-900">{customerName}</div>
+                      <div className="text-xs text-slate-600">{customerPhone}</div>
                       <div>
                         <span
-                          className={`inline-flex px-2 py-1 rounded-full text-xs border ${customerBadgeClass(
+                          className={`inline-flex rounded-full px-2 py-1 text-xs border ${customerBadgeClass(
                             registeredCustomer,
                           )}`}
                         >
@@ -682,15 +779,15 @@ export default function OpsOrdersPage() {
 
                   <td className="p-3">
                     <div className="space-y-1">
-                      <div className="font-medium">
+                      <div className="font-medium text-slate-900">
                         {o.deliveryAddress?.recipientName ?? o.deliveryRecipientName ?? '—'}
                       </div>
-                      <div className="text-xs text-gray-600">{deliveryTown}</div>
+                      <div className="text-xs text-slate-600">{deliveryTown}</div>
                     </div>
                   </td>
 
                   <td className="p-3">
-                    <span className={`px-2 py-1 rounded-full text-xs border ${badgeClass(o.status)}`}>
+                    <span className={`rounded-full px-2 py-1 text-xs border ${badgeClass(o.status)}`}>
                       {o.status}
                     </span>
                   </td>
@@ -710,7 +807,7 @@ export default function OpsOrdersPage() {
 
             {!loading && items.length === 0 ? (
               <tr>
-                <td className="p-3 text-gray-600" colSpan={7}>
+                <td className="p-3 text-slate-600" colSpan={7}>
                   No orders found.
                 </td>
               </tr>
@@ -730,7 +827,7 @@ export default function OpsOrdersPage() {
                 return nextStack;
               });
             }}
-            className="px-4 py-2 border rounded-xl"
+            className="rounded-xl border border-slate-300 px-4 py-2"
           >
             ← Previous
           </button>
@@ -738,7 +835,7 @@ export default function OpsOrdersPage() {
           <div />
         )}
 
-        <div className="text-sm font-medium">Page {pageNumber}</div>
+        <div className="text-sm font-medium text-slate-700">Page {pageNumber}</div>
 
         {hasNext ? (
           <button
@@ -747,7 +844,7 @@ export default function OpsOrdersPage() {
               setCursorStack((prev) => [...prev, nextCursor]);
               updateQuery({ cursor: nextCursor });
             }}
-            className="px-4 py-2 border rounded-xl"
+            className="rounded-xl border border-slate-300 px-4 py-2"
           >
             Next →
           </button>

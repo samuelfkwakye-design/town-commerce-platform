@@ -1,10 +1,12 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AdminRole } from '../common/auth/roles.decorator';
 
 type ListQuery = {
   status?: string;
@@ -16,12 +18,83 @@ type ListQuery = {
   cursor?: string;
 };
 
+type CurrentAdminUser = {
+  sub: string;
+  email?: string;
+  username?: string;
+  role: AdminRole;
+  townId?: string | null;
+};
+
 @Injectable()
 export class AdminOrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  private isGlobalSuperAdmin(adminUser: CurrentAdminUser) {
+    return adminUser.role === AdminRole.GLOBAL_SUPER_ADMIN;
+  }
+
+  private isTownScopedAdmin(adminUser: CurrentAdminUser) {
+    return (
+      adminUser.role === AdminRole.TOWN_SUPER_ADMIN ||
+      adminUser.role === AdminRole.WAREHOUSE_ADMIN
+    );
+  }
+
+  private assertTownScopedAdminHasTown(adminUser: CurrentAdminUser) {
+    if (this.isTownScopedAdmin(adminUser) && !adminUser.townId) {
+      throw new ForbiddenException(
+        'Town-scoped admin is not assigned to a town',
+      );
+    }
+  }
+
+  private getScopedTownId(
+    requestedTownId: string | undefined,
+    adminUser: CurrentAdminUser,
+  ) {
+    if (this.isGlobalSuperAdmin(adminUser)) {
+      return requestedTownId;
+    }
+
+    this.assertTownScopedAdminHasTown(adminUser);
+    return adminUser.townId ?? undefined;
+  }
+
+  private async getOrderTown(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        townId: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order not found: ${orderId}`);
+    }
+
+    return order;
+  }
+
+  async assertOrderAccess(orderId: string, adminUser: CurrentAdminUser) {
+    if (this.isGlobalSuperAdmin(adminUser)) {
+      return;
+    }
+
+    this.assertTownScopedAdminHasTown(adminUser);
+
+    const order = await this.getOrderTown(orderId);
+
+    if (order.townId !== adminUser.townId) {
+      throw new ForbiddenException(
+        'You do not have access to orders outside your assigned town',
+      );
+    }
+  }
 
   private async notifyDriverAssignmentChange(input: {
     previousDriverName?: string | null;
@@ -80,12 +153,14 @@ export class AdminOrdersService {
     }
   }
 
-  async list(q: ListQuery) {
+  async list(q: ListQuery, adminUser: CurrentAdminUser) {
     const limit = Math.min(Math.max(Number(q.limit ?? 20), 1), 100);
+
+    const effectiveTownId = this.getScopedTownId(q.townId, adminUser);
 
     const where: any = {
       ...(q.status ? { status: q.status } : {}),
-      ...(q.townId ? { townId: q.townId } : {}),
+      ...(effectiveTownId ? { townId: effectiveTownId } : {}),
       ...(q.from || q.to
         ? {
             createdAt: {
@@ -174,7 +249,7 @@ export class AdminOrdersService {
     return {
       filters: {
         status: q.status ?? null,
-        townId: q.townId ?? null,
+        townId: effectiveTownId ?? null,
         q: q.q ?? null,
         from: q.from ?? null,
         to: q.to ?? null,
@@ -184,7 +259,9 @@ export class AdminOrdersService {
     };
   }
 
-  async get(id: string) {
+  async get(id: string, adminUser: CurrentAdminUser) {
+    await this.assertOrderAccess(id, adminUser);
+
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
@@ -226,7 +303,13 @@ export class AdminOrdersService {
     return order;
   }
 
-  async assignDriverById(orderId: string, driverId: string) {
+  async assignDriverById(
+    orderId: string,
+    driverId: string,
+    adminUser: CurrentAdminUser,
+  ) {
+    await this.assertOrderAccess(orderId, adminUser);
+
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       select: {
@@ -346,7 +429,9 @@ export class AdminOrdersService {
     return updatedOrder;
   }
 
-  async autoAssignDriver(orderId: string) {
+  async autoAssignDriver(orderId: string, adminUser: CurrentAdminUser) {
+    await this.assertOrderAccess(orderId, adminUser);
+
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       select: {
@@ -405,14 +490,17 @@ export class AdminOrdersService {
 
     const selectedDriver = sortedDrivers[0];
 
-    return this.assignDriverById(orderId, selectedDriver.id);
+    return this.assignDriverById(orderId, selectedDriver.id, adminUser);
   }
 
   async assignDriverManual(
     orderId: string,
     driverName: string,
     driverPhone: string,
+    adminUser: CurrentAdminUser,
   ) {
+    await this.assertOrderAccess(orderId, adminUser);
+
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       select: {
@@ -492,7 +580,9 @@ export class AdminOrdersService {
     return updated;
   }
 
-  async clearDriver(orderId: string) {
+  async clearDriver(orderId: string, adminUser: CurrentAdminUser) {
+    await this.assertOrderAccess(orderId, adminUser);
+
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       select: {

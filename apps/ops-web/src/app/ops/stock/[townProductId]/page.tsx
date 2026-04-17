@@ -6,10 +6,30 @@ import { useParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { TownProductImageUpload } from "@/components/TownProductImageUpload";
 
+type AdminRole =
+  | "GLOBAL_SUPER_ADMIN"
+  | "TOWN_SUPER_ADMIN"
+  | "WAREHOUSE_ADMIN";
+
+type CurrentAdmin = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  role: AdminRole;
+  townId: string | null;
+  town: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+};
+
 type PricingModel = "UNIT" | "WEIGHT" | "VARIANT";
 
 type TownProductResp = {
   id: string;
+  townId?: string | null;
   pricingModel: PricingModel;
 
   pricePerUnit: string | null;
@@ -22,7 +42,7 @@ type TownProductResp = {
   stockWeightGrams: number | null;
 
   product?: { name: string | null } | null;
-  town?: { name: string | null; slug: string | null } | null;
+  town?: { id?: string | null; name: string | null; slug: string | null } | null;
 };
 
 type VariantResp = {
@@ -117,13 +137,16 @@ export default function OpsStockDetailPage() {
   const raw = params?.townProductId;
   const townProductId = Array.isArray(raw) ? raw[0] : raw;
 
+  const [admin, setAdmin] = useState<CurrentAdmin | null>(null);
+
+  const [bootstrapping, setBootstrapping] = useState(true);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   const [summary, setSummary] = useState<StockSummary | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
 
-  // ✅ NEW: pricing + variants
   const [tp, setTp] = useState<TownProductResp | null>(null);
   const [variants, setVariants] = useState<VariantResp[]>([]);
 
@@ -136,33 +159,64 @@ export default function OpsStockDetailPage() {
   const isWeight = pricingModel === "WEIGHT";
   const isVariant = pricingModel === "VARIANT";
 
-  async function refreshAll(id: string) {
+  const canManageImages =
+    admin?.role === "GLOBAL_SUPER_ADMIN" || admin?.role === "TOWN_SUPER_ADMIN";
+
+  async function refreshAll(id: string, currentAdmin?: CurrentAdmin | null) {
+    const effectiveAdmin = currentAdmin ?? admin;
+    if (!effectiveAdmin) return;
+
     setLoading(true);
     setErr(null);
+    setAccessDenied(false);
 
     try {
-      // 1) Stock + movements
+      // 1) TownProduct first, so we can RBAC-check town ownership before using the rest
+      const townProduct = await apiFetch<TownProductResp>(`/admin/town-products/${id}`, {
+        method: "GET",
+      });
+
+      const ownerTownId =
+        townProduct.townId ?? townProduct.town?.id ?? null;
+
+      if (
+        (effectiveAdmin.role === "TOWN_SUPER_ADMIN" ||
+          effectiveAdmin.role === "WAREHOUSE_ADMIN") &&
+        effectiveAdmin.townId &&
+        ownerTownId &&
+        ownerTownId !== effectiveAdmin.townId
+      ) {
+        setAccessDenied(true);
+        setTp(null);
+        setSummary(null);
+        setMovements([]);
+        setVariants([]);
+        return;
+      }
+
+      setTp(townProduct);
+
+      // 2) Stock + movements
       const res = await apiFetch<any>(`/stock-movements/${id}`);
       setSummary(pickSummaryShape(res, id));
       setMovements(pickMovements(res));
 
-      // 2) TownProduct pricing
-      const townProduct = await apiFetch<TownProductResp>(`/admin/town-products/${id}`, {
-        method: "GET",
-      });
-      setTp(townProduct);
-
       // 3) Variants if needed
       if (townProduct?.pricingModel === "VARIANT") {
-        const v = await apiFetch<{ rows: VariantResp[] }>(`/admin/town-products/${id}/variants`, {
-          method: "GET",
-        });
+        const v = await apiFetch<{ rows: VariantResp[] }>(
+          `/admin/town-products/${id}/variants`,
+          {
+            method: "GET",
+          },
+        );
+
         const rows = (v?.rows ?? []).slice().sort((a, b) => {
           const ao = a.sortOrder ?? 0;
           const bo = b.sortOrder ?? 0;
           if (ao !== bo) return ao - bo;
           return String(a.label).localeCompare(String(b.label));
         });
+
         setVariants(rows);
       } else {
         setVariants([]);
@@ -179,13 +233,42 @@ export default function OpsStockDetailPage() {
   }
 
   useEffect(() => {
-    if (!townProductId) return;
-    void refreshAll(townProductId);
+    let cancelled = false;
+
+    async function bootstrap() {
+      if (!townProductId) return;
+
+      try {
+        setBootstrapping(true);
+        setErr(null);
+        setAccessDenied(false);
+
+        const me = await apiFetch<CurrentAdmin>("/admin/auth/me");
+        if (cancelled) return;
+
+        setAdmin(me);
+        await refreshAll(townProductId, me);
+      } catch (e: any) {
+        if (!cancelled) {
+          setErr(String(e?.message ?? e));
+        }
+      } finally {
+        if (!cancelled) {
+          setBootstrapping(false);
+        }
+      }
+    }
+
+    void bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [townProductId]);
 
   async function doReconcile() {
-    if (!townProductId) return;
+    if (!townProductId || accessDenied) return;
 
     const ok = window.confirm(
       "Reconcile will set snapshot stock = ledger stock for this TownProduct.\n\nProceed?",
@@ -207,7 +290,7 @@ export default function OpsStockDetailPage() {
   }
 
   async function submitAdjustment() {
-    if (!townProductId) return;
+    if (!townProductId || accessDenied) return;
 
     const trimmed = note.trim();
     if (!trimmed) {
@@ -276,6 +359,44 @@ export default function OpsStockDetailPage() {
       : fmtNumber(summary.diffQty)
     : "—";
 
+  if (!townProductId) {
+    return (
+      <div className="p-4">
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+          Missing TownProductId.
+        </div>
+      </div>
+    );
+  }
+
+  if (bootstrapping) {
+    return (
+      <div className="p-4">
+        <div className="rounded-md border bg-white p-4 text-sm text-gray-700">
+          Loading stock detail...
+        </div>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="p-4 space-y-4">
+        <div className="text-sm text-gray-500">
+          <Link href="/ops/stock" className="underline">
+            Stock
+          </Link>{" "}
+          <span className="mx-1">/</span>
+          <span>Detail</span>
+        </div>
+
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          You do not have permission to access this stock item.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-start justify-between gap-4">
@@ -294,10 +415,24 @@ export default function OpsStockDetailPage() {
           </h1>
 
           <div className="text-sm text-gray-600">
-            TownProductId: <span className="font-mono text-xs">{townProductId ?? "—"}</span>
+            TownProductId: <span className="font-mono text-xs">{townProductId}</span>
           </div>
 
-          {townProductId ? (
+          {admin ? (
+            <div className="mt-1 text-xs text-gray-500">
+              Role: <span className="font-medium">{admin.role}</span>
+              {(admin.role === "TOWN_SUPER_ADMIN" ||
+                admin.role === "WAREHOUSE_ADMIN") &&
+              admin.town ? (
+                <>
+                  {" "}
+                  · Town-scoped to <span className="font-medium">{admin.town.name}</span>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+
+          {townProductId && canManageImages ? (
             <div className="mt-3">
               <TownProductImageUpload townProductId={townProductId} />
             </div>
@@ -307,7 +442,7 @@ export default function OpsStockDetailPage() {
         <div className="flex items-center gap-2">
           <button
             className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-            disabled={loading || !townProductId}
+            disabled={loading}
             onClick={doReconcile}
           >
             Reconcile
@@ -315,7 +450,7 @@ export default function OpsStockDetailPage() {
 
           <button
             className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-            disabled={loading || !townProductId}
+            disabled={loading}
             onClick={() => setShowAdjust(true)}
           >
             Manual adjustment
@@ -323,8 +458,8 @@ export default function OpsStockDetailPage() {
 
           <button
             className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-            disabled={loading || !townProductId}
-            onClick={() => townProductId && refreshAll(townProductId)}
+            disabled={loading}
+            onClick={() => refreshAll(townProductId)}
           >
             Refresh
           </button>
@@ -337,7 +472,6 @@ export default function OpsStockDetailPage() {
         </div>
       ) : null}
 
-      {/* ✅ NEW: Pricing section */}
       <div className="rounded-lg border bg-white p-3">
         <div className="text-sm font-semibold">Pricing</div>
         <div className="mt-2 text-sm text-gray-700">
@@ -402,18 +536,21 @@ export default function OpsStockDetailPage() {
         ) : null}
       </div>
 
-      {/* Stock cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="rounded-lg border bg-white p-3">
           <div className="text-xs text-gray-600">Snapshot</div>
           <div className="mt-1 text-lg font-semibold">{snapshotText}</div>
-          <div className="mt-1 text-xs text-gray-600">Updated: {fmtDate(summary?.snapshotUpdatedAt)}</div>
+          <div className="mt-1 text-xs text-gray-600">
+            Updated: {fmtDate(summary?.snapshotUpdatedAt)}
+          </div>
         </div>
 
         <div className="rounded-lg border bg-white p-3">
           <div className="text-xs text-gray-600">Ledger</div>
           <div className="mt-1 text-lg font-semibold">{ledgerText}</div>
-          <div className="mt-1 text-xs text-gray-600">Last movement: {fmtDate(summary?.lastMovementAt)}</div>
+          <div className="mt-1 text-xs text-gray-600">
+            Last movement: {fmtDate(summary?.lastMovementAt)}
+          </div>
         </div>
 
         <div className="rounded-lg border bg-white p-3">
@@ -423,7 +560,6 @@ export default function OpsStockDetailPage() {
         </div>
       </div>
 
-      {/* Movements table */}
       <div className="rounded-lg border bg-white overflow-x-auto">
         <div className="p-3 border-b">
           <div className="font-medium">Movements</div>

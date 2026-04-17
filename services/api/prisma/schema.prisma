@@ -80,6 +80,7 @@ model Town {
   promoCodes       PromoCode[]
   drivers          Driver[]
   defaultCustomers Customer[]    @relation("CustomerDefaultTown")
+  adminUsers       AdminUser[]
 }
 
 model Warehouse {
@@ -485,6 +486,10 @@ model AdminUser {
   lastName               String?
   phone                  String?
   role                   AdminRole   @default(WAREHOUSE_ADMIN)
+
+  townId                 String?
+  town                   Town?       @relation(fields: [townId], references: [id], onDelete: SetNull)
+
   isActive               Boolean     @default(true)
   resetPasswordCodeHash  String?
   resetPasswordExpiresAt DateTime?
@@ -494,6 +499,7 @@ model AdminUser {
 
   @@index([role])
   @@index([isActive])
+  @@index([townId])
 }
 model Driver {
   id             String              @id @default(cuid())
@@ -524,10 +530,9 @@ enum PromoType {
 }
 
 enum AdminRole {
-  SUPER_ADMIN
-  OPS_ADMIN
+  GLOBAL_SUPER_ADMIN
+  TOWN_SUPER_ADMIN
   WAREHOUSE_ADMIN
-  DRIVER
 }
 enum PricingModel {
   UNIT

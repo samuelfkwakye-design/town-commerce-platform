@@ -1,7 +1,12 @@
-import NewTownClient from "./new-town-client";
+'use client';
 
-export const dynamic = "force-dynamic";
+import RequireAdminRole from '@/components/auth/RequireAdminRole';
+import NewTownClient from './new-town-client';
 
 export default function NewTownPage() {
-  return <NewTownClient />;
+  return (
+    <RequireAdminRole allowedRoles={['GLOBAL_SUPER_ADMIN']}>
+      <NewTownClient />
+    </RequireAdminRole>
+  );
 }

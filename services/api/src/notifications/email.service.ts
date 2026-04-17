@@ -1,34 +1,97 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 
 @Injectable()
 export class EmailService {
-  private readonly resend = new Resend(process.env.RESEND_API_KEY);
+  private readonly logger = new Logger(EmailService.name);
 
-  async sendAdminPasswordResetEmail(email: string, code: string) {
-    const resetLink = `${process.env.OPS_APP_BASE_URL}/ops/reset-password`;
+  private get resend(): Resend | null {
+    const apiKey = process.env.RESEND_API_KEY?.trim();
 
-    await this.resend.emails.send({
-      from: process.env.EMAIL_FROM || 'Somame <onboarding@resend.dev>',
-      to: email,
-      subject: 'Reset your Somame admin password',
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-          <h2>Reset your Somame admin password</h2>
-          <p>We received a request to reset your password.</p>
-          <p>Your reset code is:</p>
-          <div style="font-size: 32px; font-weight: bold; letter-spacing: 4px; margin: 16px 0;">
-            ${code}
+    if (!apiKey) {
+      return null;
+    }
+
+    return new Resend(apiKey);
+  }
+
+  private get fromEmail(): string {
+    return process.env.RESEND_FROM_EMAIL?.trim() || 'onboarding@resend.dev';
+  }
+
+  async sendPasswordResetEmail(params: {
+    to: string;
+    resetUrl: string;
+  }): Promise<void> {
+    const client = this.resend;
+
+    if (!client) {
+      this.logger.warn(
+        `RESEND_API_KEY is not set. Skipping password reset email to ${params.to}`,
+      );
+      this.logger.log(`Password reset URL: ${params.resetUrl}`);
+      return;
+    }
+
+    try {
+      await client.emails.send({
+        from: this.fromEmail,
+        to: params.to,
+        subject: 'Reset your password',
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+            <h2>Reset your password</h2>
+            <p>Click the link below to reset your password:</p>
+            <p><a href="${params.resetUrl}">${params.resetUrl}</a></p>
+            <p>If you did not request this, you can ignore this email.</p>
           </div>
-          <p>This code expires in 15 minutes.</p>
-          <p>You can reset your password here:</p>
-          <p>
-            <a href="${resetLink}" target="_blank" rel="noopener noreferrer">
-              ${resetLink}
-            </a>
-          </p>
-        </div>
-      `,
-    });
+        `,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password reset email: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  async sendAdminPasswordResetEmail(
+    email: string,
+    resetCode: string,
+  ): Promise<void> {
+    const client = this.resend;
+
+    if (!client) {
+      this.logger.warn(
+        `RESEND_API_KEY is not set. Skipping admin password reset email to ${email}`,
+      );
+      this.logger.log(`Admin password reset code for ${email}: ${resetCode}`);
+      return;
+    }
+
+    try {
+      await client.emails.send({
+        from: this.fromEmail,
+        to: email,
+        subject: 'Admin password reset code',
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+            <h2>Admin password reset</h2>
+            <p>Your password reset code is:</p>
+            <p style="font-size: 24px; font-weight: 700; letter-spacing: 2px;">
+              ${resetCode}
+            </p>
+            <p>If you did not request this, you can ignore this email.</p>
+          </div>
+        `,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send admin password reset email: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 }

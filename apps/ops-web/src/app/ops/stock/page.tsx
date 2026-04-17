@@ -4,6 +4,26 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 
+type AdminRole =
+  | 'GLOBAL_SUPER_ADMIN'
+  | 'TOWN_SUPER_ADMIN'
+  | 'WAREHOUSE_ADMIN';
+
+type CurrentAdmin = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  role: AdminRole;
+  townId?: string | null;
+};
+
+type TownLite = {
+  id: string;
+  name: string;
+  slug: string;
+  isActive?: boolean;
+};
+
 type PricingModel = 'UNIT' | 'WEIGHT';
 
 type ReconcileRow = {
@@ -47,7 +67,7 @@ function fmtDate(iso: string | null) {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
+  return d.toLocaleString('en-GB');
 }
 
 function fmtVal(row: ReconcileRow, kind: 'snapshot' | 'ledger' | 'diff') {
@@ -77,6 +97,12 @@ function fmtVal(row: ReconcileRow, kind: 'snapshot' | 'ledger' | 'diff') {
 }
 
 export default function OpsStockDashboardPage() {
+  const [currentAdmin, setCurrentAdmin] = useState<CurrentAdmin | null>(null);
+  const [adminLoading, setAdminLoading] = useState(true);
+
+  const [towns, setTowns] = useState<TownLite[]>([]);
+  const [townsLoading, setTownsLoading] = useState(false);
+
   const [limit, setLimit] = useState(50);
   const [cursorStack, setCursorStack] = useState<(string | null)[]>([null]);
 
@@ -87,7 +113,71 @@ export default function OpsStockDashboardPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const isGlobalAdmin = currentAdmin?.role === 'GLOBAL_SUPER_ADMIN';
+  const isTownScopedAdmin =
+    currentAdmin?.role === 'TOWN_SUPER_ADMIN' ||
+    currentAdmin?.role === 'WAREHOUSE_ADMIN';
+
   const currentCursor = cursorStack[cursorStack.length - 1] ?? null;
+
+  useEffect(() => {
+    async function loadAdmin() {
+      try {
+        setAdminLoading(true);
+        const admin = await apiFetch<CurrentAdmin>('/admin/auth/me');
+        setCurrentAdmin(admin ?? null);
+
+        if (admin?.townId) {
+          setTownId(admin.townId);
+        }
+      } catch {
+        setCurrentAdmin(null);
+      } finally {
+        setAdminLoading(false);
+      }
+    }
+
+    loadAdmin();
+  }, []);
+
+  useEffect(() => {
+    async function loadTowns() {
+      try {
+        setTownsLoading(true);
+        const rows = await apiFetch<TownLite[]>('/towns');
+        setTowns(Array.isArray(rows) ? rows : []);
+      } catch {
+        setTowns([]);
+      } finally {
+        setTownsLoading(false);
+      }
+    }
+
+    loadTowns();
+  }, []);
+
+  useEffect(() => {
+    if (adminLoading) return;
+    if (!currentAdmin) return;
+
+    if (isTownScopedAdmin) {
+      const forcedTownId = currentAdmin.townId ?? '';
+      if (townId !== forcedTownId) {
+        setTownId(forcedTownId);
+        setCursorStack([null]);
+      }
+    }
+  }, [adminLoading, currentAdmin, isTownScopedAdmin, townId]);
+
+  const selectedTown = useMemo(
+    () => towns.find((t) => t.id === townId) ?? null,
+    [towns, townId],
+  );
+
+  const activeTowns = useMemo(
+    () => towns.filter((t) => t.isActive !== false),
+    [towns],
+  );
 
   const qs = useMemo(() => {
     const p = new URLSearchParams();
@@ -101,6 +191,7 @@ export default function OpsStockDashboardPage() {
   async function load() {
     setLoading(true);
     setErr(null);
+
     try {
       const res = await apiFetch<ReconcileListResponse>(`/stock-movements/reconcile?${qs}`);
       setData(res);
@@ -113,9 +204,10 @@ export default function OpsStockDashboardPage() {
   }
 
   useEffect(() => {
+    if (adminLoading) return;
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qs]);
+  }, [qs, adminLoading]);
 
   function goNext() {
     const next = data?.pageInfo?.nextCursor ?? null;
@@ -135,7 +227,7 @@ export default function OpsStockDashboardPage() {
   const rows = data?.items ?? [];
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="space-y-4 p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-sm text-gray-500">
@@ -146,15 +238,24 @@ export default function OpsStockDashboardPage() {
             <span>Stock</span>
           </div>
 
-          <h1 className="text-xl font-semibold mt-1">Stock</h1>
-          <div className="text-sm text-gray-600">Detect → Investigate → Adjust → Reconcile → Audit</div>
+          <h1 className="mt-1 text-xl font-semibold">Stock</h1>
+          <div className="text-sm text-gray-600">
+            Detect → Investigate → Adjust → Reconcile → Audit
+          </div>
+          <div className="mt-1 text-xs text-gray-500">
+            {adminLoading
+              ? 'Checking admin scope...'
+              : currentAdmin?.role
+                ? `Signed in as ${currentAdmin.role}`
+                : 'Admin session unavailable'}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={goPrev}
             disabled={cursorStack.length <= 1 || loading}
-            className="px-3 py-2 rounded border bg-white hover:bg-gray-50 disabled:opacity-50"
+            className="rounded border bg-white px-3 py-2 hover:bg-gray-50 disabled:opacity-50"
           >
             Prev
           </button>
@@ -162,7 +263,7 @@ export default function OpsStockDashboardPage() {
           <button
             onClick={goNext}
             disabled={!data?.pageInfo?.hasNextPage || loading}
-            className="px-3 py-2 rounded border bg-white hover:bg-gray-50 disabled:opacity-50"
+            className="rounded border bg-white px-3 py-2 hover:bg-gray-50 disabled:opacity-50"
           >
             Next
           </button>
@@ -173,16 +274,32 @@ export default function OpsStockDashboardPage() {
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="flex flex-col gap-2 md:flex-row md:items-end">
             <label className="text-sm">
-              <div className="text-gray-600">TownId</div>
-              <input
-                className="mt-1 w-72 rounded-md border px-2 py-1 text-sm"
-                placeholder="(optional) cmk..."
-                value={townId}
-                onChange={(e) => {
-                  setTownId(e.target.value);
-                  resetPaging();
-                }}
-              />
+              <div className="text-gray-600">Town</div>
+
+              {isTownScopedAdmin ? (
+                <input
+                  className="mt-1 w-72 rounded-md border bg-gray-100 px-2 py-1 text-sm"
+                  value={selectedTown ? `${selectedTown.name} (${selectedTown.slug})` : ''}
+                  disabled
+                />
+              ) : (
+                <select
+                  className="mt-1 w-72 rounded-md border px-2 py-1 text-sm"
+                  value={townId}
+                  onChange={(e) => {
+                    setTownId(e.target.value);
+                    resetPaging();
+                  }}
+                  disabled={townsLoading}
+                >
+                  <option value="">All towns</option>
+                  {activeTowns.map((town) => (
+                    <option key={town.id} value={town.id}>
+                      {town.name} ({town.slug})
+                    </option>
+                  ))}
+                </select>
+              )}
             </label>
 
             <label className="text-sm">
@@ -203,7 +320,7 @@ export default function OpsStockDashboardPage() {
               </select>
             </label>
 
-            <label className="flex items-center gap-2 text-sm mt-2 md:mt-0">
+            <label className="mt-2 flex items-center gap-2 text-sm md:mt-0">
               <input
                 type="checkbox"
                 checked={onlyMismatches}
@@ -221,6 +338,14 @@ export default function OpsStockDashboardPage() {
           </div>
         </div>
 
+        <div className="mt-3 text-xs text-gray-500">
+          {isTownScopedAdmin
+            ? 'Your stock view is restricted to your assigned town.'
+            : selectedTown
+              ? `Currently viewing ${selectedTown.name}.`
+              : 'Currently viewing all towns.'}
+        </div>
+
         {err ? (
           <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
             {err}
@@ -228,10 +353,16 @@ export default function OpsStockDashboardPage() {
         ) : null}
       </div>
 
-      <div className="rounded border bg-white overflow-x-auto">
+      {!selectedTown && isGlobalAdmin ? (
+        <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          You are viewing stock across all towns. For operational work, selecting one town first is usually clearer.
+        </div>
+      ) : null}
+
+      <div className="overflow-x-auto rounded border bg-white">
         <table className="min-w-[1100px] w-full text-sm">
-          <thead className="bg-gray-50 text-xs text-gray-600">
-            <tr className="text-left">
+          <thead className="bg-gray-50 text-left text-xs text-gray-600">
+            <tr>
               <th className="p-3">Town</th>
               <th className="p-3">Product</th>
               <th className="p-3">Model</th>
@@ -245,7 +376,7 @@ export default function OpsStockDashboardPage() {
           </thead>
 
           <tbody>
-            {loading ? (
+            {adminLoading || loading ? (
               <tr>
                 <td className="p-3 text-gray-500" colSpan={9}>
                   Loading…
@@ -276,15 +407,15 @@ export default function OpsStockDashboardPage() {
 
                   <td className="p-3">
                     <div className="font-medium">{row.productName}</div>
-                    <div className="text-xs text-gray-500 font-mono">{row.townProductId}</div>
+                    <div className="font-mono text-xs text-gray-500">{row.townProductId}</div>
                   </td>
 
                   <td className="p-3">{row.pricingModel}</td>
                   <td className="p-3">{fmtVal(row, 'snapshot')}</td>
                   <td className="p-3">{fmtVal(row, 'ledger')}</td>
                   <td className="p-3 font-semibold">{fmtVal(row, 'diff')}</td>
-                  <td className="p-3 whitespace-nowrap">{fmtDate(row.lastMovementAt)}</td>
-                  <td className="p-3 whitespace-nowrap">{fmtDate(row.snapshotUpdatedAt)}</td>
+                  <td className="whitespace-nowrap p-3">{fmtDate(row.lastMovementAt)}</td>
+                  <td className="whitespace-nowrap p-3">{fmtDate(row.snapshotUpdatedAt)}</td>
 
                   <td className="p-3">
                     <Link className="underline" href={`/ops/stock/${row.townProductId}`}>

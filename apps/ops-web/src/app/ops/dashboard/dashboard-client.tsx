@@ -1,11 +1,20 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useMemo } from 'react';
 
-type TownOption = { id: string; name: string; slug: string };
-type ItemLink = { id: string; label: string; href: string };
+type TownOption = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+type ItemLink = {
+  id: string;
+  label: string;
+  href: string;
+};
 
 type Snapshot = {
   generatedAt: string;
@@ -17,14 +26,20 @@ type Snapshot = {
   revenueToday: number;
   refundsToday: number;
   confirmedStaleCount: number;
-
   missingImagesTop: ItemLink[];
   lowStockTop: ItemLink[];
   confirmedStaleTop: ItemLink[];
 };
 
-type TrendPoint = { day: string; revenue: number };
-type Trend = { days: number; points: TrendPoint[] };
+type TrendPoint = {
+  day: string;
+  revenue: number;
+};
+
+type Trend = {
+  days: number;
+  points: TrendPoint[];
+};
 
 function StatCard({
   label,
@@ -35,17 +50,17 @@ function StatCard({
   value: string | number;
   href?: string;
 }) {
-  const clickable = typeof href === "string" && href.length > 0;
+  const clickable = typeof href === 'string' && href.length > 0;
 
   const inner = (
     <div
       className={[
-        "rounded-lg border bg-white p-4 shadow-sm transition",
-        clickable ? "cursor-pointer hover:border-black hover:shadow-md" : "",
-      ].join(" ")}
+        'rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition',
+        clickable ? 'cursor-pointer hover:border-slate-400 hover:shadow-md' : '',
+      ].join(' ')}
     >
-      <div className="text-sm text-gray-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">{value}</div>
+      <div className="text-sm text-slate-500">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-slate-900">{value}</div>
       {clickable ? <div className="mt-2 text-sm text-blue-600">View</div> : null}
     </div>
   );
@@ -65,19 +80,25 @@ function ActionCard({
   return (
     <Link
       href={href}
-      className="rounded-lg border bg-white p-4 shadow-sm transition hover:border-black hover:shadow-md"
+      className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-400 hover:shadow-md"
     >
-      <div className="font-semibold">{title}</div>
-      <div className="mt-1 text-sm text-gray-500">{description}</div>
+      <div className="font-semibold text-slate-900">{title}</div>
+      <div className="mt-1 text-sm text-slate-500">{description}</div>
       <div className="mt-3 text-sm text-blue-600">Open</div>
     </Link>
   );
 }
 
-function SectionCard({ title, children }: { title: string; children: any }) {
+function SectionCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="rounded-lg border bg-white p-4 shadow-sm">
-      <div className="text-base font-semibold">{title}</div>
+    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="text-base font-semibold text-slate-900">{title}</div>
       <div className="mt-3">{children}</div>
     </div>
   );
@@ -102,8 +123,8 @@ function Sparkline({ points }: { points: TrendPoint[] }) {
   });
 
   const d = coords
-    .map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(2)} ${c.y.toFixed(2)}`)
-    .join(" ");
+    .map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x.toFixed(2)} ${c.y.toFixed(2)}`)
+    .join(' ');
 
   const last = coords[coords.length - 1];
 
@@ -113,10 +134,10 @@ function Sparkline({ points }: { points: TrendPoint[] }) {
         <path d={d} fill="none" stroke="black" strokeWidth="2" />
         {last ? <circle cx={last.x} cy={last.y} r="3.5" fill="black" /> : null}
       </svg>
-      <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-        <span>{safePoints[0]?.day ?? ""}</span>
+      <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+        <span>{safePoints[0]?.day ?? ''}</span>
         <span>
-          Latest: {last?.day ?? ""} • {Number(last?.v ?? 0)}
+          Latest: {last?.day ?? ''} • {Number(last?.v ?? 0)}
         </span>
       </div>
     </div>
@@ -126,14 +147,16 @@ function Sparkline({ points }: { points: TrendPoint[] }) {
 function SafeLinksList({ items }: { items: ItemLink[] }) {
   const list = Array.isArray(items) ? items : [];
 
-  if (!list.length) return <div className="mt-2 text-sm text-gray-500">None 🎉</div>;
+  if (!list.length) {
+    return <div className="mt-2 text-sm text-slate-500">None 🎉</div>;
+  }
 
   return (
     <ul className="mt-2 space-y-1 text-sm">
       {list.map((x, i) => {
-        const href = typeof x?.href === "string" ? x.href : "";
-        const label = typeof x?.label === "string" ? x.label : "View";
-        const key = `${x?.id ?? "item"}-${i}`;
+        const href = typeof x?.href === 'string' ? x.href : '';
+        const label = typeof x?.label === 'string' ? x.label : 'View';
+        const key = `${x?.id ?? 'item'}-${i}`;
 
         return (
           <li key={key}>
@@ -142,7 +165,7 @@ function SafeLinksList({ items }: { items: ItemLink[] }) {
                 {label}
               </Link>
             ) : (
-              <span className="text-gray-600">{label}</span>
+              <span className="text-slate-600">{label}</span>
             )}
           </li>
         );
@@ -166,6 +189,8 @@ export default function DashboardClient({
   const sp = useSearchParams();
 
   const safeTowns = Array.isArray(towns) ? towns : [];
+  const canChooseTown = safeTowns.length > 0;
+  const isTownScopedView = !canChooseTown && !!selectedTownId;
 
   const selectedTown = useMemo(() => {
     if (!selectedTownId) return null;
@@ -173,31 +198,35 @@ export default function DashboardClient({
   }, [safeTowns, selectedTownId]);
 
   function setTown(townId: string) {
-    const params = new URLSearchParams(sp?.toString() ?? "");
-    if (!townId) params.delete("townId");
-    else params.set("townId", townId);
+    const params = new URLSearchParams(sp?.toString() ?? '');
+    if (!townId) {
+      params.delete('townId');
+    } else {
+      params.set('townId', townId);
+    }
+
     const qs = params.toString();
-    router.push(qs ? `/ops/dashboard?${qs}` : `/ops/dashboard`);
+    router.push(qs ? `/ops/dashboard?${qs}` : '/ops/dashboard');
   }
 
   const missingImagesHref =
     snapshot.productsMissingImages > 0
       ? `/ops/town-products?missingImages=true${
-          selectedTownId ? `&townId=${encodeURIComponent(selectedTownId)}` : ""
+          selectedTownId ? `&townId=${encodeURIComponent(selectedTownId)}` : ''
         }`
       : undefined;
 
   const lowStockHref =
     snapshot.lowStockCount > 0
       ? `/ops/stock?lowStock=true${
-          selectedTownId ? `&townId=${encodeURIComponent(selectedTownId)}` : ""
+          selectedTownId ? `&townId=${encodeURIComponent(selectedTownId)}` : ''
         }`
       : undefined;
 
   const confirmedStaleHref =
     snapshot.confirmedStaleCount > 0
       ? `/ops/orders?status=CONFIRMED&stale=true${
-          selectedTownId ? `&townId=${encodeURIComponent(selectedTownId)}` : ""
+          selectedTownId ? `&townId=${encodeURIComponent(selectedTownId)}` : ''
         }`
       : undefined;
 
@@ -205,7 +234,9 @@ export default function DashboardClient({
     ...snapshot,
     missingImagesTop: Array.isArray(snapshot?.missingImagesTop) ? snapshot.missingImagesTop : [],
     lowStockTop: Array.isArray(snapshot?.lowStockTop) ? snapshot.lowStockTop : [],
-    confirmedStaleTop: Array.isArray(snapshot?.confirmedStaleTop) ? snapshot.confirmedStaleTop : [],
+    confirmedStaleTop: Array.isArray(snapshot?.confirmedStaleTop)
+      ? snapshot.confirmedStaleTop
+      : [],
   };
 
   const safeTrendPoints = Array.isArray(trend?.points) ? trend.points : [];
@@ -214,28 +245,36 @@ export default function DashboardClient({
     <div className="space-y-6 p-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Ops Dashboard</h1>
-          <p className="text-sm text-gray-500">
-            Snapshot generated{" "}
-            {snapshot?.generatedAt ? new Date(snapshot.generatedAt).toLocaleString() : ""}
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            Ops Dashboard
+          </h1>
+          <p className="text-sm text-slate-500">
+            Snapshot generated{' '}
+            {snapshot?.generatedAt ? new Date(snapshot.generatedAt).toLocaleString('en-GB') : ''}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Town</label>
-          <select
-            className="rounded-md border bg-white px-3 py-2"
-            value={selectedTownId ?? ""}
-            onChange={(e) => setTown(e.target.value)}
-          >
-            <option value="">All towns</option>
-            {safeTowns.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.slug})
-              </option>
-            ))}
-          </select>
-        </div>
+        {canChooseTown ? (
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-slate-600">Town</label>
+            <select
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
+              value={selectedTownId ?? ''}
+              onChange={(e) => setTown(e.target.value)}
+            >
+              <option value="">All towns</option>
+              {safeTowns.map((town) => (
+                <option key={town.id} value={town.id}>
+                  {town.name} ({town.slug})
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : isTownScopedView ? (
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+            Town-scoped dashboard view
+          </div>
+        ) : null}
       </div>
 
       <SectionCard title="Quick Actions">
@@ -243,7 +282,7 @@ export default function DashboardClient({
           <ActionCard
             title="Products"
             description="Create, edit, and manage town products."
-            href="/ops/town-products"
+            href={selectedTownId ? `/ops/town-products?townId=${encodeURIComponent(selectedTownId)}` : '/ops/town-products'}
           />
           <ActionCard
             title="Categories"
@@ -253,12 +292,12 @@ export default function DashboardClient({
           <ActionCard
             title="Stock"
             description="Review stock levels, movements, and reconciliation."
-            href="/ops/stock"
+            href={selectedTownId ? `/ops/stock?townId=${encodeURIComponent(selectedTownId)}` : '/ops/stock'}
           />
           <ActionCard
             title="Orders"
             description="Track orders, payments, and refunds."
-            href="/ops/orders"
+            href={selectedTownId ? `/ops/orders?townId=${encodeURIComponent(selectedTownId)}` : '/ops/orders'}
           />
         </div>
       </SectionCard>
@@ -287,7 +326,7 @@ export default function DashboardClient({
       <div className="grid gap-4 lg:grid-cols-2">
         <SectionCard
           title={`Revenue Trend (Last ${trend.days} days)${
-            selectedTown ? ` • ${selectedTown.name}` : ""
+            selectedTown ? ` • ${selectedTown.name}` : ''
           }`}
         >
           <Sparkline points={safeTrendPoints} />
@@ -296,17 +335,21 @@ export default function DashboardClient({
         <SectionCard title="Health Alerts">
           <div className="space-y-4">
             <div>
-              <div className="text-sm font-semibold">Stale CONFIRMED orders</div>
+              <div className="text-sm font-semibold text-slate-900">
+                Stale CONFIRMED orders
+              </div>
               <SafeLinksList items={safeSnapshot.confirmedStaleTop} />
             </div>
 
             <div>
-              <div className="text-sm font-semibold">Products missing images</div>
+              <div className="text-sm font-semibold text-slate-900">
+                Products missing images
+              </div>
               <SafeLinksList items={safeSnapshot.missingImagesTop} />
             </div>
 
             <div>
-              <div className="text-sm font-semibold">Low stock</div>
+              <div className="text-sm font-semibold text-slate-900">Low stock</div>
               <SafeLinksList items={safeSnapshot.lowStockTop} />
             </div>
           </div>

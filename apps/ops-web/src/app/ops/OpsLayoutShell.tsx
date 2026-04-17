@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { getCurrentAdmin, type CurrentAdmin } from '@/lib/admin/getCurrentAdmin';
 
 function NavItem({
   href,
@@ -39,25 +40,63 @@ export default function OpsLayoutShell({
   const pathname = usePathname();
   const router = useRouter();
 
+  const [currentAdmin, setCurrentAdmin] = useState<CurrentAdmin | null>(null);
+  const [checked, setChecked] = useState(false);
+
   const isAuthPage =
     pathname === '/ops/login' ||
     pathname === '/ops/forgot-password' ||
     pathname === '/ops/reset-password';
 
+  const isGlobalSuperAdmin = currentAdmin?.role === 'GLOBAL_SUPER_ADMIN';
+  const isTownSuperAdmin = currentAdmin?.role === 'TOWN_SUPER_ADMIN';
+  const isWarehouseAdmin = currentAdmin?.role === 'WAREHOUSE_ADMIN';
+
   useEffect(() => {
-    const token = localStorage.getItem('admin_token');
+    let cancelled = false;
 
-    if (!token && !isAuthPage) {
-      router.push('/ops/login');
+    async function bootstrap() {
+      const token = localStorage.getItem('admin_token');
+
+      if (!token) {
+        if (!isAuthPage) {
+          router.push('/ops/login');
+        }
+        if (!cancelled) setChecked(true);
+        return;
+      }
+
+      const admin = await getCurrentAdmin();
+
+      if (cancelled) return;
+
+      if (!admin) {
+        localStorage.removeItem('admin_token');
+        router.push('/ops/login');
+        return;
+      }
+
+      setCurrentAdmin(admin);
+      setChecked(true);
+
+      if (pathname === '/ops/login') {
+        router.push('/ops');
+      }
     }
 
-    if (token && pathname === '/ops/login') {
-      router.push('/ops');
-    }
+    bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
   }, [pathname, isAuthPage, router]);
 
   if (isAuthPage) {
     return <div className="min-h-screen bg-gray-50">{children}</div>;
+  }
+
+  if (!checked) {
+    return <div className="min-h-screen bg-gray-50 p-6">Checking admin session…</div>;
   }
 
   return (
@@ -67,6 +106,25 @@ export default function OpsLayoutShell({
           <div className="mb-4">
             <div className="text-lg font-semibold">Ops</div>
             <div className="text-xs text-gray-500">Town Commerce Platform</div>
+
+            {currentAdmin ? (
+              <div className="mt-3 rounded-md border bg-slate-50 px-3 py-2">
+                <div className="text-sm font-medium text-slate-900">
+                  {currentAdmin.firstName || currentAdmin.username}
+                </div>
+                <div className="text-xs text-slate-500">{currentAdmin.email}</div>
+
+                <div className="mt-1 inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-700">
+                  {currentAdmin.role}
+                </div>
+
+                {(isTownSuperAdmin || isWarehouseAdmin) && currentAdmin.town ? (
+                  <div className="mt-2 text-xs text-slate-500">
+                    Town: {currentAdmin.town.name}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <nav className="space-y-1">
@@ -76,14 +134,17 @@ export default function OpsLayoutShell({
             <NavItem href="/ops/drivers" label="Drivers" />
             <NavItem href="/ops/stock" label="Stock" />
             <NavItem href="/ops/reports" label="Reports" />
-            <NavItem href="/ops/promos" label="Promos" />
 
-            <div className="pt-3">
-              <div className="px-3 pb-1 text-xs font-semibold uppercase text-gray-500">
-                Locations
+            {isGlobalSuperAdmin ? <NavItem href="/ops/promos" label="Promos" /> : null}
+
+            {isGlobalSuperAdmin ? (
+              <div className="pt-3">
+                <div className="px-3 pb-1 text-xs font-semibold uppercase text-gray-500">
+                  Locations
+                </div>
+                <NavItem href="/ops/towns" label="Towns" />
               </div>
-              <NavItem href="/ops/towns" label="Towns" />
-            </div>
+            ) : null}
 
             <div className="pt-3">
               <div className="px-3 pb-1 text-xs font-semibold uppercase text-gray-500">

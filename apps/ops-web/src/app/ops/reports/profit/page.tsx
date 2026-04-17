@@ -1,15 +1,34 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { apiFetch } from '@/lib/api';
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { apiFetch } from "@/lib/api";
+
+type AdminRole =
+  | "GLOBAL_SUPER_ADMIN"
+  | "TOWN_SUPER_ADMIN"
+  | "WAREHOUSE_ADMIN";
+
+type CurrentAdmin = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  role: AdminRole;
+  townId: string | null;
+  town: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+};
 
 type ProfitRow = {
   townProductId: string;
   townId: string;
   productId: string;
   productName: string;
-  pricingModel: 'UNIT' | 'WEIGHT';
+  pricingModel: "UNIT" | "WEIGHT";
   stockQty: number | null;
   stockWeightGrams: number | null;
   sellingValue: number;
@@ -34,8 +53,8 @@ type ProfitResponse = {
 };
 
 function safeErrMessage(raw: any): string {
-  const msg = raw?.message ?? raw?.toString?.() ?? 'Request failed';
-  if (typeof msg === 'string') {
+  const msg = raw?.message ?? raw?.toString?.() ?? "Request failed";
+  if (typeof msg === "string") {
     try {
       const parsed = JSON.parse(msg);
       if (parsed?.message) return parsed.message;
@@ -44,18 +63,21 @@ function safeErrMessage(raw: any): string {
     }
     return msg;
   }
-  return 'Request failed';
+  return "Request failed";
 }
 
 function fmtMoney(n: number): string {
-  // Ghana Cedi typically, but your API returns numeric values; keep generic
   return Number.isFinite(n) ? n.toFixed(2) : String(n);
 }
 
 export default function ProfitReportPage() {
   const LIMIT = 25;
 
-  const [townId, setTownId] = useState<string>('');
+  const [admin, setAdmin] = useState<CurrentAdmin | null>(null);
+  const [bootstrapping, setBootstrapping] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
+
+  const [townId, setTownId] = useState<string>("");
   const [cursorStack, setCursorStack] = useState<(string | null)[]>([null]);
   const cursor = cursorStack[cursorStack.length - 1] ?? null;
 
@@ -63,14 +85,34 @@ export default function ProfitReportPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  async function load(currentTownId: string, currentCursor: string | null) {
+  const isGlobal = admin?.role === "GLOBAL_SUPER_ADMIN";
+  const isTownSuper = admin?.role === "TOWN_SUPER_ADMIN";
+  const isWarehouse = admin?.role === "WAREHOUSE_ADMIN";
+
+  async function load(
+    currentTownId: string,
+    currentCursor: string | null,
+    currentAdmin?: CurrentAdmin | null,
+  ) {
+    const effectiveAdmin = currentAdmin ?? admin;
+    if (!effectiveAdmin) return;
+
     setLoading(true);
     setErr(null);
+
     try {
       const qs = new URLSearchParams();
-      qs.set('limit', String(LIMIT));
-      if (currentCursor) qs.set('cursor', currentCursor);
-      if (currentTownId.trim()) qs.set('townId', currentTownId.trim());
+      qs.set("limit", String(LIMIT));
+
+      if (currentCursor) qs.set("cursor", currentCursor);
+
+      if (effectiveAdmin.role === "GLOBAL_SUPER_ADMIN") {
+        if (currentTownId.trim()) {
+          qs.set("townId", currentTownId.trim());
+        }
+      } else if (effectiveAdmin.townId) {
+        qs.set("townId", effectiveAdmin.townId);
+      }
 
       const res = await apiFetch<ProfitResponse>(`/reports/profit?${qs.toString()}`);
       setData(res);
@@ -83,23 +125,65 @@ export default function ProfitReportPage() {
   }
 
   useEffect(() => {
-    setCursorStack([null]);
-    void load(townId, null);
+    let cancelled = false;
+
+    async function bootstrap() {
+      try {
+        setBootstrapping(true);
+        setErr(null);
+        setAccessDenied(false);
+
+        const me = await apiFetch<CurrentAdmin>("/admin/auth/me");
+        if (cancelled) return;
+
+        setAdmin(me);
+
+        if (me.role === "WAREHOUSE_ADMIN") {
+          setAccessDenied(true);
+          setLoading(false);
+          return;
+        }
+
+        const initialTownId =
+          me.role === "GLOBAL_SUPER_ADMIN" ? "" : me.townId ?? "";
+
+        setTownId(initialTownId);
+        setCursorStack([null]);
+
+        await load(initialTownId, null, me);
+      } catch (e: any) {
+        if (!cancelled) {
+          setErr(safeErrMessage(e));
+          setLoading(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setBootstrapping(false);
+        }
+      }
+    }
+
+    void bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const totals = data?.totals ?? null;
 
   function onApplyTown() {
+    const effectiveTownId = isGlobal ? townId : admin?.townId ?? "";
     setCursorStack([null]);
-    void load(townId, null);
+    void load(effectiveTownId, null);
   }
 
   function goNext() {
     const next = data?.pageInfo?.nextCursor ?? null;
     if (!next) return;
     setCursorStack((s) => [...s, next]);
-    void load(townId, next);
+    void load(isGlobal ? townId : admin?.townId ?? "", next);
   }
 
   function goPrev() {
@@ -107,12 +191,38 @@ export default function ProfitReportPage() {
     const prevStack = cursorStack.slice(0, -1);
     const prevCursor = prevStack[prevStack.length - 1] ?? null;
     setCursorStack(prevStack);
-    void load(townId, prevCursor);
+    void load(isGlobal ? townId : admin?.townId ?? "", prevCursor);
   }
 
   const pageLabel = useMemo(() => {
     return `Page ${cursorStack.length}`;
   }, [cursorStack.length]);
+
+  if (bootstrapping) {
+    return (
+      <div className="p-4">
+        <div className="text-sm text-gray-500">Loading report access…</div>
+      </div>
+    );
+  }
+
+  if (accessDenied || isWarehouse) {
+    return (
+      <div className="p-4 space-y-4">
+        <div className="text-sm text-gray-500">
+          <Link className="underline" href="/ops/reports">
+            Reports
+          </Link>{" "}
+          <span className="mx-1">/</span>
+          <span>Profit & Valuation</span>
+        </div>
+
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          You do not have permission to access this report.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 space-y-4">
@@ -121,7 +231,7 @@ export default function ProfitReportPage() {
           <div className="text-sm text-gray-500">
             <Link className="underline" href="/ops/reports">
               Reports
-            </Link>{' '}
+            </Link>{" "}
             <span className="mx-1">/</span>
             <span>Profit & Valuation</span>
           </div>
@@ -129,6 +239,17 @@ export default function ProfitReportPage() {
           <div className="text-sm text-gray-600 mt-1">
             Uses stock snapshot + per-item cost to estimate valuation and profit.
           </div>
+          {admin ? (
+            <div className="text-xs text-gray-500 mt-1">
+              Role: <span className="font-medium">{admin.role}</span>
+              {isTownSuper && admin.town ? (
+                <>
+                  {" "}
+                  · Town-scoped to <span className="font-medium">{admin.town.name}</span>
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2">
@@ -149,14 +270,28 @@ export default function ProfitReportPage() {
 
       <div className="rounded border bg-white p-3 flex flex-col md:flex-row md:items-end gap-3">
         <div className="flex-1">
-          <label className="block text-xs text-gray-500 mb-1">Town ID (optional)</label>
-          <input
-            value={townId}
-            onChange={(e) => setTownId(e.target.value)}
-            placeholder="e.g. cmkjwc7b00000x0dbnesilkaz"
-            className="w-full rounded border px-3 py-2 text-sm"
-          />
-          <div className="text-xs text-gray-500 mt-1">Leave blank for all towns.</div>
+          <label className="block text-xs text-gray-500 mb-1">Town</label>
+
+          {isGlobal ? (
+            <>
+              <input
+                value={townId}
+                onChange={(e) => setTownId(e.target.value)}
+                placeholder="e.g. cmkjwc7b00000x0dbnesilkaz"
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+              <div className="text-xs text-gray-500 mt-1">Leave blank for all towns.</div>
+            </>
+          ) : (
+            <>
+              <div className="w-full rounded border bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                {admin?.town?.name ?? "Assigned town"}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                This report is locked to your assigned town.
+              </div>
+            </>
+          )}
         </div>
 
         <button
@@ -211,7 +346,7 @@ export default function ProfitReportPage() {
               <div className="rounded border bg-white p-3">
                 <div className="text-xs text-gray-500">Margin %</div>
                 <div className="text-2xl font-semibold mt-1">
-                  {totals.marginPercent === null ? '—' : `${totals.marginPercent.toFixed(2)}%`}
+                  {totals.marginPercent === null ? "—" : `${totals.marginPercent.toFixed(2)}%`}
                 </div>
               </div>
             </div>
@@ -234,12 +369,16 @@ export default function ProfitReportPage() {
               <tbody>
                 {data.rows.map((r) => {
                   const stockText =
-                    r.pricingModel === 'UNIT'
-                      ? (r.stockQty === null ? '—' : String(r.stockQty))
-                      : (r.stockWeightGrams === null ? '—' : `${r.stockWeightGrams} g`);
+                    r.pricingModel === "UNIT"
+                      ? r.stockQty === null
+                        ? "—"
+                        : String(r.stockQty)
+                      : r.stockWeightGrams === null
+                        ? "—"
+                        : `${r.stockWeightGrams} g`;
 
                   const marginText =
-                    r.marginPercent === null ? '—' : `${r.marginPercent.toFixed(2)}%`;
+                    r.marginPercent === null ? "—" : `${r.marginPercent.toFixed(2)}%`;
 
                   return (
                     <tr key={r.townProductId} className="border-b">

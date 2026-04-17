@@ -22,7 +22,8 @@ async function main() {
         username: 'admin',
         firstName: 'Samuel',
         lastName: 'Forson',
-        role: 'SUPER_ADMIN',
+        role: 'GLOBAL_SUPER_ADMIN',
+        townId: null,
         isActive: true,
         passwordHash,
       },
@@ -35,13 +36,14 @@ async function main() {
         passwordHash,
         firstName: 'Samuel',
         lastName: 'Forson',
-        role: 'SUPER_ADMIN',
+        role: 'GLOBAL_SUPER_ADMIN',
+        townId: null,
         isActive: true,
       },
     });
   }
 
-  console.log('Super admin seeded/updated');
+  console.log('Global super admin seeded/updated');
 
   await app.close();
 }
