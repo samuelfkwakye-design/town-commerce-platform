@@ -19,29 +19,30 @@ export default function AdminLoginPage() {
     setError('');
 
     try {
-      const data = await apiFetch<{
-        accessToken: string;
-        admin: {
-          id: string;
-          email: string;
-          role: string;
-        };
-      }>('/admin-auth/login', {
-        method: 'POST',
-        body: { login, password },
-      });
+  const data = await apiFetch<{
+    accessToken?: string;
+    token?: string;
+    admin?: {
+      id: string;
+      email: string;
+      role: string;
+    };
+  }>('/admin-auth/login', {
+    method: 'POST',
+    body: { login, password },
+  });
 
-      if (!data?.accessToken) {
-        throw new Error('Invalid login response');
-      }
+      const token = data?.accessToken || data?.token;
 
-      // Save token (browser)
-      localStorage.setItem('admin_token', data.accessToken);
+if (!token) {
+  throw new Error('Invalid login response');
+}
 
-      // Also set cookie for SSR
-      document.cookie = `admin_token=${data.accessToken}; path=/; max-age=${
-        60 * 60 * 24 * 7
-      }; samesite=lax`;
+localStorage.setItem('admin_token', token);
+
+document.cookie = `admin_token=${token}; path=/; max-age=${
+  60 * 60 * 24 * 7
+}; samesite=lax`;
 
       router.replace('/ops');
     } catch (err: any) {
