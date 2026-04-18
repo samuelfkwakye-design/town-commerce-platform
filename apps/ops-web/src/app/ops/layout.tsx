@@ -1,4 +1,4 @@
-import OpsLayoutShell from '@/components/OpsLayoutShell';
+import OpsLayoutShell from './OpsLayoutShell';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,5 +7,5 @@ export default async function OpsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <OpsLayoutShell>{children}</OpsLayoutShell>;
+  return <OpsLayoutShell missingImages={0}>{children}</OpsLayoutShell>;
 }

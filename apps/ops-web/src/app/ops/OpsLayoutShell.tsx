@@ -32,10 +32,10 @@ function NavItem({
 
 export default function OpsLayoutShell({
   children,
-  missingImages,
+  missingImages = 0,
 }: {
   children: React.ReactNode;
-  missingImages: number;
+  missingImages?: number;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -136,6 +136,9 @@ export default function OpsLayoutShell({
             <NavItem href="/ops/reports" label="Reports" />
 
             {isGlobalSuperAdmin ? <NavItem href="/ops/promos" label="Promos" /> : null}
+            {isGlobalSuperAdmin || isTownSuperAdmin ? (
+              <NavItem href="/ops/admins" label="Admins" />
+            ) : null}
 
             {isGlobalSuperAdmin ? (
               <div className="pt-3">
