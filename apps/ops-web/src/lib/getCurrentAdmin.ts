@@ -1,62 +1,58 @@
-import { cookies } from 'next/headers';
+import { apiFetch } from '@/lib/api';
 
-export type AdminRole =
+export type CurrentAdminRole =
   | 'GLOBAL_SUPER_ADMIN'
   | 'TOWN_SUPER_ADMIN'
   | 'WAREHOUSE_ADMIN';
 
 export type CurrentAdmin = {
   id: string;
-  email?: string | null;
-  name?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  role: AdminRole;
-  townId?: string | null;
-  isActive?: boolean;
+  email: string;
+  username: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  role: CurrentAdminRole;
+  townId: string | null;
+  town: { id: string; name: string; slug: string } | null;
+  isActive: boolean;
 };
 
-function getApiBaseUrl() {
-  const baseUrl =
-    process.env.API_BASE ||
-    process.env.NEXT_PUBLIC_API_BASE_URL ||
-    process.env.NEXT_PUBLIC_API_BASE;
+function normaliseAdmin(raw: any): CurrentAdmin | null {
+  if (!raw || typeof raw !== 'object') return null;
+  if (!raw.id || !raw.email || !raw.role) return null;
 
-  if (!baseUrl) {
-    throw new Error(
-      'Missing API base URL. Set API_BASE or NEXT_PUBLIC_API_BASE_URL.',
-    );
-  }
-
-  return baseUrl.replace(/\/+$/, '');
+  return {
+    id: String(raw.id),
+    email: String(raw.email),
+    username: raw.username != null ? String(raw.username) : null,
+    firstName: raw.firstName != null ? String(raw.firstName) : null,
+    lastName: raw.lastName != null ? String(raw.lastName) : null,
+    phone: raw.phone != null ? String(raw.phone) : null,
+    role: String(raw.role) as CurrentAdminRole,
+    townId: raw.townId != null ? String(raw.townId) : null,
+    town:
+      raw.town && typeof raw.town === 'object'
+        ? {
+            id: String(raw.town.id),
+            name: String(raw.town.name),
+            slug: String(raw.town.slug),
+          }
+        : null,
+    isActive: Boolean(raw.isActive),
+  };
 }
 
 export async function getCurrentAdmin(): Promise<CurrentAdmin | null> {
   try {
-    const cookieStore = await cookies();
-
-    const cookieHeader = cookieStore
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
-
-    const res = await fetch(`${getApiBaseUrl()}/admin-auth/me`, {
+    const data = await apiFetch('/admin-auth/me', {
       method: 'GET',
-      headers: {
-        ...(cookieHeader ? { cookie: cookieHeader } : {}),
-      },
+      auth: true,
       cache: 'no-store',
     });
 
-    if (!res.ok) return null;
-
-    const admin = (await res.json()) as CurrentAdmin;
-
-    if (!admin?.id || !admin?.role) return null;
-
-    return admin;
-  } catch (err) {
-    console.error('getCurrentAdmin failed', err);
+    return normaliseAdmin(data);
+  } catch {
     return null;
   }
 }

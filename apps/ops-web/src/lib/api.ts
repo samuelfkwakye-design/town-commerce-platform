@@ -1,13 +1,14 @@
 type ApiFetchInit = Omit<RequestInit, 'body' | 'headers'> & {
   body?: unknown;
   headers?: HeadersInit;
+  auth?: boolean;
 };
 
 function getBaseUrl() {
   const base =
     process.env.NEXT_PUBLIC_API_BASE_URL ||
     process.env.NEXT_PUBLIC_API_BASE ||
-    'http://localhost:3000/api/v1';
+    'http://localhost:3001/api/v1';
 
   return base.replace(/\/+$/, '');
 }
@@ -22,66 +23,110 @@ async function getServerAdminToken(): Promise<string | null> {
   }
 }
 
-export async function apiFetch<T>(
+async function getAdminToken(auth?: boolean): Promise<string | null> {
+  if (!auth) return null;
+
+  if (typeof window !== 'undefined') {
+    try {
+      return localStorage.getItem('admin_token');
+    } catch {
+      return null;
+    }
+  }
+
+  return await getServerAdminToken();
+}
+
+export async function apiFetch<T = any>(
   path: string,
   init: ApiFetchInit = {},
 ): Promise<T> {
   const base = getBaseUrl();
-
-  let adminToken: string | null = null;
-
-  if (typeof window !== 'undefined') {
-    adminToken = localStorage.getItem('admin_token');
-  } else {
-    adminToken = await getServerAdminToken();
-  }
+  const token = await getAdminToken(init.auth);
 
   const headers = new Headers(init.headers);
 
-  if (adminToken) {
-    headers.set('Authorization', `Bearer ${adminToken}`);
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
   }
 
-  let body: BodyInit | null | undefined = init.body as any;
+  let body: BodyInit | null | undefined = undefined;
+
+  const rawBody = init.body;
 
   const isFormData =
-    typeof FormData !== 'undefined' && body instanceof FormData;
+    typeof FormData !== 'undefined' && rawBody instanceof FormData;
 
-  const isBodyObject =
-    body !== null &&
-    body !== undefined &&
-    typeof body === 'object' &&
+  const isBlob = typeof Blob !== 'undefined' && rawBody instanceof Blob;
+  const isArrayBuffer = rawBody instanceof ArrayBuffer;
+  const isString = typeof rawBody === 'string';
+
+  const isPlainObject =
+    rawBody !== null &&
+    rawBody !== undefined &&
+    typeof rawBody === 'object' &&
     !isFormData &&
-    !(body instanceof Blob) &&
-    !(body instanceof ArrayBuffer);
+    !isBlob &&
+    !isArrayBuffer;
 
-  if (isBodyObject) {
+  if (isFormData) {
+    body = rawBody;
+  } else if (isString) {
     if (!headers.has('Content-Type')) {
       headers.set('Content-Type', 'application/json');
     }
-    body = JSON.stringify(body);
-  } else if (typeof body === 'string') {
+    body = rawBody;
+  } else if (isPlainObject) {
     if (!headers.has('Content-Type')) {
       headers.set('Content-Type', 'application/json');
     }
+    body = JSON.stringify(rawBody);
+  } else if (rawBody != null) {
+    body = rawBody as BodyInit;
   }
 
   const res = await fetch(`${base}${path}`, {
     ...init,
-    body,
-    cache: typeof window === 'undefined' ? 'no-store' : init.cache,
     headers,
+    body,
+    cache: init.cache ?? 'no-store',
+    credentials: 'include',
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `Request failed (${res.status})`);
+    let message = `Request failed (${res.status})`;
+
+    try {
+      const contentType = res.headers.get('content-type') || '';
+
+      if (contentType.includes('application/json')) {
+        const errorJson = await res.json();
+        message =
+          errorJson?.message ||
+          errorJson?.error ||
+          JSON.stringify(errorJson);
+      } else {
+        const text = await res.text();
+        if (text) {
+          message = text;
+        }
+      }
+    } catch {
+      // keep default message
+    }
+
+    throw new Error(message);
+  }
+
+  if (res.status === 204) {
+    return undefined as T;
   }
 
   const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    return (await res.text()) as unknown as T;
+
+  if (contentType.includes('application/json')) {
+    return (await res.json()) as T;
   }
 
-  return (await res.json()) as T;
+  return (await res.text()) as T;
 }
