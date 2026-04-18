@@ -3,19 +3,38 @@ type ApiFetchInit = Omit<RequestInit, 'body' | 'headers'> & {
   headers?: HeadersInit;
 };
 
-export async function apiFetch<T>(
-  path: string,
-  init: ApiFetchInit = {},
-): Promise<T> {
+function getBaseUrl() {
   const base =
     process.env.NEXT_PUBLIC_API_BASE_URL ||
     process.env.NEXT_PUBLIC_API_BASE ||
     'http://localhost:3000/api/v1';
 
-  const adminToken =
-    typeof window !== 'undefined'
-      ? localStorage.getItem('admin_token')
-      : null;
+  return base.replace(/\/+$/, '');
+}
+
+async function getServerAdminToken(): Promise<string | null> {
+  try {
+    const mod = await import('next/headers');
+    const cookieStore = await mod.cookies();
+    return cookieStore.get('admin_token')?.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function apiFetch<T>(
+  path: string,
+  init: ApiFetchInit = {},
+): Promise<T> {
+  const base = getBaseUrl();
+
+  let adminToken: string | null = null;
+
+  if (typeof window !== 'undefined') {
+    adminToken = localStorage.getItem('admin_token');
+  } else {
+    adminToken = await getServerAdminToken();
+  }
 
   const headers = new Headers(init.headers);
 
@@ -25,7 +44,9 @@ export async function apiFetch<T>(
 
   let body: BodyInit | null | undefined = init.body as any;
 
-  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const isFormData =
+    typeof FormData !== 'undefined' && body instanceof FormData;
+
   const isBodyObject =
     body !== null &&
     body !== undefined &&
