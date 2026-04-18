@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getCurrentAdmin, type CurrentAdmin } from '@/lib/admin/getCurrentAdmin';
+import { getCurrentAdmin, type CurrentAdmin } from '@/lib/getCurrentAdmin';
 
 function NavItem({
   href,
@@ -56,31 +56,54 @@ export default function OpsLayoutShell({
     let cancelled = false;
 
     async function bootstrap() {
-      const token = localStorage.getItem('admin_token');
+      try {
+        const token =
+          typeof window !== 'undefined'
+            ? localStorage.getItem('admin_token')
+            : null;
 
-      if (!token) {
-        if (!isAuthPage) {
-          router.push('/ops/login');
+        if (!token) {
+          if (!isAuthPage) {
+            router.replace('/ops/login');
+          }
+          if (!cancelled) {
+            setCurrentAdmin(null);
+            setChecked(true);
+          }
+          return;
         }
-        if (!cancelled) setChecked(true);
-        return;
-      }
 
-      const admin = await getCurrentAdmin();
+        const admin = await getCurrentAdmin();
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      if (!admin) {
-        localStorage.removeItem('admin_token');
-        router.push('/ops/login');
-        return;
-      }
+        if (!admin) {
+          localStorage.removeItem('admin_token');
+          document.cookie = 'admin_token=; path=/; max-age=0; samesite=lax';
+          setCurrentAdmin(null);
+          setChecked(true);
 
-      setCurrentAdmin(admin);
-      setChecked(true);
+          if (!isAuthPage) {
+            router.replace('/ops/login');
+          }
+          return;
+        }
 
-      if (pathname === '/ops/login') {
-        router.push('/ops');
+        setCurrentAdmin(admin);
+        setChecked(true);
+
+        if (pathname === '/ops/login') {
+          router.replace('/ops');
+        }
+      } catch {
+        if (cancelled) return;
+
+        setCurrentAdmin(null);
+        setChecked(true);
+
+        if (!isAuthPage) {
+          router.replace('/ops/login');
+        }
       }
     }
 
@@ -96,7 +119,19 @@ export default function OpsLayoutShell({
   }
 
   if (!checked) {
-    return <div className="min-h-screen bg-gray-50 p-6">Checking admin session…</div>;
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        Checking admin session…
+      </div>
+    );
+  }
+
+  if (!currentAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        Redirecting to login…
+      </div>
+    );
   }
 
   return (
@@ -107,24 +142,22 @@ export default function OpsLayoutShell({
             <div className="text-lg font-semibold">Ops</div>
             <div className="text-xs text-gray-500">Town Commerce Platform</div>
 
-            {currentAdmin ? (
-              <div className="mt-3 rounded-md border bg-slate-50 px-3 py-2">
-                <div className="text-sm font-medium text-slate-900">
-                  {currentAdmin.firstName || currentAdmin.username}
-                </div>
-                <div className="text-xs text-slate-500">{currentAdmin.email}</div>
-
-                <div className="mt-1 inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-700">
-                  {currentAdmin.role}
-                </div>
-
-                {(isTownSuperAdmin || isWarehouseAdmin) && currentAdmin.town ? (
-                  <div className="mt-2 text-xs text-slate-500">
-                    Town: {currentAdmin.town.name}
-                  </div>
-                ) : null}
+            <div className="mt-3 rounded-md border bg-slate-50 px-3 py-2">
+              <div className="text-sm font-medium text-slate-900">
+                {currentAdmin.firstName || currentAdmin.username || currentAdmin.email}
               </div>
-            ) : null}
+              <div className="text-xs text-slate-500">{currentAdmin.email}</div>
+
+              <div className="mt-1 inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-700">
+                {currentAdmin.role}
+              </div>
+
+              {(isTownSuperAdmin || isWarehouseAdmin) && currentAdmin.town ? (
+                <div className="mt-2 text-xs text-slate-500">
+                  Town: {currentAdmin.town.name}
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <nav className="space-y-1">
@@ -176,11 +209,11 @@ export default function OpsLayoutShell({
             </Link>
 
             <button
-             onClick={() => {
-  localStorage.removeItem('admin_token');
-  document.cookie = 'admin_token=; path=/; max-age=0; samesite=lax';
-  window.location.href = '/ops/login';
-}}
+              onClick={() => {
+                localStorage.removeItem('admin_token');
+                document.cookie = 'admin_token=; path=/; max-age=0; samesite=lax';
+                window.location.href = '/ops/login';
+              }}
               className="w-full rounded bg-red-500 py-2 text-sm text-white"
             >
               Logout
