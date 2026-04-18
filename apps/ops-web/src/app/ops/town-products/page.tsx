@@ -84,9 +84,15 @@ export default async function TownProductsPage(props: {
 
   const [townsResp, categoriesResp, data] = await Promise.all([
     isGlobalAdmin
-      ? apiFetch<TownsResp>('/admin/reports/towns', { method: 'GET' })
+      ? apiFetch<TownsResp>('/admin/reports/towns', {
+    method: 'GET',
+    auth: true,
+  })
       : Promise.resolve({ rows: [] }),
-    apiFetch<CategoriesResp>('/admin/town-products/meta/categories', { method: 'GET' }),
+    apiFetch<CategoriesResp>('/admin/town-products/meta/categories', {
+  method: 'GET',
+  auth: true,
+}),
     (async () => {
       const qs = new URLSearchParams();
       if (effectiveTownId) qs.set('townId', effectiveTownId);
@@ -95,7 +101,10 @@ export default async function TownProductsPage(props: {
       if (categoryId) qs.set('categoryId', categoryId);
       if (cursor) qs.set('cursor', cursor);
 
-      return apiFetch<Resp>(`/admin/town-products?${qs.toString()}`, { method: 'GET' });
+      return apiFetch<Resp>(`/admin/town-products?${qs.toString()}`, {
+  method: 'GET',
+  auth: true,
+});
     })(),
   ]);
 

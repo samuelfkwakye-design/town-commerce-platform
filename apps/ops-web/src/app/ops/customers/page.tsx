@@ -86,7 +86,10 @@ export default function OpsCustomersPage() {
         ? `/admin/customers?${params.toString()}`
         : '/admin/customers';
 
-      const res = await apiFetch<CustomersResponse>(query);
+      const res = await apiFetch<CustomersResponse>(query, {
+  method: 'GET',
+  auth: true,
+});
       setData(res ?? { rows: [], count: 0 });
     } catch (err: any) {
       setError(err?.message || 'Failed to load customers');
@@ -103,8 +106,14 @@ export default function OpsCustomersPage() {
 
       try {
         const [adminRes, townsRes] = await Promise.all([
-          apiFetch<CurrentAdmin>('/admin-auth/me'),
-          apiFetch<Town[]>('/towns'),
+          apiFetch<CurrentAdmin>('/admin-auth/me', {
+  method: 'GET',
+  auth: true,
+}),
+          apiFetch<Town[]>('/towns', {
+  method: 'GET',
+  auth: true,
+}),
         ]);
 
         const admin = adminRes ?? null;

@@ -19,7 +19,9 @@ function StatCard({
   hint: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-ssnapshot = await apiFetch<OpsDashboardResponse>('/admin/reports/ops-dashboard', {
+  method: 'GET',
+});late-200 bg-white p-5 shadow-sm">
       <div className="text-sm font-medium text-slate-500">{title}</div>
       <div className="mt-2 text-3xl font-bold text-slate-900">{value}</div>
       <div className="mt-2 text-sm text-slate-500">{hint}</div>
@@ -52,8 +54,9 @@ export default async function OpsHomePage() {
 
   try {
     snapshot = await apiFetch<OpsDashboardResponse>('/admin/reports/ops-dashboard', {
-      method: 'GET',
-    });
+  method: 'GET',
+  auth: true,
+});
   } catch {
     snapshot = null;
   }

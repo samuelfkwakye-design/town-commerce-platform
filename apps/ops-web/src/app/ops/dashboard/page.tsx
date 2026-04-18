@@ -98,22 +98,31 @@ export default async function OpsDashboardPage(props: {
 
   try {
     const townsPromise: Promise<TownsResponse | TownOption[] | null> = isGlobalAdmin
-      ? apiFetch<TownsResponse>('/admin/reports/towns', { method: 'GET' })
+      ? apiFetch<TownsResponse>('/admin/reports/towns', {
+    method: 'GET',
+    auth: true,
+  })
       : Promise.resolve(null);
 
     const snapshotPromise = apiFetch<OpsDashboardResponse>(
-      `/admin/reports/ops-dashboard${
-        dashboardTownId ? `?townId=${encodeURIComponent(dashboardTownId)}` : ''
-      }`,
-      { method: 'GET' },
-    );
+  `/admin/reports/ops-dashboard${
+    dashboardTownId ? `?townId=${encodeURIComponent(dashboardTownId)}` : ''
+  }`,
+  {
+    method: 'GET',
+    auth: true,
+  },
+);
 
     const trendPromise = apiFetch<RevenueTrendResponse>(
-      `/admin/reports/revenue-trend?days=7${
-        dashboardTownId ? `&townId=${encodeURIComponent(dashboardTownId)}` : ''
-      }`,
-      { method: 'GET' },
-    );
+  `/admin/reports/revenue-trend?days=7${
+    dashboardTownId ? `&townId=${encodeURIComponent(dashboardTownId)}` : ''
+  }`,
+  {
+    method: 'GET',
+    auth: true,
+  },
+);
 
     const [townsResp, snapshotResp, trendResp] = await Promise.all([
       townsPromise,

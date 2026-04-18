@@ -98,7 +98,10 @@ export default function AdminsClient() {
       setLoading(true);
       setError("");
 
-      const data = await apiFetch<AdminUsersResponse>("/admin/admin-users");
+      const data = await apiFetch<AdminUsersResponse>('/admin/admin-users', {
+  method: 'GET',
+  auth: true,
+});
       setRows(data.rows || []);
     } catch (err: any) {
       setError(err?.message || "Failed to load admin users");
@@ -124,7 +127,10 @@ export default function AdminsClient() {
         setBootstrapping(true);
         setError("");
 
-        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
+        const me = await apiFetch<CurrentAdmin>('/admin-auth/me', {
+  method: 'GET',
+  auth: true,
+});
         if (cancelled) return;
 
         setAdmin(me);
@@ -177,14 +183,15 @@ export default function AdminsClient() {
       setSuccess("");
 
       const updated = await apiFetch<UpdatedAdminResponse>(
-        `/admin/admin-users/${encodeURIComponent(row.id)}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            isActive: nextActive,
-          }),
-        },
-      );
+  `/admin/admin-users/${encodeURIComponent(row.id)}`,
+  {
+    method: 'PATCH',
+    auth: true,
+    body: {
+      isActive: nextActive,
+    },
+  },
+);
 
       setRows((prev) =>
         prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
