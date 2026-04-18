@@ -1,15 +1,20 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { AdminKeyGuard } from '../../auth/admin-key.guard';
 import { AdminCustomersService } from './admin-customers.service';
+import { AdminJwtGuard } from '../../admin-auth/guards/admin-jwt.guard';
+import { RolesGuard } from '../../common/auth/roles.guard';
+import { Roles, AdminRole } from '../../common/auth/roles.decorator';
 
-@UseGuards(AdminKeyGuard)
 @Controller('admin/customers')
+@UseGuards(AdminJwtGuard, RolesGuard)
 export class AdminCustomersController {
-  constructor(
-    private readonly adminCustomersService: AdminCustomersService,
-  ) {}
+  constructor(private readonly adminCustomersService: AdminCustomersService) {}
 
   @Get()
+  @Roles(
+    AdminRole.GLOBAL_SUPER_ADMIN,
+    AdminRole.TOWN_SUPER_ADMIN,
+    AdminRole.WAREHOUSE_ADMIN,
+  )
   listCustomers(
     @Query('search') search?: string,
     @Query('townId') townId?: string,

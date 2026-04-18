@@ -10,20 +10,23 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AdminKeyGuard } from '../auth/admin-key.guard';
+import { AdminJwtGuard } from '../admin-auth/guards/admin-jwt.guard';
+import { RolesGuard } from '../common/auth/roles.guard';
+import { Roles, AdminRole } from '../common/auth/roles.decorator';
 import { CloneTownProductDto } from './dto/clone-town-product.dto';
 import { ApplyTownProductPricingDto } from './dto/apply-town-product-pricing.dto';
 import { AdminTownProductsService } from './admin.town-products.service';
 
 @Controller('admin/town-products')
-@UseGuards(AdminKeyGuard)
+@UseGuards(AdminJwtGuard, RolesGuard)
 export class AdminTownProductsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminTownProductsService: AdminTownProductsService,
   ) {}
 
-  @Post(':id/clone')
+   @Post(':id/clone')
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
   async cloneTownProduct(
     @Param('id') id: string,
     @Body() body: CloneTownProductDto,
@@ -31,7 +34,8 @@ export class AdminTownProductsController {
     return this.adminTownProductsService.cloneTownProduct(id, body);
   }
 
-  @Post(':id/apply-pricing')
+    @Post(':id/apply-pricing')
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
   async applyPricingToTowns(
     @Param('id') id: string,
     @Body() body: ApplyTownProductPricingDto,
@@ -43,8 +47,13 @@ export class AdminTownProductsController {
   // META
   // GET /admin/town-products/meta/categories
   // -----------------------------
-  @Get('meta/categories')
-async listCategories() {
+    @Get('meta/categories')
+  @Roles(
+    AdminRole.GLOBAL_SUPER_ADMIN,
+    AdminRole.TOWN_SUPER_ADMIN,
+    AdminRole.WAREHOUSE_ADMIN,
+  )
+  async listCategories() {
   const rows = await this.prisma.category.findMany({
     where: { isActive: true },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
@@ -77,7 +86,8 @@ async listCategories() {
   // META CREATE
   // POST /admin/town-products/meta/categories
   // -----------------------------
-  @Post('meta/categories')
+    @Post('meta/categories')
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
   async createCategory(@Body() body: any) {
     const name = String(body?.name ?? '').trim();
     const slugInput = String(body?.slug ?? '').trim();
@@ -145,7 +155,8 @@ async listCategories() {
   // META UPDATE
   // PATCH /admin/town-products/meta/categories/:id
   // -----------------------------
-  @Patch('meta/categories/:id')
+    @Patch('meta/categories/:id')
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
   async updateCategory(@Param('id') id: string, @Body() body: any) {
     const existing = await this.prisma.category.findUnique({
       where: { id },
@@ -283,7 +294,12 @@ async listCategories() {
   // LIST (paged)
   // GET /admin/town-products?townId=&search=&missingImages=&cursor=&limit=
   // -----------------------------
-  @Get()
+ @Get()
+@Roles(
+  AdminRole.GLOBAL_SUPER_ADMIN,
+  AdminRole.TOWN_SUPER_ADMIN,
+  AdminRole.WAREHOUSE_ADMIN,
+)
 async listTownProducts(
   @Query('townId') townId?: string,
   @Query('search') search?: string,

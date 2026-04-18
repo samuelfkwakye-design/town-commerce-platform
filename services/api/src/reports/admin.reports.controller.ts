@@ -1,40 +1,40 @@
 // src/reports/admin.reports.controller.ts
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ReportsService } from './reports.service';
-import { AdminKeyGuard } from '../auth/admin-key.guard';
+import { AdminJwtGuard } from '../admin-auth/guards/admin-jwt.guard';
+import { RolesGuard } from '../common/auth/roles.guard';
+import { Roles, AdminRole } from '../common/auth/roles.decorator';
 import { OpsDashboardQueryDto } from './dto/ops-dashboard.query.dto';
 import { RevenueTrendQueryDto } from './dto/revenue-trend.query.dto';
 
 @Controller('admin/reports')
-@UseGuards(AdminKeyGuard)
+@UseGuards(AdminJwtGuard, RolesGuard)
 export class AdminReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
   @Get('ops-dashboard')
+  @Roles(
+    AdminRole.GLOBAL_SUPER_ADMIN,
+    AdminRole.TOWN_SUPER_ADMIN,
+    AdminRole.WAREHOUSE_ADMIN,
+  )
   async opsDashboard(@Query() query: OpsDashboardQueryDto) {
     return this.reportsService.getOpsDashboard(query);
   }
 
-  /**
-   * For dropdowns in Ops UI
-   * GET /api/v1/admin/reports/towns
-   */
   @Get('towns')
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN)
   async towns() {
     return this.reportsService.getTownOptions();
   }
 
-  /**
-   * Revenue trend (SUCCESS payments)
-   * GET /api/v1/admin/reports/revenue-trend?days=7&bucket=day
-   *
-   * Supports:
-   * - days=7 (your current curl)
-   * - OR from/to ISO strings
-   */
   @Get('revenue-trend')
+  @Roles(
+    AdminRole.GLOBAL_SUPER_ADMIN,
+    AdminRole.TOWN_SUPER_ADMIN,
+    AdminRole.WAREHOUSE_ADMIN,
+  )
   async revenueTrend(@Query() query: RevenueTrendQueryDto & { days?: any }) {
-    // Support `days=7` convenience
     const daysRaw = query.days;
     const days =
       daysRaw === null || daysRaw === undefined || daysRaw === ''
@@ -47,7 +47,6 @@ export class AdminReportsController {
       const to = new Date();
       const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
 
-      // Pass computed from/to into service
       return this.reportsService.getRevenueTrend({
         ...query,
         from: from.toISOString(),
