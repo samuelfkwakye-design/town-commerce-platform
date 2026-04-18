@@ -308,10 +308,10 @@ export default function OpsOrdersPage() {
     async function loadAdmin() {
       try {
         setAdminLoading(true);
-       const admin = await apiFetch<CurrentAdmin>('/admin-auth/me', {
-  method: 'GET',
-  auth: true,
-});
+        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me', {
+          method: 'GET',
+          auth: true,
+        });
         setCurrentAdmin(admin ?? null);
       } catch {
         setCurrentAdmin(null);
@@ -328,9 +328,9 @@ export default function OpsOrdersPage() {
       try {
         setTownsLoading(true);
         const data = await apiFetch<TownLite[]>('/towns', {
-  method: 'GET',
-  auth: true,
-});
+          method: 'GET',
+          auth: true,
+        });
         const rows = Array.isArray(data) ? data : [];
         setTowns(rows);
       } catch {
@@ -344,16 +344,19 @@ export default function OpsOrdersPage() {
   useEffect(() => {
     if (adminLoading) return;
     if (!currentAdmin) return;
+    if (!isTownScopedAdmin) return;
 
-    if (isTownScopedAdmin) {
-      const forcedTownId = currentAdmin.townId ?? '';
-      if (townIdParam !== forcedTownId) {
-        setTownIdInput(forcedTownId);
-        updateQuery({ townId: forcedTownId, cursor: null });
-      }
+    const forcedTownId = currentAdmin.townId ?? '';
+
+    if (townIdInput !== forcedTownId) {
+      setTownIdInput(forcedTownId);
+    }
+
+    if (townIdParam !== forcedTownId) {
+      updateQuery({ townId: forcedTownId, cursor: null });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminLoading, currentAdmin, isTownScopedAdmin, townIdParam]);
+  }, [adminLoading, currentAdmin, isTownScopedAdmin, townIdParam, townIdInput]);
 
   useEffect(() => {
     if (!townIdParam) {
@@ -381,14 +384,7 @@ export default function OpsOrdersPage() {
     if (townIdParam) return;
     if (towns.length === 0) return;
 
-    const savedTownId = window.localStorage.getItem(LAST_TOWN_STORAGE_KEY);
-    if (!savedTownId) return;
-
-    const exists = towns.some((t) => t.id === savedTownId && t.isActive !== false);
-    if (!exists) return;
-
-    updateQuery({ townId: savedTownId, cursor: null });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Temporarily disabled to reduce page instability caused by automatic URL rewrites.
   }, [townIdParam, townsLoading, towns, isGlobalAdmin]);
 
   useEffect(() => {
@@ -477,9 +473,9 @@ export default function OpsOrdersPage() {
         setErr(null);
 
         const data = await apiFetch<any>(listPath, {
-  method: 'GET',
-  auth: true,
-});
+          method: 'GET',
+          auth: true,
+        });
 
         setItems(data.items ?? []);
         setNextCursor(data.pageInfo?.nextCursor ?? null);
@@ -536,8 +532,8 @@ export default function OpsOrdersPage() {
 
         <div className="flex items-center gap-3">
           <ExportOrdersCsvButton />
-          <Link className="text-sm underline" href="/ops/login">
-            Change key
+          <Link className="text-sm underline" href="/ops/change-password">
+            Change password
           </Link>
         </div>
       </div>
