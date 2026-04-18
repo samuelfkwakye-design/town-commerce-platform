@@ -40,7 +40,7 @@ export async function getCurrentAdmin(): Promise<CurrentAdmin | null> {
       .map((c) => `${c.name}=${c.value}`)
       .join('; ');
 
-    const res = await fetch(`${getApiBaseUrl()}/admin/auth/me`, {
+    const res = await fetch(`${getApiBaseUrl()}/admin-auth/me`, {
       method: 'GET',
       headers: {
         ...(cookieHeader ? { cookie: cookieHeader } : {}),

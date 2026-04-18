@@ -34,7 +34,11 @@ export default function AdminLoginPage() {
       }
 
       localStorage.setItem('admin_token', data.token);
+
+      document.cookie = `admin_token=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
+
       router.push('/ops');
+      router.refresh();
     } catch (err: any) {
       setError(err.message || 'Login error');
     } finally {

@@ -176,10 +176,11 @@ export default function OpsLayoutShell({
             </Link>
 
             <button
-              onClick={() => {
-                localStorage.removeItem('admin_token');
-                window.location.href = '/ops/login';
-              }}
+             onClick={() => {
+  localStorage.removeItem('admin_token');
+  document.cookie = 'admin_token=; path=/; max-age=0; samesite=lax';
+  window.location.href = '/ops/login';
+}}
               className="w-full rounded bg-red-500 py-2 text-sm text-white"
             >
               Logout
