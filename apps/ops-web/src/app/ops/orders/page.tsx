@@ -308,7 +308,10 @@ export default function OpsOrdersPage() {
     async function loadAdmin() {
       try {
         setAdminLoading(true);
-        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me');
+       const admin = await apiFetch<CurrentAdmin>('/admin-auth/me', {
+  method: 'GET',
+  auth: true,
+});
         setCurrentAdmin(admin ?? null);
       } catch {
         setCurrentAdmin(null);
@@ -324,7 +327,10 @@ export default function OpsOrdersPage() {
     (async () => {
       try {
         setTownsLoading(true);
-        const data = await apiFetch<TownLite[]>('/towns');
+        const data = await apiFetch<TownLite[]>('/towns', {
+  method: 'GET',
+  auth: true,
+});
         const rows = Array.isArray(data) ? data : [];
         setTowns(rows);
       } catch {
@@ -470,7 +476,10 @@ export default function OpsOrdersPage() {
         setLoading(true);
         setErr(null);
 
-        const data = await apiFetch<any>(listPath);
+        const data = await apiFetch<any>(listPath, {
+  method: 'GET',
+  auth: true,
+});
 
         setItems(data.items ?? []);
         setNextCursor(data.pageInfo?.nextCursor ?? null);
