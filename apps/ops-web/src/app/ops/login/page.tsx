@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -18,29 +19,33 @@ export default function AdminLoginPage() {
     setError('');
 
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/admin-auth/login`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ login, password }),
-        }
-      );
+      const data = await apiFetch<{
+        accessToken: string;
+        admin: {
+          id: string;
+          email: string;
+          role: string;
+        };
+      }>('/admin-auth/login', {
+        method: 'POST',
+        body: { login, password },
+      });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Login failed');
+      if (!data?.accessToken) {
+        throw new Error('Invalid login response');
       }
 
-      localStorage.setItem('admin_token', data.token);
+      // Save token (browser)
+      localStorage.setItem('admin_token', data.accessToken);
 
-      document.cookie = `admin_token=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
+      // Also set cookie for SSR
+      document.cookie = `admin_token=${data.accessToken}; path=/; max-age=${
+        60 * 60 * 24 * 7
+      }; samesite=lax`;
 
-      router.push('/ops');
-      router.refresh();
+      router.replace('/ops');
     } catch (err: any) {
-      setError(err.message || 'Login error');
+      setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -52,7 +57,9 @@ export default function AdminLoginPage() {
         onSubmit={handleLogin}
         className="w-full max-w-md rounded-2xl bg-white p-6 shadow"
       >
-        <h1 className="mb-1 text-2xl font-bold text-slate-900">Admin Login</h1>
+        <h1 className="mb-1 text-2xl font-bold text-slate-900">
+          Admin Login
+        </h1>
         <p className="mb-5 text-sm text-slate-500">
           Sign in to access the operations dashboard.
         </p>
