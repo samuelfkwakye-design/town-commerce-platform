@@ -308,7 +308,7 @@ export default function OpsOrdersPage() {
     async function loadAdmin() {
       try {
         setAdminLoading(true);
-        const admin = await apiFetch<CurrentAdmin>('/admin/auth/me');
+        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me');
         setCurrentAdmin(admin ?? null);
       } catch {
         setCurrentAdmin(null);

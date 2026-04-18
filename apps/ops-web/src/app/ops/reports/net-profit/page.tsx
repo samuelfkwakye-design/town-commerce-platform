@@ -152,7 +152,7 @@ export default function NetProfitTimeseriesPage() {
         setErr(null);
         setAccessDenied(false);
 
-        const me = await apiFetch<CurrentAdmin>("/admin/auth/me");
+        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
         if (cancelled) return;
 
         setAdmin(me);

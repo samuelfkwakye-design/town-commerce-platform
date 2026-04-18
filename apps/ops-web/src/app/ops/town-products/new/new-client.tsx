@@ -129,7 +129,7 @@ export default function NewTownProductClient() {
     (async () => {
       try {
         setAdminLoading(true);
-        const admin = await apiFetch<CurrentAdmin>('/admin/auth/me');
+        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me');
         if (!alive) return;
         setCurrentAdmin(admin ?? null);
 

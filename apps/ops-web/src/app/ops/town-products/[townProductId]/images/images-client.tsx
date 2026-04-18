@@ -108,7 +108,7 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
         setError(null);
 
         const [admin, townProduct] = await Promise.all([
-          apiFetch<CurrentAdmin>('/admin/auth/me'),
+          apiFetch<CurrentAdmin>('/admin-auth/me'),
           apiFetch<TownProductLite>(`/admin/town-products/${townProductId}`, {
             method: 'GET',
           }),

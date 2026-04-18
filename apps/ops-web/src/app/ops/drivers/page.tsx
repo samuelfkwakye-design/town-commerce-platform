@@ -105,7 +105,7 @@ export default function DriversPage() {
   async function loadCurrentAdmin() {
     setLoadingAdmin(true);
     try {
-      const res = await apiFetch<CurrentAdmin>('/admin/auth/me');
+      const res = await apiFetch<CurrentAdmin>('/admin-auth/me');
       setCurrentAdmin(res || null);
 
       if (res?.townId) {
@@ -272,7 +272,7 @@ export default function DriversPage() {
       setErrorMessage('');
 
       try {
-        const admin = await apiFetch<CurrentAdmin>('/admin/auth/me');
+        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me');
         setCurrentAdmin(admin || null);
 
         const townsRes = await apiFetch<Town[]>('/towns');

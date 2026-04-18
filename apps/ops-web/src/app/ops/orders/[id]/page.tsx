@@ -323,7 +323,7 @@ export default function OrderDetailPage() {
 
     async function bootstrapAdmin() {
       try {
-        const admin = await apiFetch<CurrentAdmin>('/admin/auth/me');
+        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me');
 
         if (cancelled) return;
 

@@ -141,7 +141,7 @@ export default function OpsPromosPage() {
         setBootstrapping(true);
         setError("");
 
-        const me = await apiFetch<CurrentAdmin>("/admin/auth/me");
+        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
         if (cancelled) return;
 
         setAdmin(me);

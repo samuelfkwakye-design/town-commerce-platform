@@ -99,7 +99,7 @@ export default function EditPromoClient() {
         setError("");
         setAccessDenied(false);
 
-        const me = await apiFetch<CurrentAdmin>("/admin/auth/me");
+        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
         if (cancelled) return;
 
         setAdmin(me);

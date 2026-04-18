@@ -112,7 +112,7 @@ export default function OpsCategoriesPage() {
         setBootstrapping(true);
         setError(null);
 
-        const me = await apiFetch<CurrentAdmin>("/admin/auth/me");
+        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
         if (cancelled) return;
 
         setAdmin(me);

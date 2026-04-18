@@ -124,7 +124,7 @@ export default function OpsStockDashboardPage() {
     async function loadAdmin() {
       try {
         setAdminLoading(true);
-        const admin = await apiFetch<CurrentAdmin>('/admin/auth/me');
+        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me');
         setCurrentAdmin(admin ?? null);
 
         if (admin?.townId) {

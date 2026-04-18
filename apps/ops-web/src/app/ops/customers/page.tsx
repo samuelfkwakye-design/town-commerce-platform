@@ -103,7 +103,7 @@ export default function OpsCustomersPage() {
 
       try {
         const [adminRes, townsRes] = await Promise.all([
-          apiFetch<CurrentAdmin>('/admin/auth/me'),
+          apiFetch<CurrentAdmin>('/admin-auth/me'),
           apiFetch<Town[]>('/towns'),
         ]);
 

@@ -325,7 +325,7 @@ export default function EditTownProductClient(props: {
         setAdminLoading(true);
         setErr(null);
 
-        const admin = await apiFetch<CurrentAdmin>('/admin/auth/me');
+        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me');
         if (cancelled) return;
 
         setCurrentAdmin(admin ?? null);

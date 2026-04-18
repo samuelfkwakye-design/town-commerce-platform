@@ -17,18 +17,10 @@ export async function apiFetch<T>(
       ? localStorage.getItem('admin_token')
       : null;
 
-  const adminKey =
-    typeof window !== 'undefined'
-      ? localStorage.getItem('ops_admin_key') ||
-        process.env.NEXT_PUBLIC_ADMIN_KEY
-      : process.env.NEXT_PUBLIC_ADMIN_KEY;
-
   const headers = new Headers(init.headers);
 
   if (adminToken) {
     headers.set('Authorization', `Bearer ${adminToken}`);
-  } else if (adminKey) {
-    headers.set('x-admin-key', adminKey);
   }
 
   let body: BodyInit | null | undefined = init.body as any;
