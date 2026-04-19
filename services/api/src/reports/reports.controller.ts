@@ -12,8 +12,10 @@ import { TopProductsQueryDto } from './dto/top-products.query.dto';
 import { TownLeaderboardQueryDto } from './dto/town-leaderboard.query.dto';
 import { NetProfitQueryDto } from './dto/net-profit.query.dto';
 import { RefundLeaderboardQueryDto } from './dto/refund-leaderboard.query.dto';
+import { AdminJwtGuard } from '../admin-auth/guards/admin-jwt.guard';
+import { RolesGuard } from '../common/auth/roles.guard';
 
-@UseGuards(AdminKeyGuard)
+@UseGuards(AdminJwtGuard, RolesGuard)
 @Controller('reports')
 export class ReportsController {
   constructor(private readonly service: ReportsService) {}
