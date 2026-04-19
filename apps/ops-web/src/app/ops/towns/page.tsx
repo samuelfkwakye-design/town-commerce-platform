@@ -20,8 +20,9 @@ export default async function TownsPage() {
 
   try {
     const data = await apiFetch<TownsResponse>('/admin/towns', {
-      method: 'GET',
-    });
+  method: 'GET',
+  auth: true,
+});
 
     rows = data?.rows ?? [];
   } catch (e: any) {
