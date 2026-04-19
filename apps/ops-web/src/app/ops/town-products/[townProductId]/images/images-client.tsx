@@ -108,10 +108,11 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
         setError(null);
 
         const [admin, townProduct] = await Promise.all([
-          apiFetch<CurrentAdmin>('/admin-auth/me'),
+          apiFetch<CurrentAdmin>('/admin-auth/me', { auth: true }),
           apiFetch<TownProductLite>(`/admin/town-products/${townProductId}`, {
-            method: 'GET',
-          }),
+  method: 'GET',
+  auth: true,
+}),
         ]);
 
         if (cancelled) return;
@@ -168,8 +169,9 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
     setLoading(true);
     try {
       const data = await apiFetch<TownProductImage[]>(
-        `/admin/town-products/${townProductId}/images`,
-      );
+  `/admin/town-products/${townProductId}/images`,
+  { auth: true },
+);
       setImages(data ?? []);
     } catch (e: any) {
       setError(String(e?.message ?? e));
@@ -233,13 +235,14 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
     try {
       const orderedImageIds = next.map((x) => x.id);
       const data = await apiFetch<TownProductImage[]>(
-        `/admin/town-products/${townProductId}/images/reorder`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderedImageIds }),
-        },
-      );
+  `/admin/town-products/${townProductId}/images/reorder`,
+  {
+    method: 'PATCH',
+    auth: true,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderedImageIds }),
+  },
+);
       setImages(data ?? next);
     } catch (e: any) {
       setError(String(e?.message ?? e));
@@ -275,8 +278,9 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
 
     try {
       const sig = await apiFetch<CloudinarySignature>(
-        `/admin/uploads/cloudinary-signature?folder=town-products/${townProductId}`,
-      );
+  `/admin/uploads/cloudinary-signature?folder=town-products/${townProductId}`,
+  { auth: true },
+);
 
       const uploadUrl = `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`;
       const form = new FormData();
@@ -297,13 +301,14 @@ export default function ImagesClient({ townProductId }: { townProductId: string 
       if (!secureUrl) throw new Error('Upload succeeded but no secure_url returned');
 
       const updated = await apiFetch<TownProductImage[]>(
-        `/admin/town-products/${townProductId}/images`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: secureUrl, alt: alt.trim() || null }),
-        },
-      );
+  `/admin/town-products/${townProductId}/images`,
+  {
+    method: 'POST',
+    auth: true,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: secureUrl, alt: alt.trim() || null }),
+  },
+);
 
       const nextImages = updated ?? [];
       setImages(nextImages);
