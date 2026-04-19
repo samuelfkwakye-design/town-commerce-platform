@@ -263,7 +263,10 @@ export default function OrderDetailPage() {
 
     try {
       setLoadingDrivers(true);
-      const rows = await apiFetch<Driver[]>(`/admin/drivers?townId=${encodeURIComponent(townId)}`);
+      const rows = await apiFetch<Driver[]>(
+  `/admin/drivers?townId=${encodeURIComponent(townId)}`,
+  { auth: true },
+);
       const list = Array.isArray(rows) ? rows : [];
       setDrivers(list);
 
@@ -286,7 +289,7 @@ export default function OrderDetailPage() {
       setLoading(true);
       setErr(null);
 
-      const o = await apiFetch<any>(`/admin/orders/${id}`);
+      const o = await apiFetch<any>(`/admin/orders/${id}`, { auth: true });
       setOrder(o);
       setDriverName(o?.driverName ?? '');
       setDriverPhone(o?.driverPhone ?? '');
@@ -303,7 +306,9 @@ export default function OrderDetailPage() {
       setEditDeliveryNotes(o?.deliveryNotes ?? '');
 
       try {
-        const res = await apiFetch<any>(`/orders/${id}/stock-movements?limit=50`);
+        const res = await apiFetch<any>(`/orders/${id}/stock-movements?limit=50`, {
+  auth: true,
+});
         const rows = Array.isArray(res) ? res : res?.items ?? res?.rows ?? [];
         setMovements(Array.isArray(rows) ? rows : []);
       } catch {
@@ -323,7 +328,9 @@ export default function OrderDetailPage() {
 
     async function bootstrapAdmin() {
       try {
-        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me');
+        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me', {
+  auth: true,
+});
 
         if (cancelled) return;
 
@@ -457,8 +464,9 @@ export default function OrderDetailPage() {
       setActionOk(null);
 
       await apiFetch(`/orders/admin/${id}/confirm`, {
-        method: 'PATCH',
-      });
+  method: 'PATCH',
+  auth: true,
+});
 
       setActionOk('Availability confirmed. Order moved to CONFIRMED.');
       await load();
@@ -484,11 +492,12 @@ export default function OrderDetailPage() {
       setActionOk(null);
 
       await apiFetch(`/admin/orders/${id}/assign-driver`, {
-        method: 'POST',
-        body: JSON.stringify({
-          driverId: selectedDriverId,
-        }),
-      });
+  method: 'POST',
+  auth: true,
+  body: JSON.stringify({
+    driverId: selectedDriverId,
+  }),
+});
 
       setActionOk('Driver assigned successfully.');
       await load();
@@ -509,9 +518,9 @@ export default function OrderDetailPage() {
       setActionOk(null);
 
       await apiFetch(`/admin/orders/${id}/auto-assign-driver`, {
-        method: 'POST',
-      });
-
+  method: 'POST',
+  auth: true,
+});
       setActionOk('Driver auto-assigned successfully.');
       await load();
       setTimeout(() => setActionOk(null), 2500);
@@ -541,13 +550,13 @@ export default function OrderDetailPage() {
       setActionOk(null);
 
       await apiFetch(`/admin/orders/${id}/assign-driver-manual`, {
-        method: 'POST',
-        body: JSON.stringify({
-          driverName: driverName.trim(),
-          driverPhone: driverPhone.trim(),
-        }),
-      });
-
+  method: 'POST',
+  auth: true,
+  body: JSON.stringify({
+    driverName: driverName.trim(),
+    driverPhone: driverPhone.trim(),
+  }),
+});
       setActionOk('Driver saved manually.');
       await load();
       setTimeout(() => setActionOk(null), 2500);
@@ -572,11 +581,12 @@ export default function OrderDetailPage() {
       setActionOk(null);
 
       await apiFetch(`/orders/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+  method: 'PATCH',
+  auth: true,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
           customerPhone: editCustomerPhone.trim() || null,
           customerEmail: editCustomerEmail.trim() || null,
           deliveryRecipientName: editDeliveryRecipientName.trim() || null,
@@ -609,9 +619,9 @@ export default function OrderDetailPage() {
       setActionOk(null);
 
       await apiFetch(`/admin/orders/${id}/clear-driver`, {
-        method: 'PATCH',
-      });
-
+  method: 'PATCH',
+  auth: true,
+});
       setActionOk('Driver cleared.');
       setDriverName('');
       setDriverPhone('');
@@ -658,13 +668,14 @@ export default function OrderDetailPage() {
       setActionOk(null);
 
       await apiFetch(`/orders/${id}/refund-items`, {
-        method: 'POST',
-        body: JSON.stringify({
-          reason: refundReason.trim(),
-          restock: refundRestock,
-          items: selected,
-        }),
-      });
+  method: 'POST',
+  auth: true,
+  body: JSON.stringify({
+    reason: refundReason.trim(),
+    restock: refundRestock,
+    items: selected,
+  }),
+});
 
       setActionOk('Refund request created.');
       closeRefund();
@@ -687,10 +698,10 @@ export default function OrderDetailPage() {
       setActionOk(null);
 
       await apiFetch(`/admin/orders/${id}/mark-cod-collected`, {
-        method: 'PATCH',
-        body: JSON.stringify({ note: 'Cash received by rider' }),
-      });
-
+  method: 'PATCH',
+  auth: true,
+  body: JSON.stringify({ note: 'Cash received by rider' }),
+});
       setActionOk('COD marked as collected.');
       await load();
       document.getElementById('payments')?.scrollIntoView({ behavior: 'smooth' });
@@ -710,7 +721,10 @@ export default function OrderDetailPage() {
       setActionErr(null);
       setActionOk(null);
 
-      await apiFetch(`/orders/${id}/dev/force-settle`, { method: 'POST' });
+      await apiFetch(`/orders/${id}/dev/force-settle`, {
+  method: 'POST',
+  auth: true,
+});
 
       setActionOk('Force settle successful.');
       await load();
@@ -731,7 +745,10 @@ export default function OrderDetailPage() {
       setActionErr(null);
       setActionOk(null);
 
-      await apiFetch(`/orders/${id}/cancel`, { method: 'PATCH' });
+      await apiFetch(`/orders/${id}/cancel`, {
+  method: 'PATCH',
+  auth: true,
+});
 
       setActionOk('Order cancelled.');
       await load();
