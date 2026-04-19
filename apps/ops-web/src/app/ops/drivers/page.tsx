@@ -205,9 +205,10 @@ export default function DriversPage() {
       await loadDrivers(selectedTown);
       setSuccessMessage('Driver added successfully.');
     } catch (error) {
-      console.error('Failed to create driver', error);
-      setErrorMessage('Failed to add driver. Please try again.');
-    } finally {
+  console.error('Failed to create driver', error);
+  const msg = error instanceof Error ? error.message : String(error);
+  setErrorMessage(msg || 'Failed to add driver. Please try again.');
+} finally {
       setSubmitting(false);
     }
   }
