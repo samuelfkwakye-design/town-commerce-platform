@@ -21,6 +21,7 @@ export default async function EditPage({ params }: Props) {
   try {
     const data = await apiFetch<any>(`/admin/town-products/${townProductId}`, {
       method: 'GET',
+      auth: true,
     });
 
     return <EditClient townProductId={townProductId} initialTownProduct={data} />;
