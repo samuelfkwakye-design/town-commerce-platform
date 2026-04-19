@@ -25,16 +25,16 @@ async function bootstrap() {
   ].filter(Boolean);
 
   app.enableCors({
-    origin: allowedOrigins,
-    credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'x-admin-key',
-      'x-webhook-secret',
-    ],
-  });
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-admin-key',
+    'x-webhook-secret',
+  ],
+});
 
   app.use(cookieParser());
 
