@@ -132,8 +132,9 @@ export default function NetProfitTimeseriesPage() {
 
     try {
       const res = await apiFetch<NetProfitResponse>(
-        `/reports/net-profit-timeseries?${qs.toString()}`,
-      );
+  `/reports/net-profit-timeseries?${qs.toString()}`,
+  { auth: true },
+);
       setData(res);
     } catch (e: any) {
       setData(null);
@@ -152,7 +153,7 @@ export default function NetProfitTimeseriesPage() {
         setErr(null);
         setAccessDenied(false);
 
-        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
+        const me = await apiFetch<CurrentAdmin>("/admin-auth/me", { auth: true });
         if (cancelled) return;
 
         setAdmin(me);
