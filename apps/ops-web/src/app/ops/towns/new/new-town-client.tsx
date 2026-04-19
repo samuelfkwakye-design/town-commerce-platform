@@ -64,8 +64,9 @@ export default function NewTownClient() {
       setLoadingTowns(true);
       try {
         const data = await apiFetch<TownsResponse>("/admin/towns", {
-          method: "GET",
-        });
+  method: "GET",
+  auth: true,
+});
         const rows = data?.rows ?? [];
         setTowns(rows);
         if (!cloneFromTownId && rows.length) {
@@ -98,9 +99,10 @@ export default function NewTownClient() {
       };
 
       await apiFetch<CreateTownResponse>("/admin/towns", {
-        method: "POST",
-        body: payload,
-      });
+  method: "POST",
+  body: payload,
+  auth: true,
+});
 
       router.push("/ops/towns");
       router.refresh();
