@@ -250,9 +250,12 @@ export default function EditTownProductClient(props: {
     setLoadingCategories(true);
     try {
       const resp = await apiFetch<CategoriesResp>(
-        '/admin/town-products/meta/categories',
-        { method: 'GET' },
-      );
+  '/admin/town-products/meta/categories',
+  {
+    method: 'GET',
+    auth: true,
+  },
+);
       setCategories(resp?.rows ?? []);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -268,11 +271,12 @@ export default function EditTownProductClient(props: {
 
     try {
       const data = await apiFetch<TownProductResp>(
-        `/admin/town-products/${townProductId}`,
-        {
-          method: 'GET',
-        },
-      );
+  `/admin/town-products/${townProductId}`,
+  {
+    method: 'GET',
+    auth: true,
+  },
+);
 
       setTp(data);
       setPricingModel(data.pricingModel);
@@ -300,9 +304,12 @@ export default function EditTownProductClient(props: {
         setVariants(normalizeVariants(data.variants));
       } else {
         const v = await apiFetch<{ rows: TownProductVariantResp[] }>(
-          `/admin/town-products/${townProductId}/variants`,
-          { method: 'GET' },
-        );
+  `/admin/town-products/${townProductId}/variants`,
+  {
+    method: 'GET',
+    auth: true,
+  },
+);
         setVariants(normalizeVariants(v?.rows ?? []));
       }
 
@@ -325,7 +332,9 @@ export default function EditTownProductClient(props: {
         setAdminLoading(true);
         setErr(null);
 
-        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me');
+        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me', {
+  auth: true,
+});
         if (cancelled) return;
 
         setCurrentAdmin(admin ?? null);
@@ -403,12 +412,13 @@ export default function EditTownProductClient(props: {
       setCreatingCategory(true);
 
       const created = await apiFetch<CategoryOption>(
-        '/admin/town-products/meta/categories',
-        {
-          method: 'POST',
-          body: { name, slug },
-        },
-      );
+  '/admin/town-products/meta/categories',
+  {
+    method: 'POST',
+    auth: true,
+    body: { name, slug },
+  },
+);
 
       await loadCategories();
 
@@ -431,8 +441,9 @@ export default function EditTownProductClient(props: {
     const cleaned = validateVariants(variants);
 
     await apiFetch(`/admin/town-products/${townProductId}/variants`, {
-      method: 'PUT',
-      body: {
+  method: 'PUT',
+  auth: true,
+  body: {
         variants: cleaned.map((row, idx) => ({
           label: row.label.trim(),
           unitPrice: row.unitPrice.trim(),
@@ -478,9 +489,10 @@ export default function EditTownProductClient(props: {
       }
 
       await apiFetch(`/admin/town-products/${townProductId}`, {
-        method: 'PATCH',
-        body: payload,
-      });
+  method: 'PATCH',
+  auth: true,
+  body: { isActive: false },
+});
 
       await saveVariantsIfNeeded();
       await loadAll();
