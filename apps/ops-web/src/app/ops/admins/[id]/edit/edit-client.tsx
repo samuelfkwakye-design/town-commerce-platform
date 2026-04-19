@@ -93,14 +93,16 @@ export default function EditAdminClient() {
         setError("");
         setAccessDenied(false);
 
-        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
+       const me = await apiFetch<CurrentAdmin>("/admin-auth/me", { auth: true });
         if (cancelled) return;
 
         setCurrentAdmin(me);
 
         if (me.role === "GLOBAL_SUPER_ADMIN") {
           try {
-            const townsResp = await apiFetch<TownsResponse>("/towns");
+            const townsResp = await apiFetch<TownsResponse>("/admin/towns", {
+  auth: true,
+});
             if (!cancelled) {
               setTowns(townsResp.rows || []);
             }
@@ -112,8 +114,9 @@ export default function EditAdminClient() {
         }
 
         const target = await apiFetch<AdminUserDetail>(
-          `/admin/admin-users/${encodeURIComponent(adminUserId)}`,
-        );
+  `/admin/admin-users/${encodeURIComponent(adminUserId)}`,
+  { auth: true },
+);
         if (cancelled) return;
 
         setTargetAdmin(target);
@@ -196,13 +199,13 @@ export default function EditAdminClient() {
       }
 
       const updated = await apiFetch<AdminUserDetail>(
-        `/admin/admin-users/${encodeURIComponent(adminUserId)}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify(payload),
-        },
-      );
-
+  `/admin/admin-users/${encodeURIComponent(adminUserId)}`,
+  {
+    method: "PATCH",
+    auth: true,
+    body: payload,
+  },
+);
       setTargetAdmin(updated);
       setPassword("");
       setSuccess(`Admin user ${updated.email} updated successfully.`);
