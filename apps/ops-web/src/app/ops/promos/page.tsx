@@ -121,8 +121,9 @@ export default function OpsPromosPage() {
 
       const query = params.toString();
       const data = await apiFetch<PromosResponse>(
-        `/admin/promos${query ? `?${query}` : ""}`,
-      );
+  `/admin/promos${query ? `?${query}` : ""}`,
+  { auth: true },
+);
 
       setRows(data.rows || []);
     } catch (err: any) {
@@ -141,14 +142,16 @@ export default function OpsPromosPage() {
         setBootstrapping(true);
         setError("");
 
-        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
+        const me = await apiFetch<CurrentAdmin>("/admin-auth/me", { auth: true });
         if (cancelled) return;
 
         setAdmin(me);
 
         if (me.role === "GLOBAL_SUPER_ADMIN") {
           try {
-            const townsResp = await apiFetch<TownsResponse>("/towns");
+            const townsResp = await apiFetch<TownsResponse>("/admin/towns", {
+  auth: true,
+});
             if (!cancelled) {
               setTowns(townsResp.rows || []);
             }
