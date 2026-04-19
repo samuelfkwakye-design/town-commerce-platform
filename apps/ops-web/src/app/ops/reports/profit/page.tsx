@@ -114,7 +114,9 @@ export default function ProfitReportPage() {
         qs.set("townId", effectiveAdmin.townId);
       }
 
-      const res = await apiFetch<ProfitResponse>(`/reports/profit?${qs.toString()}`);
+      const res = await apiFetch<ProfitResponse>(`/reports/profit?${qs.toString()}`, {
+  auth: true,
+});
       setData(res);
     } catch (e: any) {
       setData(null);
@@ -133,7 +135,7 @@ export default function ProfitReportPage() {
         setErr(null);
         setAccessDenied(false);
 
-        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
+       const me = await apiFetch<CurrentAdmin>("/admin-auth/me", { auth: true });
         if (cancelled) return;
 
         setAdmin(me);
