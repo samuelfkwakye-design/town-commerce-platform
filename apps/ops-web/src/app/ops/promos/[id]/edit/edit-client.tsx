@@ -99,7 +99,7 @@ export default function EditPromoClient() {
         setError("");
         setAccessDenied(false);
 
-        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
+       const me = await apiFetch<CurrentAdmin>("/admin-auth/me", { auth: true });
         if (cancelled) return;
 
         setAdmin(me);
@@ -111,7 +111,9 @@ export default function EditPromoClient() {
 
         if (me.role === "GLOBAL_SUPER_ADMIN") {
           try {
-            const townsResp = await apiFetch<TownsResponse>("/towns");
+            const townsResp = await apiFetch<TownsResponse>("/admin/towns", {
+  auth: true,
+});
             if (!cancelled) {
               setTowns(townsResp.rows || []);
             }
@@ -126,7 +128,9 @@ export default function EditPromoClient() {
           throw new Error("Promo ID is missing.");
         }
 
-        const data = await apiFetch<PromoDetail>(`/admin/promos/${promoId}`);
+        const data = await apiFetch<PromoDetail>(`/admin/promos/${promoId}`, {
+  auth: true,
+});
         if (cancelled) return;
 
         if (
@@ -233,9 +237,10 @@ export default function EditPromoClient() {
       }
 
       const updated = await apiFetch<PromoDetail>(`/admin/promos/${promoId}`, {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
+  method: "PATCH",
+  auth: true,
+  body: payload,
+});
 
       setPromo(updated);
       setSuccess(`Promo ${updated.code} updated successfully.`);
