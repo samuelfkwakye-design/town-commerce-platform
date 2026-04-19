@@ -86,7 +86,7 @@ export default function NewPromoClient() {
         setError("");
         setAccessDenied(false);
 
-        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
+        const me = await apiFetch<CurrentAdmin>("/admin-auth/me", { auth: true });
         if (cancelled) return;
 
         setAdmin(me);
@@ -98,7 +98,9 @@ export default function NewPromoClient() {
 
         if (me.role === "GLOBAL_SUPER_ADMIN") {
           try {
-            const townsResp = await apiFetch<TownsResponse>("/towns");
+            const townsResp = await apiFetch<TownsResponse>("/admin/towns", {
+  auth: true,
+});
             if (!cancelled) {
               setTowns(townsResp.rows || []);
             }
@@ -197,9 +199,10 @@ export default function NewPromoClient() {
       }
 
       const created = await apiFetch<CreatePromoResponse>("/admin/promos", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+  method: "POST",
+  auth: true,
+  body: payload,
+});
 
       setSuccess(`Promo ${created.code} created successfully.`);
 
