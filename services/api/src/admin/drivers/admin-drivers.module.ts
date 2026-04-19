@@ -1,17 +1,12 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
 import { AdminDriversController } from './admin-drivers.controller';
 import { AdminDriversService } from './admin-drivers.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { AdminJwtGuard } from '../../admin-auth/guards/admin-jwt.guard';
+import { AdminAuthModule } from '../../admin-auth/admin-auth.module';
 
 @Module({
-  imports: [
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'dev-secret-change-me',
-    }),
-  ],
+  imports: [AdminAuthModule],
   controllers: [AdminDriversController],
-  providers: [AdminDriversService, PrismaService, AdminJwtGuard],
+  providers: [AdminDriversService, PrismaService],
 })
 export class AdminDriversModule {}
