@@ -1,10 +1,11 @@
 import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
-import { AdminKeyGuard } from '../auth/admin-key.guard';
 import { AdminExportsService } from './admin.exports.service';
+import { AdminJwtGuard } from '../admin-auth/guards/admin-jwt.guard';
+import { RolesGuard } from '../common/auth/roles.guard';
 
 @Controller('admin/exports')
-@UseGuards(AdminKeyGuard)
+@UseGuards(AdminJwtGuard, RolesGuard)
 export class AdminExportsController {
   constructor(private readonly exportsService: AdminExportsService) {}
 
@@ -22,8 +23,6 @@ export class AdminExportsController {
     await this.exportsService.streamRefundsCsv(q, res);
   }
 
-  // ✅ Phase 3: Net Profit Timeseries CSV
-  // GET /api/v1/admin/exports/net-profit-timeseries.csv?bucket=day|week|month&townId=&from=&to=&adminKey=...
   @Get('net-profit-timeseries.csv')
   async exportNetProfitTimeseries(@Query() q: any, @Res() res: Response) {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');

@@ -8,12 +8,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AdminKeyGuard } from '../auth/admin-key.guard';
 import { CloneTownCatalogDto } from './dto/clone-town-catalog.dto';
 import { AdminTownProductsService } from '../town-products/admin.town-products.service';
+import { AdminJwtGuard } from '../admin-auth/guards/admin-jwt.guard';
+import { RolesGuard } from '../common/auth/roles.guard';
 
 @Controller('admin/towns')
-@UseGuards(AdminKeyGuard)
+@UseGuards(AdminJwtGuard, RolesGuard)
 export class AdminTownsController {
   constructor(
     private readonly prisma: PrismaService,

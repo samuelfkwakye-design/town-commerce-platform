@@ -3,10 +3,11 @@ import { StockMovementsService } from './stock-movements.service';
 import { ListStockMovementsQueryDto } from './dto/list-stock-movements.query.dto';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { ReconcileStockQueryDto } from './dto/reconcile-stock.query.dto';
-import { AdminKeyGuard } from '../auth/admin-key.guard';
 import { BaselineFromSnapshotDto } from './dto/baseline-from-snapshot.dto';
 import { FixMismatchDto } from './dto/fix-mismatch.dto';
 import { DevLedgerOnlyDto } from './dto/dev-ledger-only.dto';
+import { AdminJwtGuard } from '../admin-auth/guards/admin-jwt.guard';
+import { RolesGuard } from '../common/auth/roles.guard';
 
 @Controller('stock-movements')
 export class StockMovementsController {
@@ -19,21 +20,21 @@ export class StockMovementsController {
   }
 
   // GET /api/v1/stock-movements/reconcile (admin)
-  @UseGuards(AdminKeyGuard)
+  @UseGuards(AdminJwtGuard, RolesGuard)
   @Get('reconcile')
   reconcile(@Query() q: ReconcileStockQueryDto) {
     return this.service.reconcile(q);
   }
 
   // GET /api/v1/stock-movements/:townProductId (admin)
-  @UseGuards(AdminKeyGuard)
+  @UseGuards(AdminJwtGuard, RolesGuard)
   @Get(':townProductId')
   getTownProductStock(@Param('townProductId') townProductId: string) {
     return this.service.getTownProductStock(townProductId);
   }
 
   // POST /api/v1/stock-movements/:townProductId/reconcile (admin)
-  @UseGuards(AdminKeyGuard)
+  @UseGuards(AdminJwtGuard, RolesGuard)
   @Post(':townProductId/reconcile')
   reconcileTownProduct(
     @Param('townProductId') townProductId: string,
@@ -43,7 +44,7 @@ export class StockMovementsController {
   }
 
   // POST /api/v1/stock-movements/:townProductId/manual-adjustment (admin)
-  @UseGuards(AdminKeyGuard)
+  @UseGuards(AdminJwtGuard, RolesGuard)
   @Post(':townProductId/manual-adjustment')
   manualAdjustment(
     @Param('townProductId') townProductId: string,
@@ -58,28 +59,28 @@ export class StockMovementsController {
   }
 
   // POST /api/v1/stock-movements/dev/ledger-only (admin, dev-only)
-  @UseGuards(AdminKeyGuard)
+  @UseGuards(AdminJwtGuard, RolesGuard)
   @Post('dev/ledger-only')
   devLedgerOnly(@Body() dto: DevLedgerOnlyDto) {
     return this.service.devLedgerOnly(dto);
   }
 
   // POST /api/v1/stock-movements/adjust (admin)
-  @UseGuards(AdminKeyGuard)
+  @UseGuards(AdminJwtGuard, RolesGuard)
   @Post('adjust')
   adjust(@Body() dto: AdjustStockDto) {
     return this.service.adjust(dto);
   }
 
   // POST /api/v1/stock-movements/fix-mismatch (admin)
-  @UseGuards(AdminKeyGuard)
+  @UseGuards(AdminJwtGuard, RolesGuard)
   @Post('fix-mismatch')
   fixMismatch(@Body() dto: FixMismatchDto) {
     return this.service.fixMismatch(dto.townProductId, dto.note);
   }
 
   // POST /api/v1/stock-movements/baseline-from-snapshot (admin)
-  @UseGuards(AdminKeyGuard)
+  @UseGuards(AdminJwtGuard, RolesGuard)
   @Post('baseline-from-snapshot')
   baselineFromSnapshot(@Body() dto: BaselineFromSnapshotDto) {
     return this.service.baselineFromSnapshot(dto);
