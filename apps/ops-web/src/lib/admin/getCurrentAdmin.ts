@@ -22,8 +22,9 @@ export type CurrentAdmin = {
 export async function getCurrentAdmin(): Promise<CurrentAdmin | null> {
   try {
     return await apiFetch<CurrentAdmin>('/admin-auth/me', {
-      method: 'GET',
-    });
+  method: 'GET',
+  auth: true,
+});
   } catch {
     return null;
   }
