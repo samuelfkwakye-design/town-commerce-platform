@@ -124,7 +124,7 @@ export default function OpsStockDashboardPage() {
     async function loadAdmin() {
       try {
         setAdminLoading(true);
-        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me');
+        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me', { auth: true });
         setCurrentAdmin(admin ?? null);
 
         if (admin?.townId) {
@@ -193,7 +193,9 @@ export default function OpsStockDashboardPage() {
     setErr(null);
 
     try {
-      const res = await apiFetch<ReconcileListResponse>(`/stock-movements/reconcile?${qs}`);
+      const res = await apiFetch<ReconcileListResponse>(`/stock-movements/reconcile?${qs}`, {
+  auth: true,
+});
       setData(res);
     } catch (e: any) {
       setData(null);
