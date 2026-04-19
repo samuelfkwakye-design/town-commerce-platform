@@ -113,8 +113,9 @@ export default function NewTownProductClient() {
     setLoadingCategories(true);
     try {
       const resp = await apiFetch<CategoriesResp>('/admin/town-products/meta/categories', {
-        method: 'GET',
-      });
+  method: 'GET',
+  auth: true,
+});
       setCategories(resp?.rows ?? []);
     } catch (e: any) {
       setError((prev) => prev ?? e?.message ?? 'Failed to load categories');
@@ -129,7 +130,9 @@ export default function NewTownProductClient() {
     (async () => {
       try {
         setAdminLoading(true);
-        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me');
+       const admin = await apiFetch<CurrentAdmin>('/admin-auth/me', {
+  auth: true,
+});
         if (!alive) return;
         setCurrentAdmin(admin ?? null);
 
@@ -162,8 +165,9 @@ export default function NewTownProductClient() {
         setLoadingTowns(true);
 
         const resp = await apiFetch<TownsResp>('/admin/reports/towns', {
-          method: 'GET',
-        });
+  method: 'GET',
+  auth: true,
+});
 
         if (!alive) return;
 
@@ -258,14 +262,15 @@ export default function NewTownProductClient() {
       setCreatingCategory(true);
 
       const createdPayload = await apiFetch<any>('/admin/town-products/meta/categories', {
-        method: 'POST',
-        body: JSON.stringify({
-          name,
-          slug,
-          isActive: true,
-          sortOrder: 0,
-        }),
-      });
+  method: 'POST',
+  auth: true,
+  body: JSON.stringify({
+    name,
+    slug,
+    isActive: true,
+    sortOrder: 0,
+  }),
+});
 
       const createdCategory = extractCreatedCategory(createdPayload);
 
@@ -275,8 +280,9 @@ export default function NewTownProductClient() {
         setCategoryId(createdCategory.id);
       } else {
         const refreshed = await apiFetch<CategoriesResp>('/admin/town-products/meta/categories', {
-          method: 'GET',
-        });
+  method: 'GET',
+  auth: true,
+});
 
         const rows = refreshed?.rows ?? [];
         setCategories(rows);
@@ -369,10 +375,10 @@ export default function NewTownProductClient() {
       setSubmitting(true);
 
       const created = await apiFetch<CreateResp>('/admin/town-products', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-
+  method: 'POST',
+  auth: true,
+  body: JSON.stringify(payload),
+});
       if (!created?.id) {
         throw new Error('Create succeeded but no id returned.');
       }
