@@ -105,7 +105,7 @@ export default function DriversPage() {
   async function loadCurrentAdmin() {
     setLoadingAdmin(true);
     try {
-      const res = await apiFetch<CurrentAdmin>('/admin-auth/me');
+      const res = await apiFetch<CurrentAdmin>('/admin-auth/me', { auth: true });
       setCurrentAdmin(res || null);
 
       if (res?.townId) {
@@ -154,7 +154,9 @@ export default function DriversPage() {
     setErrorMessage('');
 
     try {
-      const res = await apiFetch<DriversResponse>(`/admin/drivers?townId=${townId}`);
+      const res = await apiFetch<DriversResponse>(`/admin/drivers?townId=${townId}`, {
+  auth: true,
+});
       setDrivers(extractDrivers(res));
     } catch (error) {
       console.error('Failed to load drivers', error);
@@ -183,18 +185,16 @@ export default function DriversPage() {
 
     try {
       await apiFetch('/admin/drivers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          townId: selectedTown,
-          name: newDriver.name.trim(),
-          phone: newDriver.phone.trim(),
-          priority: Number(newDriver.priority) || 100,
-          availability: 'AVAILABLE',
-        }),
-      });
+  method: 'POST',
+  auth: true,
+  body: {
+    townId: selectedTown,
+    name: newDriver.name.trim(),
+    phone: newDriver.phone.trim(),
+    priority: Number(newDriver.priority) || 100,
+    availability: 'AVAILABLE',
+  },
+});
 
       setNewDriver({
         name: '',
@@ -223,13 +223,10 @@ export default function DriversPage() {
 
     try {
       await apiFetch(`/admin/drivers/${id}/availability`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ availability }),
-      });
-
+  method: 'PATCH',
+  auth: true,
+  body: { availability },
+});
       await loadDrivers(selectedTown);
       setSuccessMessage(`Driver marked ${availability.toLowerCase()}.`);
     } catch (error) {
@@ -249,12 +246,10 @@ export default function DriversPage() {
 
     try {
       await apiFetch(`/admin/drivers/${id}/active`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ isActive }),
-      });
+  method: 'PATCH',
+  auth: true,
+  body: { isActive },
+});
 
       await loadDrivers(selectedTown);
       setSuccessMessage(
@@ -272,7 +267,7 @@ export default function DriversPage() {
       setErrorMessage('');
 
       try {
-        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me');
+        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me', { auth: true });
         setCurrentAdmin(admin || null);
 
         const townsRes = await apiFetch<Town[]>('/towns');
