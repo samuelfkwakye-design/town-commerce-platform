@@ -85,14 +85,16 @@ export default function NewAdminClient() {
         setBootstrapping(true);
         setError("");
 
-        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
+        const me = await apiFetch<CurrentAdmin>("/admin-auth/me", { auth: true });
         if (cancelled) return;
 
         setAdmin(me);
 
         if (me.role === "GLOBAL_SUPER_ADMIN") {
           try {
-            const townsResp = await apiFetch<TownsResponse>("/towns");
+            const townsResp = await apiFetch<TownsResponse>("/admin/towns", {
+  auth: true,
+});
             if (!cancelled) {
               setTowns(townsResp.rows || []);
             }
@@ -175,9 +177,10 @@ export default function NewAdminClient() {
       }
 
       const created = await apiFetch<CreatedAdminResponse>("/admin/admin-users", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+  method: "POST",
+  auth: true,
+  body: payload,
+});
 
       setSuccess(`Admin user ${created.email} created successfully.`);
 
