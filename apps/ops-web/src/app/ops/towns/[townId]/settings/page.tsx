@@ -2,8 +2,7 @@ import Link from 'next/link';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import { getCurrentAdmin } from '@/lib/getCurrentAdmin';
-
+import { getCurrentAdmin } from '@/lib/admin/getCurrentAdmin';
 export const dynamic = 'force-dynamic';
 
 type AdminRole =
