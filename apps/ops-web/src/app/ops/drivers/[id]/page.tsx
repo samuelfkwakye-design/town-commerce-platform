@@ -100,13 +100,15 @@ export default async function DriverDetailPage({
   const { id } = await params;
 
   const [driver, ordersResponse] = await Promise.all([
-    apiFetch<Driver>(`/admin/drivers/${id}`, {
-      method: 'GET',
-    }),
-    apiFetch<OrdersResponse>(`/admin/drivers/${id}/orders`, {
-      method: 'GET',
-    }),
-  ]);
+  apiFetch<Driver>(`/admin/drivers/${id}`, {
+    method: 'GET',
+    auth: true,
+  }),
+  apiFetch<OrdersResponse>(`/admin/drivers/${id}/orders`, {
+    method: 'GET',
+    auth: true,
+  }),
+]);
 
   const orders = extractOrders(ordersResponse);
 
