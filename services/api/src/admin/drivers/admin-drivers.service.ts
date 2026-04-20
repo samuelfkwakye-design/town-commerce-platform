@@ -73,7 +73,31 @@ export class AdminDriversService {
 
     return driver;
   }
+  async getOrders(id: string, admin: CurrentAdminUser) {
+    await this.get(id, admin);
 
+    return this.prisma.order.findMany({
+      where: {
+        driverId: id,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        status: true,
+        total: true,
+        createdAt: true,
+        town: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
+    });
+  }
   async create(
     data: {
       name: string;

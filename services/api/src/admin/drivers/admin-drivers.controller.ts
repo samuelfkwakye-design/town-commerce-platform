@@ -39,7 +39,15 @@ export class AdminDriversController {
   get(@Param('id') id: string, @Req() req: any) {
     return this.service.get(id, req.adminUser);
   }
-
+  @Get(':id/orders')
+  @Roles(
+    AdminRole.GLOBAL_SUPER_ADMIN,
+    AdminRole.TOWN_SUPER_ADMIN,
+    AdminRole.WAREHOUSE_ADMIN,
+  )
+  getOrders(@Param('id') id: string, @Req() req: any) {
+    return this.service.getOrders(id, req.adminUser);
+  }
   @Post()
   @Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
   create(@Body() body: any, @Req() req: any) {
