@@ -498,9 +498,9 @@ export default function OrderDetailPage() {
       await apiFetch(`/admin/orders/${id}/assign-driver`, {
   method: 'POST',
   auth: true,
-  body: JSON.stringify({
+  body: {
     driverId: selectedDriverId,
-  }),
+  },
 });
 
       setActionOk('Driver assigned successfully.');
@@ -556,10 +556,10 @@ export default function OrderDetailPage() {
       await apiFetch(`/admin/orders/${id}/assign-driver-manual`, {
   method: 'POST',
   auth: true,
-  body: JSON.stringify({
+  body: {
     driverName: driverName.trim(),
     driverPhone: driverPhone.trim(),
-  }),
+  },
 });
       setActionOk('Driver saved manually.');
       await load();
@@ -674,11 +674,11 @@ export default function OrderDetailPage() {
       await apiFetch(`/orders/${id}/refund-items`, {
   method: 'POST',
   auth: true,
-  body: JSON.stringify({
+  body: {
     reason: refundReason.trim(),
     restock: refundRestock,
     items: selected,
-  }),
+  },
 });
 
       setActionOk('Refund request created.');
@@ -704,7 +704,7 @@ export default function OrderDetailPage() {
       await apiFetch(`/admin/orders/${id}/mark-cod-collected`, {
   method: 'PATCH',
   auth: true,
-  body: JSON.stringify({ note: 'Cash received by rider' }),
+  body: { note: 'Cash received by rider' },
 });
       setActionOk('COD marked as collected.');
       await load();
