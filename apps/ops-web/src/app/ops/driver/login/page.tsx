@@ -16,16 +16,13 @@ export default function DriverLoginPage() {
     setError(null);
 
     try {
-      const resRaw = await apiFetch('/driver-auth/login', {
+      const data = await apiFetch<{ accessToken: string }>('/driver-auth/login', {
         method: 'POST',
-        body: JSON.stringify({ phone }),
+        body: { phone },
       });
 
-      const res = resRaw as Response;
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'Login failed');
+      if (!data?.accessToken) {
+        throw new Error('Invalid login response');
       }
 
       localStorage.setItem('driverToken', data.accessToken);
