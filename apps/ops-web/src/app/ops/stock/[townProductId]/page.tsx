@@ -247,7 +247,9 @@ export default function OpsStockDetailPage() {
         setErr(null);
         setAccessDenied(false);
 
-        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
+        const me = await apiFetch<CurrentAdmin>("/admin-auth/me", {
+  auth: true,
+});
         if (cancelled) return;
 
         setAdmin(me);
@@ -283,9 +285,10 @@ export default function OpsStockDetailPage() {
     setErr(null);
     try {
       await apiFetch<any>(`/stock-movements/${townProductId}/reconcile`, {
-        method: "POST",
-        body: JSON.stringify({}),
-      });
+  method: "POST",
+  auth: true,
+  body: {},
+});
       await refreshAll(townProductId);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
@@ -325,13 +328,14 @@ export default function OpsStockDetailPage() {
     setErr(null);
     try {
       await apiFetch<any>(`/stock-movements/${townProductId}/manual-adjustment`, {
-        method: "POST",
-        body: JSON.stringify({
-          note: trimmed,
-          deltaQty: isWeight ? null : qty,
-          deltaWeightGrams: isWeight ? grams : null,
-        }),
-      });
+  method: "POST",
+  auth: true,
+  body: {
+    note: trimmed,
+    deltaQty: isWeight ? null : qty,
+    deltaWeightGrams: isWeight ? grams : null,
+  },
+});
 
       setShowAdjust(false);
       setNote("");
