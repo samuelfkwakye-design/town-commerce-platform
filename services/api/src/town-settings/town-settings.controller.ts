@@ -1,6 +1,8 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { TownSettingsService } from './town-settings.service';
-import { AdminKeyGuard } from '../auth/admin-key.guard';
+import { AdminJwtGuard } from '../admin-auth/guards/admin-jwt.guard';
+import { RolesGuard } from '../common/auth/roles.guard';
+import { Roles, AdminRole } from '../common/auth/roles.decorator';
 
 @Controller()
 export class TownSettingsController {
@@ -11,13 +13,15 @@ export class TownSettingsController {
     return this.townSettingsService.getByTownSlug(townSlug);
   }
 
-  @UseGuards(AdminKeyGuard)
+  @UseGuards(AdminJwtGuard, RolesGuard)
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
   @Get('admin/town-settings/:townId')
-  getByTown(@Param('townId') townId: string) {
+  getByTown(@Param('townId') townId: string, @Req() req: any) {
     return this.townSettingsService.getByTown(townId);
   }
 
-  @UseGuards(AdminKeyGuard)
+  @UseGuards(AdminJwtGuard, RolesGuard)
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
   @Post('admin/town-settings/:townId')
   upsert(
     @Param('townId') townId: string,
@@ -28,6 +32,7 @@ export class TownSettingsController {
       minimumOrder?: string;
       currency?: string;
     },
+    @Req() req: any,
   ) {
     return this.townSettingsService.upsert(townId, body);
   }
