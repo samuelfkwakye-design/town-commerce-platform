@@ -28,7 +28,17 @@ async function getAdminToken(auth?: boolean): Promise<string | null> {
 
   if (typeof window !== 'undefined') {
     try {
-      return localStorage.getItem('admin_token');
+      const fromLocalStorage = localStorage.getItem('admin_token');
+      if (fromLocalStorage) return fromLocalStorage;
+    } catch {
+      // ignore
+    }
+
+    try {
+      const match = document.cookie.match(
+        /(?:^|;\s*)admin_token=([^;]+)/,
+      );
+      return match ? decodeURIComponent(match[1]) : null;
     } catch {
       return null;
     }
