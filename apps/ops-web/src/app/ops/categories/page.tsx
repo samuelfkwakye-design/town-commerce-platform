@@ -86,8 +86,9 @@ export default function OpsCategoriesPage() {
 
     try {
       const resp = await apiFetch<CategoriesResp>(`/admin/town-products/meta/categories`, {
-        method: "GET",
-      });
+  method: "GET",
+  auth: true,
+});
 
       const nextRows = resp?.rows ?? [];
       setRows(nextRows);
@@ -112,7 +113,9 @@ export default function OpsCategoriesPage() {
         setBootstrapping(true);
         setError(null);
 
-        const me = await apiFetch<CurrentAdmin>("/admin-auth/me");
+        const me = await apiFetch<CurrentAdmin>("/admin-auth/me", {
+  auth: true,
+});
         if (cancelled) return;
 
         setAdmin(me);
@@ -168,12 +171,13 @@ export default function OpsCategoriesPage() {
       setSaving(true);
 
       await apiFetch(`/admin/town-products/meta/categories`, {
-        method: "POST",
-        body: JSON.stringify({
-          name: name.trim(),
-          slug: slugify(slug),
-        }),
-      });
+  method: "POST",
+  auth: true,
+  body: {
+    name: name.trim(),
+    slug: slugify(slug),
+  },
+});
 
       setName("");
       setSlug("");
@@ -204,11 +208,12 @@ export default function OpsCategoriesPage() {
       setDeletingId(row.id);
 
       const resp = await apiFetch<DeleteResp>(
-        `/admin/town-products/meta/categories/${row.id}/delete`,
-        {
-          method: "POST",
-        },
-      );
+  `/admin/town-products/meta/categories/${row.id}/delete`,
+  {
+    method: "POST",
+    auth: true,
+  },
+);
 
       setSuccess(resp.message || "Category deleted.");
       await loadCategories();
@@ -239,12 +244,12 @@ export default function OpsCategoriesPage() {
       }
 
       await apiFetch(`/admin/town-products/meta/categories/${row.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          sortOrder,
-        }),
-      });
-
+  method: "PATCH",
+  auth: true,
+  body: {
+    sortOrder,
+  },
+});
       setSuccess(`Sort order updated for "${row.name}".`);
       await loadCategories();
     } catch (e: any) {
