@@ -104,9 +104,29 @@ function upper(v: any) {
 
 async function copyText(text: string) {
   try {
-    await navigator.clipboard.writeText(text);
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
   } catch {
-    // ignore
+    // fall through to legacy fallback
+  }
+
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
   }
 }
 
@@ -830,10 +850,10 @@ export default function OrderDetailPage() {
             <button
               className="text-xs text-slate-700 underline"
               onClick={async () => {
-                await copyText(order.id);
-                setActionOk('Order ID copied.');
-                setTimeout(() => setActionOk(null), 1200);
-              }}
+  const ok = await copyText(order.id);
+  setActionOk(ok ? 'Order ID copied.' : 'Copy failed.');
+  setTimeout(() => setActionOk(null), 1200);
+}}
             >
               copy
             </button>
@@ -1168,9 +1188,16 @@ export default function OrderDetailPage() {
 
               <div className="space-y-3">
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_auto]">
-                  <select
-                    value={selectedDriverId}
-                    onChange={(e) => setSelectedDriverId(e.target.value)}
+                 <select
+  value={selectedDriverId}
+  onChange={async (e) => {
+    const val = e.target.value;
+    setSelectedDriverId(val);
+
+    if (!val) return;
+
+    await assignSelectedDriver();
+  }}
                     className="rounded-xl border px-3 py-2 text-sm"
                     disabled={actionLoading || loadingDrivers}
                   >
@@ -1473,10 +1500,10 @@ export default function OrderDetailPage() {
                         <button
                           className="text-xs text-slate-500 underline"
                           onClick={async () => {
-                            await copyText(it.id);
-                            setActionOk('OrderItem ID copied.');
-                            setTimeout(() => setActionOk(null), 1200);
-                          }}
+  const ok = await copyText(it.id);
+  setActionOk(ok ? 'OrderItem ID copied.' : 'Copy failed.');
+  setTimeout(() => setActionOk(null), 1200);
+}}
                         >
                           copy
                         </button>
@@ -1574,10 +1601,10 @@ export default function OrderDetailPage() {
                           <button
                             className="text-xs text-slate-600 underline"
                             onClick={async () => {
-                              await copyText(p.id);
-                              setActionOk('Payment ID copied.');
-                              setTimeout(() => setActionOk(null), 1200);
-                            }}
+  const ok = await copyText(p.id);
+  setActionOk(ok ? 'Payment ID copied.' : 'Copy failed.');
+  setTimeout(() => setActionOk(null), 1200);
+}}
                           >
                             copy
                           </button>
@@ -1615,10 +1642,10 @@ export default function OrderDetailPage() {
                                       <button
                                         className="text-xs text-slate-700 underline"
                                         onClick={async () => {
-                                          await copyText(r.id);
-                                          setActionOk('Refund ID copied.');
-                                          setTimeout(() => setActionOk(null), 1200);
-                                        }}
+  const ok = await copyText(r.id);
+  setActionOk(ok ? 'Refund ID copied.' : 'Copy failed.');
+  setTimeout(() => setActionOk(null), 1200);
+}}
                                       >
                                         copy
                                       </button>
@@ -1692,10 +1719,10 @@ export default function OrderDetailPage() {
                                                       <button
                                                         className="text-xs text-slate-600 underline"
                                                         onClick={async () => {
-                                                          await copyText(ri.orderItemId);
-                                                          setActionOk('OrderItem ID copied.');
-                                                          setTimeout(() => setActionOk(null), 1200);
-                                                        }}
+  const ok = await copyText(ri.orderItemId);
+  setActionOk(ok ? 'OrderItem ID copied.' : 'Copy failed.');
+  setTimeout(() => setActionOk(null), 1200);
+}}
                                                       >
                                                         copy
                                                       </button>

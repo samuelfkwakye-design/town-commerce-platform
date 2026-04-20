@@ -173,8 +173,9 @@ export default function OpsStockDetailPage() {
     try {
       // 1) TownProduct first, so we can RBAC-check town ownership before using the rest
       const townProduct = await apiFetch<TownProductResp>(`/admin/town-products/${id}`, {
-        method: "GET",
-      });
+  method: "GET",
+  auth: true,
+});
 
       const ownerTownId =
         townProduct.townId ?? townProduct.town?.id ?? null;
@@ -197,18 +198,21 @@ export default function OpsStockDetailPage() {
       setTp(townProduct);
 
       // 2) Stock + movements
-      const res = await apiFetch<any>(`/stock-movements/${id}`);
+      const res = await apiFetch<any>(`/stock-movements/${id}`, {
+  auth: true,
+});
       setSummary(pickSummaryShape(res, id));
       setMovements(pickMovements(res));
 
       // 3) Variants if needed
       if (townProduct?.pricingModel === "VARIANT") {
         const v = await apiFetch<{ rows: VariantResp[] }>(
-          `/admin/town-products/${id}/variants`,
-          {
-            method: "GET",
-          },
-        );
+  `/admin/town-products/${id}/variants`,
+  {
+    method: "GET",
+    auth: true,
+  },
+);
 
         const rows = (v?.rows ?? []).slice().sort((a, b) => {
           const ao = a.sortOrder ?? 0;
