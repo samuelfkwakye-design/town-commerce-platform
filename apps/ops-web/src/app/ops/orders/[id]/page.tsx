@@ -265,7 +265,10 @@ export default function OrderDetailPage() {
       setLoadingDrivers(true);
       const rows = await apiFetch<Driver[]>(
   `/admin/drivers?townId=${encodeURIComponent(townId)}`,
-  { auth: true },
+  {
+    method: 'GET',
+    auth: true,
+  },
 );
       const list = Array.isArray(rows) ? rows : [];
       setDrivers(list);
@@ -275,9 +278,10 @@ export default function OrderDetailPage() {
       } else {
         setSelectedDriverId('');
       }
-    } catch {
+        } catch (e: any) {
       setDrivers([]);
       setSelectedDriverId('');
+      setActionErr(e?.message ?? 'Failed to load drivers');
     } finally {
       setLoadingDrivers(false);
     }
