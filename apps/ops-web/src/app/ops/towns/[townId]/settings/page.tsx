@@ -82,14 +82,15 @@ async function saveTownSettings(formData: FormData) {
   const currency = String(formData.get('currency') || 'GHS');
 
   await apiFetch(`/admin/town-settings/${encodeURIComponent(effectiveTownId)}`, {
-    method: 'POST',
-    body: JSON.stringify({
-      deliveryFee,
-      serviceFee,
-      minimumOrder,
-      currency,
-    }),
-  });
+  method: 'POST',
+  auth: true,
+  body: {
+    deliveryFee,
+    serviceFee,
+    minimumOrder,
+    currency,
+  },
+});
 
   revalidatePath(`/ops/towns/${effectiveTownId}/settings`);
   redirect(`/ops/towns/${effectiveTownId}/settings?saved=1`);
@@ -146,8 +147,9 @@ export default async function Page({
 
   try {
     settings = await apiFetch<TownSettings>(
-      `/admin/town-settings/${encodeURIComponent(effectiveTownId)}`
-    );
+  `/admin/town-settings/${encodeURIComponent(effectiveTownId)}`,
+  { auth: true },
+);
   } catch {
     settings = null;
   }
