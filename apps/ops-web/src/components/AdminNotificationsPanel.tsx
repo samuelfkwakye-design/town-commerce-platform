@@ -57,7 +57,7 @@ export default function AdminNotificationsPanel() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 rounded-xl border bg-white shadow-lg">
+        <div className="absolute left-0 z-50 mt-2 w-[340px] max-w-[calc(100vw-2rem)] rounded-xl border bg-white shadow-lg">
           <div className="flex items-center justify-between p-3 border-b">
             <div className="font-semibold">Notifications</div>
             <button
