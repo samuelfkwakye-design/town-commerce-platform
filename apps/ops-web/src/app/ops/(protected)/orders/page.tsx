@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
@@ -198,7 +198,7 @@ function isRegisteredCustomer(order: OrderLite) {
   );
 }
 
-export default function OpsOrdersPage() {
+function OpsOrdersPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -858,5 +858,12 @@ export default function OpsOrdersPage() {
         )}
       </div>
     </div>
+  );
+}
+export default function OpsOrdersPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-slate-500">Loading orders…</div>}>
+      <OpsOrdersPageInner />
+    </Suspense>
   );
 }
