@@ -207,9 +207,9 @@ export default function DriverClient() {
   }
 
   return (
-    <div className="min-h-screen bg-emerald-50 px-4 py-5">
-      <div className="mx-auto max-w-3xl space-y-4">
-        <div className="rounded-3xl bg-emerald-700 p-5 text-white shadow-sm">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white px-3 py-4 sm:px-4">
+  <div className="mx-auto w-full max-w-md space-y-4 sm:max-w-2xl">
+        <div className="sticky top-3 z-10 rounded-[2rem] bg-emerald-700 p-5 text-white shadow-lg shadow-emerald-900/10">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-sm font-semibold">
@@ -252,9 +252,15 @@ export default function DriverClient() {
           </div>
 
           {activeOrders.length === 0 ? (
-            <div className="rounded-3xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-600">
-              No assigned orders yet.
-            </div>
+            <div className="rounded-[2rem] bg-emerald-50 px-5 py-10 text-center">
+  <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl shadow-sm">
+    🛵
+  </div>
+  <div className="text-base font-bold text-slate-900">No jobs assigned</div>
+  <div className="mt-1 text-sm text-slate-600">
+    New deliveries will appear here as soon as operations assigns them.
+  </div>
+</div>
           ) : (
             <div className="space-y-4">
               {activeOrders.map((order) => {
