@@ -34,7 +34,7 @@ export class AdminOrdersController {
 
   // PATCH /api/v1/admin/orders/:id/mark-cod-collected
   @Patch(':id/mark-cod-collected')
-  @Roles(AdminRole.GLOBAL_SUPER_ADMIN)
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
   async markCodCollected(
     @Param('id') id: string,
     @Body() dto: CodCollectedDto,
