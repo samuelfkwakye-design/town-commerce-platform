@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { getCurrentAdmin, type CurrentAdmin } from '@/lib/getCurrentAdmin';
+import AdminNotificationsPanel from '@/components/AdminNotificationsPanel';
 
 function NavItem({
   href,
@@ -139,6 +140,9 @@ export default function OpsLayoutShell({
       <div className="flex">
         <aside className="w-64 border-r bg-white p-4">
           <div className="mb-4">
+            <div className="flex justify-end mb-2">
+  <AdminNotificationsPanel />
+</div>
             <div className="text-lg font-semibold">Ops</div>
             <div className="text-xs text-gray-500">Town Commerce Platform</div>
 

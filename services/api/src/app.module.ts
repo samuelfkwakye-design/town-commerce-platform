@@ -22,6 +22,7 @@ import { AdminCustomersModule } from './admin/customers/admin-customers.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminAuthModule } from './admin-auth/admin-auth.module';
 import { DriverAuthModule } from './driver-auth/driver-auth.module';
+import { AdminNotificationsModule } from './admin/notifications/admin-notifications.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { DriverAuthModule } from './driver-auth/driver-auth.module';
     NotificationsModule,
     AdminAuthModule,
     DriverAuthModule,
+    AdminNotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

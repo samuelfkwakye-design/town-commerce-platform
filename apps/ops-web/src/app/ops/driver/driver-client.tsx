@@ -80,6 +80,8 @@ export default function DriverClient() {
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('driverToken');
@@ -153,20 +155,49 @@ if (!cancelled) {
     setError(null);
 
     try {
-      await apiFetch(`/driver/orders/${orderId}/${action}`, {
-  method: 'POST',
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-});
+  await apiFetch(`/driver/orders/${orderId}/${action}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-await refreshOrders(token);
-    } catch (err: any) {
-      setError(err?.message || 'Action failed');
-    } finally {
-      setActionLoadingId(null);
-    }
+  // ✅ Instant feedback
+  const message =
+    action === 'pickup'
+      ? 'Pickup confirmed. The customer has been notified.'
+      : 'Delivery confirmed. The order has been completed.';
+
+  setSuccessMessage(message);
+  setError(null);
+  if (action === 'delivered') {
+  setCompletedOrderId(orderId);
+}
+
+  // 📳 Haptic feedback (mobile)
+  if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+    navigator.vibrate(100);
   }
+
+ if (action === 'delivered') {
+  setTimeout(async () => {
+    await refreshOrders(token);
+    setCompletedOrderId(null);
+  }, 1200);
+} else {
+  await refreshOrders(token);
+}
+
+  // ⏳ Auto-clear message
+  setTimeout(() => {
+    setSuccessMessage(null);
+  }, 5000);
+
+} catch (err: any) {
+  setError(err?.message || 'Action failed');
+} finally {
+  setActionLoadingId(null);
+}
 
   function logout() {
     localStorage.removeItem('driverToken');
@@ -192,7 +223,7 @@ await refreshOrders(token);
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700">
-                Somame Driver
+                Marketa Driver
               </div>
               <h1 className="mt-3 text-2xl font-bold text-slate-900">
                 {driver?.name || 'Driver'}
@@ -239,8 +270,18 @@ await refreshOrders(token);
                 return (
                   <div
                     key={order.id}
-                    className="rounded-3xl border border-slate-200 p-4"
-                  >
+                    className={`rounded-3xl border p-4 transition-all duration-500 ${
+  completedOrderId === order.id
+    ? 'border-emerald-300 bg-emerald-50 scale-[0.99]'
+    : 'border-slate-200 bg-white'
+}`}
+>
+{completedOrderId === order.id ? (
+  <div className="mb-3 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white">
+    ✅ Delivery confirmed
+  </div>
+) : null}
+                  
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <div className="text-base font-semibold text-slate-900">
@@ -328,4 +369,5 @@ await refreshOrders(token);
       </div>
     </div>
   );
+}
 }
