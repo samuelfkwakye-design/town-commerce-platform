@@ -100,37 +100,23 @@ export default function DriverClient() {
       setError(null);
 
       try {
-        const [meResRaw, ordersResRaw] = await Promise.all([
-          apiFetch('/driver-auth/me', {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }),
-          apiFetch('/driver/orders', {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }),
-        ]);
+        const [meData, ordersData] = await Promise.all([
+  apiFetch<DriverMe>('/driver-auth/me', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }),
+  apiFetch<DriverOrder[]>('/driver/orders', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }),
+]);
 
-        const meRes = meResRaw as Response;
-        const ordersRes = ordersResRaw as Response;
-
-        const meData = await meRes.json();
-        const ordersData = await ordersRes.json();
-
-        if (!meRes.ok) {
-          throw new Error(meData?.message || 'Failed to load driver');
-        }
-
-        if (!ordersRes.ok) {
-          throw new Error(ordersData?.message || 'Failed to load orders');
-        }
-
-        if (!cancelled) {
-          setDriver(meData);
-          setOrders(Array.isArray(ordersData) ? ordersData : []);
-        }
+if (!cancelled) {
+  setDriver(meData);
+  setOrders(Array.isArray(ordersData) ? ordersData : []);
+}
       } catch (err: any) {
         if (!cancelled) {
           setError(err?.message || 'Failed to load driver dashboard');
@@ -152,22 +138,14 @@ export default function DriverClient() {
   }, [token, router]);
 
   async function refreshOrders(currentToken: string) {
-    const resRaw = await apiFetch('/driver/orders', {
-      headers: {
-        Authorization: `Bearer ${currentToken}`,
-      },
-    });
+  const data = await apiFetch<DriverOrder[]>('/driver/orders', {
+    headers: {
+      Authorization: `Bearer ${currentToken}`,
+    },
+  });
 
-    const res = resRaw as Response;
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data?.message || 'Failed to refresh orders');
-    }
-
-    setOrders(Array.isArray(data) ? data : []);
-  }
-
+  setOrders(Array.isArray(data) ? data : []);
+}
   async function doAction(orderId: string, action: 'pickup' | 'delivered') {
     if (!token) return;
 
@@ -175,21 +153,14 @@ export default function DriverClient() {
     setError(null);
 
     try {
-      const resRaw = await apiFetch(`/driver/orders/${orderId}/${action}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await apiFetch(`/driver/orders/${orderId}/${action}`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${token}`,
+  },
+});
 
-      const res = resRaw as Response;
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'Action failed');
-      }
-
-      await refreshOrders(token);
+await refreshOrders(token);
     } catch (err: any) {
       setError(err?.message || 'Action failed');
     } finally {
