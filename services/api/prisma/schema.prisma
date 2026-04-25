@@ -258,6 +258,7 @@ model Order {
   driverName            String?
   driverPhone           String?
   driverAssignedAt      DateTime?
+  deliveredAt           DateTime?
   driverId              String?
   driver                Driver?       @relation(fields: [driverId], references: [id])
   goodsPaymentMethod    PaymentMethod @default(COD)

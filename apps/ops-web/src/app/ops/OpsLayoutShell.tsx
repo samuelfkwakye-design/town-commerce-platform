@@ -15,15 +15,28 @@ function NavItem({
   label: string;
   badge?: number | null;
 }) {
+  const pathname = usePathname();
+  const active = pathname === href || pathname.startsWith(`${href}/`);
+
   return (
     <Link
       href={href}
-      className="flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-gray-100"
+      className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold transition ${
+        active
+          ? 'bg-emerald-600 text-white shadow-sm'
+          : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-800'
+      }`}
     >
       <span>{label}</span>
 
       {badge && badge > 0 ? (
-        <span className="ml-3 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+        <span
+          className={`ml-3 rounded-full px-2 py-0.5 text-xs font-bold ${
+            active
+              ? 'bg-white/20 text-white'
+              : 'bg-amber-100 text-amber-800'
+          }`}
+        >
           {badge}
         </span>
       ) : null}
@@ -64,9 +77,7 @@ export default function OpsLayoutShell({
             : null;
 
         if (!token) {
-          if (!isAuthPage) {
-            router.replace('/ops/login');
-          }
+          if (!isAuthPage) router.replace('/ops/login');
           if (!cancelled) {
             setCurrentAdmin(null);
             setChecked(true);
@@ -84,27 +95,21 @@ export default function OpsLayoutShell({
           setCurrentAdmin(null);
           setChecked(true);
 
-          if (!isAuthPage) {
-            router.replace('/ops/login');
-          }
+          if (!isAuthPage) router.replace('/ops/login');
           return;
         }
 
         setCurrentAdmin(admin);
         setChecked(true);
 
-        if (pathname === '/ops/login') {
-          router.replace('/ops');
-        }
+        if (pathname === '/ops/login') router.replace('/ops');
       } catch {
         if (cancelled) return;
 
         setCurrentAdmin(null);
         setChecked(true);
 
-        if (!isAuthPage) {
-          router.replace('/ops/login');
-        }
+        if (!isAuthPage) router.replace('/ops/login');
       }
     }
 
@@ -116,12 +121,16 @@ export default function OpsLayoutShell({
   }, [pathname, isAuthPage, router]);
 
   if (isAuthPage) {
-    return <div className="min-h-screen bg-gray-50">{children}</div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-slate-100">
+        {children}
+      </div>
+    );
   }
 
   if (!checked) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-slate-100 p-6 text-slate-700">
         Checking admin session…
       </div>
     );
@@ -129,65 +138,82 @@ export default function OpsLayoutShell({
 
   if (!currentAdmin) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-slate-100 p-6 text-slate-700">
         Redirecting to login…
       </div>
     );
   }
 
   return (
-  <div className="min-h-screen bg-gray-50">
-    <div className="flex">
-      <aside className="w-64 border-r bg-white p-4">
-        <div className="mb-3 flex justify-end">
-          <AdminNotificationsPanel />
-        </div>
-
-        <div className="mb-4">
-          <div className="text-lg font-semibold">Ops</div>
-          <div className="text-xs text-gray-500">Town Commerce Platform</div>
-
-          <div className="mt-3 rounded-md border bg-slate-50 px-3 py-2">
-            <div className="text-sm font-medium text-slate-900">
-              {currentAdmin.firstName || currentAdmin.username || currentAdmin.email}
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-slate-50 to-white">
+      <div className="flex min-h-screen">
+        <aside className="w-72 border-r border-emerald-100 bg-white/90 p-4 shadow-sm backdrop-blur">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <div className="text-xl font-black tracking-tight text-emerald-800">
+                Somameha
+              </div>
+              <div className="text-xs font-semibold text-slate-500">
+                Operations Console
+              </div>
             </div>
-            <div className="text-xs text-slate-500">{currentAdmin.email}</div>
 
-            <div className="mt-1 inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-700">
+            <AdminNotificationsPanel />
+          </div>
+
+          <div className="mb-5 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white px-4 py-3 shadow-sm">
+            <div className="text-sm font-bold text-slate-900">
+              {currentAdmin.firstName ||
+                currentAdmin.username ||
+                currentAdmin.email}
+            </div>
+            <div className="mt-0.5 text-xs text-slate-500">
+              {currentAdmin.email}
+            </div>
+
+            <div className="mt-2 inline-flex rounded-full bg-emerald-700 px-2.5 py-1 text-xs font-bold text-white">
               {currentAdmin.role}
             </div>
 
             {(isTownSuperAdmin || isWarehouseAdmin) && currentAdmin.town ? (
-              <div className="mt-2 text-xs text-slate-500">
+              <div className="mt-2 text-xs font-semibold text-slate-600">
                 Town: {currentAdmin.town.name}
               </div>
             ) : null}
           </div>
-        </div>
-          <nav className="space-y-1">
+
+          <nav className="space-y-1.5">
             <NavItem href="/ops/dashboard" label="Dashboard" />
             <NavItem href="/ops/orders" label="Orders" />
             <NavItem href="/ops/customers" label="Customers" />
             <NavItem href="/ops/drivers" label="Drivers" />
+
+            {isGlobalSuperAdmin || isTownSuperAdmin ? (
+              <NavItem href="/ops/cod" label="COD Cash" />
+            ) : null}
+
             <NavItem href="/ops/stock" label="Stock" />
             <NavItem href="/ops/reports" label="Reports" />
 
-            {isGlobalSuperAdmin ? <NavItem href="/ops/promos" label="Promos" /> : null}
+            {isGlobalSuperAdmin ? (
+              <NavItem href="/ops/promos" label="Promos" />
+            ) : null}
+
             {isGlobalSuperAdmin || isTownSuperAdmin ? (
               <NavItem href="/ops/admins" label="Admins" />
             ) : null}
 
             {isGlobalSuperAdmin ? (
-              <div className="pt-3">
-                <div className="px-3 pb-1 text-xs font-semibold uppercase text-gray-500">
+              <div className="pt-4">
+                <div className="px-3 pb-2 text-xs font-black uppercase tracking-wide text-emerald-700">
                   Locations
                 </div>
                 <NavItem href="/ops/towns" label="Towns" />
               </div>
             ) : null}
 
-            <div className="pt-3">
-              <div className="px-3 pb-1 text-xs font-semibold uppercase text-gray-500">
+            <div className="pt-4">
+              <div className="px-3 pb-2 text-xs font-black uppercase tracking-wide text-emerald-700">
                 Catalog
               </div>
 
@@ -207,7 +233,7 @@ export default function OpsLayoutShell({
           <div className="mt-6 space-y-2">
             <Link
               href="/ops/change-password"
-              className="block w-full rounded border border-slate-300 px-3 py-2 text-center text-sm text-slate-700 hover:bg-slate-50"
+              className="block w-full rounded-xl border border-emerald-100 bg-white px-3 py-2 text-center text-sm font-bold text-slate-700 hover:bg-emerald-50"
             >
               Change Password
             </Link>
@@ -215,16 +241,17 @@ export default function OpsLayoutShell({
             <button
               onClick={() => {
                 localStorage.removeItem('admin_token');
-                document.cookie = 'admin_token=; path=/; max-age=0; samesite=lax';
+                document.cookie =
+                  'admin_token=; path=/; max-age=0; samesite=lax';
                 window.location.href = '/ops/login';
               }}
-              className="w-full rounded bg-red-500 py-2 text-sm text-white"
+              className="w-full rounded-xl bg-red-500 py-2 text-sm font-bold text-white hover:bg-red-600"
             >
               Logout
             </button>
           </div>
 
-          <div className="mt-6 text-xs text-gray-500">
+          <div className="mt-6 rounded-2xl bg-slate-50 px-3 py-3 text-xs font-semibold text-slate-600">
             {missingImages > 0 ? (
               <div>⚠ {missingImages} product(s) missing images</div>
             ) : (
@@ -233,7 +260,7 @@ export default function OpsLayoutShell({
           </div>
         </aside>
 
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 p-6">{children}</main>
       </div>
     </div>
   );

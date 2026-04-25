@@ -181,7 +181,7 @@ export class NotificationsService {
 
     const message =
       `Hi ${firstName},\n\n` +
-      `Your Marketa order has been picked up and is on the way.\n` +
+      `Your Somameha order has been picked up and is on the way.\n` +
       `Driver: ${driverName}\n` +
       (driverPhone ? `Driver phone: ${driverPhone}\n` : '') +
       `Ref: ${input.orderId}`;
@@ -208,8 +208,8 @@ export class NotificationsService {
 
     const message =
       `Hi ${firstName},\n\n` +
-      `Your Marketa order has been delivered by ${driverName}.\n` +
-      `Thank you for shopping with Marketa.\n` +
+      `Your Somameha order has been delivered by ${driverName}.\n` +
+      `Thank you for shopping with Somameha.\n` +
       `Ref: ${input.orderId}`;
 
     return this.sms.sendSms(phone, message);

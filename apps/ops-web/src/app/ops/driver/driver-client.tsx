@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 
+type Availability = 'AVAILABLE' | 'BUSY' | 'OFFLINE';
+
 type DriverMe = {
   id: string;
   name: string;
   phone: string;
-  availability: 'AVAILABLE' | 'BUSY' | 'OFFLINE';
+  availability: Availability;
   townId: string | null;
 };
 
@@ -27,6 +29,8 @@ type DriverOrder = {
   deliveryLandmark: string | null;
   deliveryNotes: string | null;
   total: string | number;
+  payOnDeliveryTotal?: string | number;
+  goodsPaymentMethod?: 'COD' | 'MOMO' | string;
   driverName: string | null;
   driverPhone: string | null;
   driverAssignedAt: string | null;
@@ -35,12 +39,63 @@ type DriverOrder = {
     id: string;
     name: string;
     phone: string;
-    availability: 'AVAILABLE' | 'BUSY' | 'OFFLINE';
+    availability: Availability;
   } | null;
 };
 
-function formatMoney(value: string | number) {
-  const n = typeof value === 'number' ? value : Number(value);
+type CodSummary = {
+  driver: {
+    id: string;
+    name: string;
+    phone: string;
+    availability: Availability;
+  };
+  outstandingAmount: number;
+  deliveredCodOrders: Array<{
+    orderId: string;
+    deliveredAt: string;
+    amountDue: number;
+    orderTotal: number;
+    customerName: string | null;
+    customerPhone: string | null;
+    area: string | null;
+    town: string | null;
+    status: 'PENDING_HANDOVER';
+  }>;
+};
+type EarningsSummary = {
+  currency: 'GHS';
+  earningPerDelivery: number;
+  todayDeliveries: number;
+  weekDeliveries: number;
+  todayEstimatedEarnings: number;
+  weekEstimatedEarnings: number;
+  recentDeliveries: Array<{
+    orderId: string;
+    deliveredAt: string | null;
+    orderTotal: number;
+    goodsPaymentMethod: string;
+    codAmount: number;
+    estimatedEarning: number;
+  }>;
+};
+
+type HistoryOrder = {
+  id: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  total: string | number;
+  payOnDeliveryTotal: string | number;
+  goodsPaymentMethod: string;
+  deliveryRecipientName: string | null;
+  deliveryPhone: string | null;
+  deliveryArea: string | null;
+  deliveryTown: string | null;
+};
+
+function formatMoney(value: string | number | undefined | null) {
+  const n = typeof value === 'number' ? value : Number(value ?? 0);
   if (!Number.isFinite(n)) return '—';
 
   return new Intl.NumberFormat('en-GB', {
@@ -74,11 +129,15 @@ export default function DriverClient() {
   const [token, setToken] = useState<string | null>(null);
   const [driver, setDriver] = useState<DriverMe | null>(null);
   const [orders, setOrders] = useState<DriverOrder[]>([]);
+  const [codSummary, setCodSummary] = useState<CodSummary | null>(null);
+  const [history, setHistory] = useState<HistoryOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
+  const [earnings, setEarnings] = useState<EarningsSummary | null>(null);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('driverToken');
@@ -91,6 +150,32 @@ export default function DriverClient() {
     setToken(savedToken);
   }, [router]);
 
+  async function loadDashboard(currentToken: string) {
+    const [meData, ordersData, codData, historyData, earningsData] = await Promise.all([
+      apiFetch<DriverMe>('/driver-auth/me', {
+        headers: { Authorization: `Bearer ${currentToken}` },
+      }),
+      apiFetch<DriverOrder[]>('/driver/orders', {
+        headers: { Authorization: `Bearer ${currentToken}` },
+      }),
+      apiFetch<CodSummary>('/driver/cod/summary', {
+        headers: { Authorization: `Bearer ${currentToken}` },
+      }),
+      apiFetch<HistoryOrder[]>('/driver/orders/history', {
+        headers: { Authorization: `Bearer ${currentToken}` },
+      }),
+      apiFetch<EarningsSummary>('/driver/earnings/summary', {
+  headers: { Authorization: `Bearer ${currentToken}` },
+}),
+    ]);
+
+    setDriver(meData);
+    setOrders(Array.isArray(ordersData) ? ordersData : []);
+    setCodSummary(codData);
+    setHistory(Array.isArray(historyData) ? historyData : []);
+    setEarnings(earningsData);
+  }
+
   useEffect(() => {
     if (!token) return;
 
@@ -101,19 +186,9 @@ export default function DriverClient() {
       setError(null);
 
       try {
-        const [meData, ordersData] = await Promise.all([
-          apiFetch<DriverMe>('/driver-auth/me', {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          apiFetch<DriverOrder[]>('/driver/orders', {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
+        await loadDashboard(token as string);
 
-        if (!cancelled) {
-          setDriver(meData);
-          setOrders(Array.isArray(ordersData) ? ordersData : []);
-        }
+        if (cancelled) return;
       } catch (err: any) {
         if (!cancelled) {
           setError(err?.message || 'Failed to load driver dashboard');
@@ -134,12 +209,55 @@ export default function DriverClient() {
     };
   }, [token, router]);
 
-  async function refreshOrders(currentToken: string) {
-    const data = await apiFetch<DriverOrder[]>('/driver/orders', {
-      headers: { Authorization: `Bearer ${currentToken}` },
+  async function refreshDashboard(currentToken: string) {
+    await loadDashboard(currentToken);
+  }
+
+  async function toggleAvailability() {
+    if (!token || !driver) return;
+
+    const nextAvailability =
+      driver.availability === 'AVAILABLE' ? 'OFFLINE' : 'AVAILABLE';
+
+    setAvailabilityLoading(true);
+    setError(null);
+
+    const previous = driver;
+
+    setDriver({
+      ...driver,
+      availability: nextAvailability,
     });
 
-    setOrders(Array.isArray(data) ? data : []);
+    try {
+      const updated = await apiFetch<DriverMe>('/driver/availability', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ availability: nextAvailability }),
+      });
+
+      setDriver((current) => ({
+        ...(current || previous),
+        ...updated,
+      }));
+
+      setSuccessMessage(
+        nextAvailability === 'AVAILABLE'
+          ? 'You are now available for deliveries.'
+          : 'You are now offline.',
+      );
+
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(100);
+      }
+
+      setTimeout(() => setSuccessMessage(null), 4000);
+    } catch (err: any) {
+      setDriver(previous);
+      setError(err?.message || 'Failed to update availability');
+    } finally {
+      setAvailabilityLoading(false);
+    }
   }
 
   async function doAction(orderId: string, action: 'pickup' | 'delivered') {
@@ -149,15 +267,19 @@ export default function DriverClient() {
     setError(null);
 
     try {
-      await apiFetch(`/driver/orders/${orderId}/${action}`, {
+      const result: any = await apiFetch(`/driver/orders/${orderId}/${action}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
 
       const message =
         action === 'pickup'
-          ? 'Pickup confirmed. The customer has been notified.'
-          : 'Delivery confirmed. The order has been completed.';
+          ? 'Pickup confirmed. Somameha has notified the customer.'
+          : result?.codPendingHandover
+            ? `Delivery confirmed. Please hand over ${formatMoney(
+                result?.codAmountDue,
+              )} to the town super admin.`
+            : 'Delivery confirmed. Order completed via Somameha.';
 
       setSuccessMessage(message);
       setError(null);
@@ -172,11 +294,11 @@ export default function DriverClient() {
 
       if (action === 'delivered') {
         setTimeout(async () => {
-          await refreshOrders(token);
+          await refreshDashboard(token);
           setCompletedOrderId(null);
         }, 1200);
       } else {
-        await refreshOrders(token);
+        await refreshDashboard(token);
       }
 
       setTimeout(() => {
@@ -195,6 +317,11 @@ export default function DriverClient() {
   }
 
   const activeOrders = useMemo(() => orders, [orders]);
+  const todayDeliveries = useMemo(() => {
+    const today = new Date().toDateString();
+    return history.filter((order) => new Date(order.updatedAt).toDateString() === today)
+      .length;
+  }, [history]);
 
   if (loading) {
     return (
@@ -208,17 +335,18 @@ export default function DriverClient() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white px-3 py-4 sm:px-4">
-  <div className="mx-auto w-full max-w-md space-y-4 sm:max-w-2xl">
+      <div className="mx-auto w-full max-w-md space-y-4 sm:max-w-2xl">
         <div className="sticky top-3 z-10 rounded-[2rem] bg-emerald-700 p-5 text-white shadow-lg shadow-emerald-900/10">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-sm font-semibold">
-                Marketa Driver
+                Somameha Driver
               </div>
               <h1 className="mt-3 text-2xl font-bold">{driver?.name || 'Driver'}</h1>
               <p className="mt-1 text-sm text-emerald-50">Phone: {driver?.phone || '—'}</p>
               <p className="mt-1 text-sm text-emerald-50">
-                Availability: {driver?.availability || '—'}
+                Status:{' '}
+                <span className="font-bold">{driver?.availability || '—'}</span>
               </p>
             </div>
 
@@ -227,6 +355,94 @@ export default function DriverClient() {
               className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-emerald-800"
             >
               Log out
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+  <div className="rounded-3xl bg-white p-4 text-center shadow-sm ring-1 ring-emerald-100">
+    <div className="text-2xl font-black text-slate-900">{activeOrders.length}</div>
+    <div className="mt-1 text-xs font-semibold text-slate-500">Active</div>
+  </div>
+
+  <div className="rounded-3xl bg-white p-4 text-center shadow-sm ring-1 ring-emerald-100">
+    <div className="text-2xl font-black text-slate-900">
+      {earnings?.todayDeliveries ?? todayDeliveries}
+    </div>
+    <div className="mt-1 text-xs font-semibold text-slate-500">Today</div>
+  </div>
+
+  <div className="rounded-3xl bg-white p-4 text-center shadow-sm ring-1 ring-emerald-100">
+    <div className="text-lg font-black text-emerald-700">
+      {formatMoney(earnings?.todayEstimatedEarnings || 0)}
+    </div>
+    <div className="mt-1 text-xs font-semibold text-slate-500">Today pay</div>
+  </div>
+
+  <div className="rounded-3xl bg-white p-4 text-center shadow-sm ring-1 ring-emerald-100">
+    <div className="text-lg font-black text-amber-700">
+      {formatMoney(codSummary?.outstandingAmount || 0)}
+    </div>
+    <div className="mt-1 text-xs font-semibold text-slate-500">Cash</div>
+  </div>
+</div>
+
+<div className="rounded-3xl bg-gradient-to-br from-emerald-600 to-emerald-800 p-5 text-white shadow-lg shadow-emerald-900/10">
+  <div className="flex items-start justify-between gap-4">
+    <div>
+      <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-wide">
+        Today&apos;s earnings
+      </div>
+
+      <div className="mt-3 animate-pulse text-4xl font-black">
+        {formatMoney(earnings?.todayEstimatedEarnings || 0)}
+      </div>
+
+      <p className="mt-2 text-sm font-semibold text-emerald-50">
+        You completed {earnings?.todayDeliveries || 0}{' '}
+        {(earnings?.todayDeliveries || 0) === 1 ? 'delivery' : 'deliveries'} today.
+      </p>
+
+      <p className="mt-1 text-xs text-emerald-100">
+        Estimated at {formatMoney(earnings?.earningPerDelivery || 10)} per delivery.
+      </p>
+    </div>
+
+    <div className="rounded-2xl bg-white/15 px-4 py-3 text-right">
+      <div className="text-xs font-bold uppercase tracking-wide text-emerald-100">
+        This week
+      </div>
+      <div className="mt-1 text-xl font-black">
+        {formatMoney(earnings?.weekEstimatedEarnings || 0)}
+      </div>
+      <div className="mt-1 text-xs font-semibold text-emerald-100">
+        {earnings?.weekDeliveries || 0} deliveries
+      </div>
+    </div>
+  </div>
+</div>
+        <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-emerald-100">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Availability</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Toggle whether you are ready to receive deliveries.
+              </p>
+            </div>
+            <button
+              onClick={toggleAvailability}
+              disabled={availabilityLoading || driver?.availability === 'BUSY'}
+              className={`rounded-2xl px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60 ${
+                driver?.availability === 'AVAILABLE'
+                  ? 'bg-slate-900'
+                  : 'bg-emerald-600'
+              }`}
+            >
+              {availabilityLoading
+                ? 'Updating...'
+                : driver?.availability === 'AVAILABLE'
+                  ? 'Go offline'
+                  : 'Go available'}
             </button>
           </div>
         </div>
@@ -243,6 +459,34 @@ export default function DriverClient() {
           </div>
         ) : null}
 
+        {(codSummary?.outstandingAmount || 0) > 0 ? (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+            <h2 className="text-lg font-black text-amber-950">Cash to hand over</h2>
+            <div className="mt-2 text-3xl font-black text-amber-900">
+              {formatMoney(codSummary?.outstandingAmount || 0)}
+            </div>
+            <p className="mt-2 text-sm font-semibold text-amber-900">
+              This is COD cash from delivered orders. Hand it over to the town super admin.
+            </p>
+
+            <div className="mt-4 space-y-2">
+              {codSummary?.deliveredCodOrders.slice(0, 4).map((order) => (
+                <div
+                  key={order.orderId}
+                  className="rounded-2xl bg-white/80 px-4 py-3 text-sm"
+                >
+                  <div className="font-bold text-slate-900">
+                    Order {order.orderId.slice(-8)} · {formatMoney(order.amountDue)}
+                  </div>
+                  <div className="mt-1 text-slate-600">
+                    {order.customerName || 'Customer'} · {formatDate(order.deliveredAt)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-emerald-100">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-900">Assigned orders</h2>
@@ -253,19 +497,22 @@ export default function DriverClient() {
 
           {activeOrders.length === 0 ? (
             <div className="rounded-[2rem] bg-emerald-50 px-5 py-10 text-center">
-  <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl shadow-sm">
-    🛵
-  </div>
-  <div className="text-base font-bold text-slate-900">No jobs assigned</div>
-  <div className="mt-1 text-sm text-slate-600">
-    New deliveries will appear here as soon as operations assigns them.
-  </div>
-</div>
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl shadow-sm">
+                🛵
+              </div>
+              <div className="text-base font-bold text-slate-900">No jobs assigned</div>
+              <div className="mt-1 text-sm text-slate-600">
+                New deliveries will appear here as soon as operations assigns them.
+              </div>
+            </div>
           ) : (
             <div className="space-y-4">
               {activeOrders.map((order) => {
                 const address = buildAddress(order);
                 const isBusy = actionLoadingId === order.id;
+                const isCod =
+                  order.goodsPaymentMethod === 'COD' &&
+                  Number(order.payOnDeliveryTotal || 0) > 0;
 
                 return (
                   <div
@@ -279,6 +526,12 @@ export default function DriverClient() {
                     {completedOrderId === order.id ? (
                       <div className="mb-3 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white">
                         ✅ Delivery confirmed
+                      </div>
+                    ) : null}
+
+                    {isCod ? (
+                      <div className="mb-3 rounded-2xl bg-amber-100 px-4 py-3 text-sm font-bold text-amber-900">
+                        Cash on delivery: collect {formatMoney(order.payOnDeliveryTotal)}
                       </div>
                     ) : null}
 
@@ -372,6 +625,58 @@ export default function DriverClient() {
               })}
             </div>
           )}
+        </div>
+
+     <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-emerald-100">
+  <div className="mb-4 flex items-center justify-between">
+    <h2 className="text-lg font-bold text-slate-900">Recent deliveries</h2>
+    <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+      Last 30
+    </div>
+  </div>
+
+  {history.length === 0 ? (
+    <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+      No completed deliveries yet.
+    </div>
+  ) : (
+    <div className="space-y-3">
+      {history.slice(0, 8).map((order) => (
+        <div
+          key={order.id}
+          className="rounded-2xl border border-slate-200 p-4 transition hover:shadow-sm"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="font-bold text-slate-900">
+                Order {order.id.slice(-8)}
+              </div>
+              <div className="mt-1 text-sm text-slate-600">
+                {order.deliveryRecipientName || 'Customer'} ·{' '}
+                {formatDate(order.updatedAt)}
+              </div>
+            </div>
+
+            <div className="text-right text-sm font-bold text-slate-900">
+              {formatMoney(order.total)}
+            </div>
+          </div>
+
+          {/* COD badge */}
+          {order.goodsPaymentMethod === 'COD' ? (
+            <div className="mt-2 text-xs font-bold text-amber-700">
+              COD: {formatMoney(order.payOnDeliveryTotal)}
+            </div>
+          ) : null}
+
+          {/* 💰 Earnings badge (NEW) */}
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+            💰 Earned {formatMoney(earnings?.earningPerDelivery || 10)}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
         </div>
       </div>
     </div>

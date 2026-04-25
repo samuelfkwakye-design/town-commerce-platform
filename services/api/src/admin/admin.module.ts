@@ -20,6 +20,7 @@ import { AdminDriversModule } from './drivers/admin-drivers.module';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { AdminUsersController } from './admin-users.controller';
 import { AdminUsersService } from './admin-users.service';
+import { AdminCodModule } from './cod/admin-cod.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AdminUsersService } from './admin-users.service';
     AdminProductImagesModule,
     AdminDriversModule,
     AdminAuthModule,
+    AdminCodModule,
   ],
   controllers: [
     AdminOrdersController,
