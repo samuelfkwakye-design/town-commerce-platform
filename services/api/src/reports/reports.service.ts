@@ -1783,4 +1783,183 @@ private async countConfirmedStale(townId: string | null, staleCutoff: Date): Pro
     confirmedStaleTop,
   };
   }
+    async financeSummary(adminUser: any) {
+    const now = new Date();
+
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const startOfWeek = new Date(now);
+    const day = startOfWeek.getDay();
+    const diffToMonday = day === 0 ? 6 : day - 1;
+    startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const townFilter =
+      adminUser?.role === 'GLOBAL_SUPER_ADMIN'
+        ? {}
+        : { townId: adminUser?.townId };
+
+    const paymentTownFilter =
+      adminUser?.role === 'GLOBAL_SUPER_ADMIN'
+        ? {}
+        : { order: { townId: adminUser?.townId } };
+
+    const [
+      todayPayments,
+      weekPayments,
+      todayCodCollected,
+      codOutstandingOrders,
+      todaySettledOrders,
+      todayDeliveredOrders,
+      todaySales,
+      weekSales,
+    ] = await Promise.all([
+      this.prisma.payment.aggregate({
+        where: {
+          status: 'SUCCESS',
+          createdAt: { gte: startOfToday },
+          ...paymentTownFilter,
+        },
+        _sum: { amount: true },
+      }),
+
+      this.prisma.payment.aggregate({
+        where: {
+          status: 'SUCCESS',
+          createdAt: { gte: startOfWeek },
+          ...paymentTownFilter,
+        },
+        _sum: { amount: true },
+      }),
+
+      this.prisma.payment.aggregate({
+        where: {
+          status: 'SUCCESS',
+          method: 'COD',
+          purpose: 'COD_GOODS',
+          createdAt: { gte: startOfToday },
+          ...paymentTownFilter,
+        },
+        _sum: { amount: true },
+      }),
+
+      this.prisma.order.findMany({
+        where: {
+          status: 'FULFILLED',
+          goodsPaymentMethod: 'COD',
+          payOnDeliveryTotal: { gt: 0 },
+          deliveredAt: { not: null },
+          ...townFilter,
+          NOT: {
+            payments: {
+              some: {
+                purpose: 'COD_GOODS',
+                status: 'SUCCESS',
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          payOnDeliveryTotal: true,
+          driverId: true,
+          driverName: true,
+          driverPhone: true,
+          deliveredAt: true,
+        },
+      }),
+
+      this.prisma.order.count({
+        where: {
+          status: 'SETTLED',
+          updatedAt: { gte: startOfToday },
+          ...townFilter,
+        },
+      }),
+
+      this.prisma.order.count({
+        where: {
+          deliveredAt: { gte: startOfToday },
+          ...townFilter,
+        },
+      }),
+
+      this.prisma.saleItem.aggregate({
+        where: {
+          createdAt: { gte: startOfToday },
+        },
+        _sum: {
+          revenue: true,
+          cogs: true,
+          profit: true,
+        },
+      }),
+
+      this.prisma.saleItem.aggregate({
+        where: {
+          createdAt: { gte: startOfWeek },
+        },
+        _sum: {
+          revenue: true,
+          cogs: true,
+          profit: true,
+        },
+      }),
+    ]);
+
+    const codOutstandingAmount = codOutstandingOrders.reduce(
+      (sum, order) => sum + Number(order.payOnDeliveryTotal ?? 0),
+      0,
+    );
+
+    const outstandingByDriverMap = new Map<string, any>();
+
+    for (const order of codOutstandingOrders) {
+      const key = order.driverId || 'unassigned';
+
+      if (!outstandingByDriverMap.has(key)) {
+        outstandingByDriverMap.set(key, {
+          driverId: order.driverId,
+          driverName: order.driverName || 'Unassigned',
+          driverPhone: order.driverPhone,
+          totalOutstanding: 0,
+          ordersCount: 0,
+        });
+      }
+
+      const row = outstandingByDriverMap.get(key);
+      row.totalOutstanding += Number(order.payOnDeliveryTotal ?? 0);
+      row.ordersCount += 1;
+    }
+
+    return {
+      generatedAt: now.toISOString(),
+      scope: {
+        role: adminUser?.role,
+        townId: adminUser?.role === 'GLOBAL_SUPER_ADMIN' ? null : adminUser?.townId,
+      },
+      totals: {
+        todayRevenue: this.round2(Number(todayPayments._sum.amount ?? 0)),
+        weekRevenue: this.round2(Number(weekPayments._sum.amount ?? 0)),
+        todayCodCollected: this.round2(Number(todayCodCollected._sum.amount ?? 0)),
+        codOutstandingAmount: this.round2(codOutstandingAmount),
+        codOutstandingOrders: codOutstandingOrders.length,
+        todaySettledOrders,
+        todayDeliveredOrders,
+        todayProfit: this.round2(Number(todaySales._sum.profit ?? 0)),
+        weekProfit: this.round2(Number(weekSales._sum.profit ?? 0)),
+        todayCogs: this.round2(Number(todaySales._sum.cogs ?? 0)),
+        weekCogs: this.round2(Number(weekSales._sum.cogs ?? 0)),
+        todaySalesRevenue: this.round2(Number(todaySales._sum.revenue ?? 0)),
+        weekSalesRevenue: this.round2(Number(weekSales._sum.revenue ?? 0)),
+      },
+      codOutstandingByDriver: Array.from(outstandingByDriverMap.values()).map(
+        (row) => ({
+          ...row,
+          totalOutstanding: this.round2(row.totalOutstanding),
+        }),
+      ),
+    };
+  }
 }

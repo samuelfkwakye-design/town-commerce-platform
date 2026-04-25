@@ -1,5 +1,5 @@
 // src/reports/admin.reports.controller.ts
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { AdminJwtGuard } from '../admin-auth/guards/admin-jwt.guard';
 import { RolesGuard } from '../common/auth/roles.guard';
@@ -55,5 +55,10 @@ export class AdminReportsController {
     }
 
     return this.reportsService.getRevenueTrend(query as any);
+  }
+    @Get('finance-summary')
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
+  async financeSummary(@Query() _query: any, @Req() req: any) {
+    return this.reportsService.financeSummary(req.adminUser);
   }
 }
