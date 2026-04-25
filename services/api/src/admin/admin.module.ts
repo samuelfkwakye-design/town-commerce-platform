@@ -21,6 +21,7 @@ import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { AdminUsersController } from './admin-users.controller';
 import { AdminUsersService } from './admin-users.service';
 import { AdminCodModule } from './cod/admin-cod.module';
+import { AdminDriverPayoutsModule } from './driver-payouts/admin-driver-payouts.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { AdminCodModule } from './cod/admin-cod.module';
     AdminDriversModule,
     AdminAuthModule,
     AdminCodModule,
+    AdminDriverPayoutsModule,
   ],
   controllers: [
     AdminOrdersController,

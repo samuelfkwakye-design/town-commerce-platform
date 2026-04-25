@@ -189,8 +189,11 @@ export default function OpsLayoutShell({
             <NavItem href="/ops/drivers" label="Drivers" />
 
             {isGlobalSuperAdmin || isTownSuperAdmin ? (
-              <NavItem href="/ops/cod" label="COD Cash" />
-            ) : null}
+  <>
+    <NavItem href="/ops/cod" label="COD Cash" />
+    <NavItem href="/ops/driver-payouts" label="Driver Payouts" />
+  </>
+) : null}
 
             <NavItem href="/ops/stock" label="Stock" />
             <NavItem href="/ops/reports" label="Reports" />

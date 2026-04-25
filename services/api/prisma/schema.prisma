@@ -479,6 +479,24 @@ model PromoUsage {
   @@index([phone])
 }
 
+model DriverPayout {
+  id          String   @id @default(cuid())
+  driverId    String
+  townId      String
+  amount      Decimal  @db.Decimal(12, 2)
+  status      String   @default("PAID")
+  periodFrom  DateTime?
+  periodTo    DateTime?
+  paidById    String?
+  paidAt      DateTime @default(now())
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@index([driverId])
+  @@index([townId])
+  @@index([paidAt])
+}
+
 model AdminUser {
   id           String    @id @default(cuid())
   email        String    @unique
