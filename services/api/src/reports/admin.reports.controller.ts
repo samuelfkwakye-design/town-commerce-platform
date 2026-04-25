@@ -27,7 +27,15 @@ export class AdminReportsController {
   async towns() {
     return this.reportsService.getTownOptions();
   }
-
+@Get('profit-intelligence')
+@Roles(
+  AdminRole.GLOBAL_SUPER_ADMIN,
+  AdminRole.TOWN_SUPER_ADMIN,
+  AdminRole.WAREHOUSE_ADMIN,
+)
+async profitIntelligence(@Query('townId') townId?: string) {
+  return this.reportsService.getProfitIntelligence(townId ?? null);
+}
   @Get('revenue-trend')
   @Roles(
     AdminRole.GLOBAL_SUPER_ADMIN,

@@ -30,6 +30,17 @@ type FinanceSummary = {
   }>;
 };
 
+type ProfitIntelligence = {
+  today: {
+    revenue: number;
+    refunds: number;
+    profit: number;
+    cogs: number;
+    margin: number;
+  };
+  health: 'GOOD' | 'WARNING' | 'CRITICAL';
+};
+
 function money(value: number | null | undefined) {
   return new Intl.NumberFormat('en-GB', {
     style: 'currency',
@@ -43,6 +54,7 @@ function number(value: number | null | undefined) {
 
 export default function FinanceReportsPage() {
   const [data, setData] = useState<FinanceSummary | null>(null);
+  const [profit, setProfit] = useState<ProfitIntelligence | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,10 +63,17 @@ export default function FinanceReportsPage() {
     setError(null);
 
     try {
-      const res = await apiFetch<FinanceSummary>('/admin/reports/finance-summary', {
-        auth: true,
-      });
-      setData(res);
+      const [summaryRes, profitRes] = await Promise.all([
+        apiFetch<FinanceSummary>('/admin/reports/finance-summary', {
+          auth: true,
+        }),
+        apiFetch<ProfitIntelligence>('/admin/reports/profit-intelligence', {
+          auth: true,
+        }),
+      ]);
+
+      setData(summaryRes);
+      setProfit(profitRes);
     } catch (err: any) {
       setError(err?.message || 'Failed to load finance report');
     } finally {
@@ -74,6 +93,13 @@ export default function FinanceReportsPage() {
     if (amount >= 300) return 'Medium';
     return 'Low';
   }, [totals?.codOutstandingAmount]);
+
+  const profitTone =
+    profit?.health === 'CRITICAL'
+      ? 'red'
+      : profit?.health === 'WARNING'
+        ? 'amber'
+        : 'emerald';
 
   if (loading) {
     return <div className="p-6 text-slate-600">Loading finance dashboard...</div>;
@@ -100,7 +126,10 @@ export default function FinanceReportsPage() {
               Revenue, profit, COD collection and settlement visibility.
             </p>
             <p className="mt-1 text-xs text-emerald-100">
-              Last updated: {data?.generatedAt ? new Date(data.generatedAt).toLocaleString() : '—'}
+              Last updated:{' '}
+              {data?.generatedAt
+                ? new Date(data.generatedAt).toLocaleString()
+                : '—'}
             </p>
           </div>
 
@@ -114,6 +143,31 @@ export default function FinanceReportsPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-4">
+        <Metric title="Revenue today" value={money(profit?.today?.revenue)} tone="emerald" />
+        <Metric title="Profit today" value={money(profit?.today?.profit)} tone="emerald" />
+        <Metric title="Profit margin" value={`${Number(profit?.today?.margin ?? 0).toFixed(1)}%`} tone={profitTone} />
+        <Metric title="Profit health" value={profit?.health || '—'} tone={profitTone} />
+      </div>
+
+      {profit?.health === 'CRITICAL' || profit?.health === 'WARNING' ? (
+        <div
+          className={`rounded-3xl p-5 text-sm font-bold ring-1 ${
+            profit.health === 'CRITICAL'
+              ? 'bg-red-50 text-red-800 ring-red-200'
+              : 'bg-amber-50 text-amber-800 ring-amber-200'
+          }`}
+        >
+          {profit.health === 'CRITICAL'
+            ? '⚠ Profit margin is critically low today. Review pricing, delivery fees, product costs, or refunds.'
+            : '⚠ Profit margin is below the preferred range today. Keep an eye on costs and pricing.'}
+        </div>
+      ) : (
+        <div className="rounded-3xl bg-emerald-50 p-5 text-sm font-bold text-emerald-800 ring-1 ring-emerald-100">
+          ✅ Profit margin looks healthy today.
+        </div>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-4">
         <Metric title="Today revenue" value={money(totals?.todayRevenue)} tone="emerald" />
         <Metric title="This week revenue" value={money(totals?.weekRevenue)} tone="slate" />
         <Metric title="Today profit" value={money(totals?.todayProfit)} tone="emerald" />
@@ -124,7 +178,17 @@ export default function FinanceReportsPage() {
         <Metric title="COD collected today" value={money(totals?.todayCodCollected)} tone="emerald" />
         <Metric title="COD outstanding" value={money(totals?.codOutstandingAmount)} tone="amber" />
         <Metric title="Outstanding COD orders" value={number(totals?.codOutstandingOrders)} tone="amber" />
-        <Metric title="COD risk" value={codRiskLevel} tone={codRiskLevel === 'High' ? 'red' : codRiskLevel === 'Medium' ? 'amber' : 'emerald'} />
+        <Metric
+          title="COD risk"
+          value={codRiskLevel}
+          tone={
+            codRiskLevel === 'High'
+              ? 'red'
+              : codRiskLevel === 'Medium'
+                ? 'amber'
+                : 'emerald'
+          }
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -136,7 +200,9 @@ export default function FinanceReportsPage() {
       <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-emerald-100">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-black text-slate-900">Outstanding COD by driver</h2>
+            <h2 className="text-xl font-black text-slate-900">
+              Outstanding COD by driver
+            </h2>
             <p className="mt-1 text-sm text-slate-600">
               Drivers holding cash that still needs to be collected.
             </p>
@@ -166,7 +232,8 @@ export default function FinanceReportsPage() {
                     {driver.driverName || 'Unassigned'}
                   </div>
                   <div className="mt-1 text-sm text-slate-500">
-                    {driver.driverPhone || 'No phone'} · {driver.ordersCount} orders
+                    {driver.driverPhone || 'No phone'} · {driver.ordersCount}{' '}
+                    orders
                   </div>
                 </div>
 

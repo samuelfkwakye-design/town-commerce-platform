@@ -161,6 +161,63 @@ private async countOrdersToday(townId: string | null, start: Date, end: Date): P
   return Number(rows?.[0]?.count ?? 0);
 }
 
+async getProfitIntelligence(townId?: string | null) {
+  const start = this.startOfTodayUtc();
+  const end = this.startOfTomorrowUtc();
+
+  // Revenue today (SUCCESS payments)
+  const revenue = await this.sumRevenueToday(townId ?? null, start, end);
+
+  // Refunds today
+  let refunds = 0;
+  try {
+    refunds = await this.sumRefundsToday(townId ?? null, start, end);
+  } catch {
+    refunds = 0;
+  }
+
+  // Profit from SaleItem (true profit)
+  const profitAgg = await this.prisma.saleItem.aggregate({
+    _sum: { profit: true, revenue: true, cogs: true },
+    where: {
+      createdAt: {
+        gte: start,
+        lt: end,
+      },
+      ...(townId
+        ? {
+            townProduct: {
+              townId,
+            },
+          }
+        : {}),
+    },
+  });
+
+  const profit = Number(profitAgg._sum.profit ?? 0);
+  const revenueFromSales = Number(profitAgg._sum.revenue ?? 0);
+  const cogs = Number(profitAgg._sum.cogs ?? 0);
+
+  const margin =
+    revenueFromSales > 0 ? (profit / revenueFromSales) * 100 : 0;
+
+  let health: 'GOOD' | 'WARNING' | 'CRITICAL' = 'GOOD';
+
+  if (margin < 10) health = 'CRITICAL';
+  else if (margin < 20) health = 'WARNING';
+
+  return {
+    today: {
+      revenue: this.round2(revenue),
+      refunds: this.round2(refunds),
+      profit: this.round2(profit),
+      cogs: this.round2(cogs),
+      margin: this.round2(margin),
+    },
+    health,
+  };
+}
+
 private async countConfirmedStale(townId: string | null, staleCutoff: Date): Promise<number> {
   const rows = await this.prisma.$queryRaw<any[]>`
     SELECT COUNT(*)::int AS count
