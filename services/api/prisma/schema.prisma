@@ -21,8 +21,8 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  addresses CustomerAddress[]
-  orders    Order[]
+  addresses      CustomerAddress[]
+  orders         Order[]
   passwordResets CustomerPasswordReset[]
 
   @@index([phone])
@@ -52,12 +52,12 @@ model CustomerAddress {
 }
 
 model CustomerPasswordReset {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   customerId String
   codeHash   String
   expiresAt  DateTime
   usedAt     DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
@@ -66,21 +66,22 @@ model CustomerPasswordReset {
 }
 
 model Town {
-  id               String        @id @default(cuid())
-  name             String        @unique
-  slug             String        @unique
-  isActive         Boolean       @default(true)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  orders           Order[]
-  townProducts     TownProduct[]
-  warehouse        Warehouse?
-  suppliers        Supplier[]
-  settings         TownSettings?
-  promoCodes       PromoCode[]
-  drivers          Driver[]
-  defaultCustomers Customer[]    @relation("CustomerDefaultTown")
-  adminUsers       AdminUser[]
+  id                 String              @id @default(cuid())
+  name               String              @unique
+  slug               String              @unique
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  orders             Order[]
+  townProducts       TownProduct[]
+  warehouse          Warehouse?
+  suppliers          Supplier[]
+  settings           TownSettings?
+  promoCodes         PromoCode[]
+  drivers            Driver[]
+  defaultCustomers   Customer[]          @relation("CustomerDefaultTown")
+  adminUsers         AdminUser[]
+  adminNotifications AdminNotification[]
 }
 
 model Warehouse {
@@ -258,16 +259,16 @@ model Order {
   driverPhone           String?
   driverAssignedAt      DateTime?
   driverId              String?
-  driver                Driver?     @relation(fields: [driverId], references: [id])
+  driver                Driver?       @relation(fields: [driverId], references: [id])
   goodsPaymentMethod    PaymentMethod @default(COD)
   customerId            String?
   customer              Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
-  town                  Town         @relation(fields: [townId], references: [id], onDelete: Cascade)
-  items                 OrderItem[]
-  payments              Payment[]
-  sale                  Sale?
-  promoUsages           PromoUsage[]
+  town        Town         @relation(fields: [townId], references: [id], onDelete: Cascade)
+  items       OrderItem[]
+  payments    Payment[]
+  sale        Sale?
+  promoUsages PromoUsage[]
 
   @@index([customerId])
   @@index([townId])
@@ -478,48 +479,74 @@ model PromoUsage {
 }
 
 model AdminUser {
-  id                     String      @id @default(cuid())
-  email                  String      @unique
-  username               String      @unique
-  passwordHash           String
-  firstName              String?
-  lastName               String?
-  phone                  String?
-  role                   AdminRole   @default(WAREHOUSE_ADMIN)
+  id           String    @id @default(cuid())
+  email        String    @unique
+  username     String    @unique
+  passwordHash String
+  firstName    String?
+  lastName     String?
+  phone        String?
+  role         AdminRole @default(WAREHOUSE_ADMIN)
 
-  townId                 String?
-  town                   Town?       @relation(fields: [townId], references: [id], onDelete: SetNull)
+  townId String?
+  town   Town?   @relation(fields: [townId], references: [id], onDelete: SetNull)
 
-  isActive               Boolean     @default(true)
+  isActive               Boolean   @default(true)
   resetPasswordCodeHash  String?
   resetPasswordExpiresAt DateTime?
   lastLoginAt            DateTime?
-  createdAt              DateTime    @default(now())
-  updatedAt              DateTime    @updatedAt
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   @@index([role])
   @@index([isActive])
   @@index([townId])
 }
+
 model Driver {
-  id             String              @id @default(cuid())
+  id             String             @id @default(cuid())
   townId         String
   name           String
   phone          String
-  isActive       Boolean             @default(true)
-  availability   DriverAvailability  @default(AVAILABLE)
-  priority       Int                 @default(100)
+  isActive       Boolean            @default(true)
+  availability   DriverAvailability @default(AVAILABLE)
+  priority       Int                @default(100)
   lastAssignedAt DateTime?
 
-  town           Town                @relation(fields: [townId], references: [id], onDelete: Cascade)
-  orders         Order[]
+  town   Town    @relation(fields: [townId], references: [id], onDelete: Cascade)
+  orders Order[]
 
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([townId])
   @@index([townId, isActive, availability])
   @@index([townId, priority])
+}
+
+model AdminNotification {
+  id String @id @default(cuid())
+
+  townId String?
+  town   Town?   @relation(fields: [townId], references: [id], onDelete: SetNull)
+
+  type    String
+  title   String
+  message String
+
+  orderId  String?
+  driverId String?
+
+  role AdminRole?
+
+  isRead Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([townId])
+  @@index([type])
+  @@index([isRead])
+  @@index([createdAt])
 }
 
 enum PromoType {
@@ -533,7 +560,9 @@ enum AdminRole {
   GLOBAL_SUPER_ADMIN
   TOWN_SUPER_ADMIN
   WAREHOUSE_ADMIN
+  DRIVER
 }
+
 enum PricingModel {
   UNIT
   WEIGHT

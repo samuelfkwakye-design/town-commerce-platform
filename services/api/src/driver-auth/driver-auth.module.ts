@@ -6,6 +6,7 @@ import { DriverJwtGuard } from './guards/driver-jwt.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { DriverController } from '../driver/driver.controller';
 import { DriverService } from '../driver/driver.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { DriverService } from '../driver/driver.service';
       secret: process.env.JWT_SECRET || 'dev-secret-change-me',
       signOptions: { expiresIn: '30d' },
     }),
+    NotificationsModule,
   ],
   controllers: [DriverAuthController, DriverController],
   providers: [DriverAuthService, DriverJwtGuard, DriverService, PrismaService],

@@ -160,6 +160,61 @@ export class NotificationsService {
     return this.sms.sendSms(phone, message);
   }
 
+    async sendDriverPickedUpCustomerSms(input: {
+    phoneNumber?: string | null;
+    customerName?: string | null;
+    driverName?: string | null;
+    driverPhone?: string | null;
+    orderId: string;
+  }) {
+    const phone = String(input.phoneNumber ?? '').trim();
+    if (!phone) {
+      this.logger.warn(
+        `No customer phone number for picked-up SMS on order ${input.orderId}. SMS skipped.`,
+      );
+      return { ok: false, reason: 'missing_phone' };
+    }
+
+    const firstName = this.firstName(input.customerName);
+    const driverName = input.driverName?.trim() || 'your driver';
+    const driverPhone = input.driverPhone?.trim();
+
+    const message =
+      `Hi ${firstName},\n\n` +
+      `Your Marketa order has been picked up and is on the way.\n` +
+      `Driver: ${driverName}\n` +
+      (driverPhone ? `Driver phone: ${driverPhone}\n` : '') +
+      `Ref: ${input.orderId}`;
+
+    return this.sms.sendSms(phone, message);
+  }
+
+  async sendDriverDeliveredCustomerSms(input: {
+    phoneNumber?: string | null;
+    customerName?: string | null;
+    driverName?: string | null;
+    orderId: string;
+  }) {
+    const phone = String(input.phoneNumber ?? '').trim();
+    if (!phone) {
+      this.logger.warn(
+        `No customer phone number for delivered SMS on order ${input.orderId}. SMS skipped.`,
+      );
+      return { ok: false, reason: 'missing_phone' };
+    }
+
+    const firstName = this.firstName(input.customerName);
+    const driverName = input.driverName?.trim() || 'your driver';
+
+    const message =
+      `Hi ${firstName},\n\n` +
+      `Your Marketa order has been delivered by ${driverName}.\n` +
+      `Thank you for shopping with Marketa.\n` +
+      `Ref: ${input.orderId}`;
+
+    return this.sms.sendSms(phone, message);
+  }
+
   async sendDriverUnassignedSms(input: {
     phoneNumber?: string | null;
     driverName?: string | null;
