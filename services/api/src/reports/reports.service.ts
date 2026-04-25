@@ -161,7 +161,11 @@ private async countOrdersToday(townId: string | null, start: Date, end: Date): P
   return Number(rows?.[0]?.count ?? 0);
 }
 
-async getProfitIntelligence(townId?: string | null) {
+async getProfitIntelligence(adminUser: any, requestedTownId?: string | null) {
+    const townId =
+    adminUser?.role === 'GLOBAL_SUPER_ADMIN'
+      ? requestedTownId ?? null
+      : adminUser?.townId ?? null;
   const start = this.startOfTodayUtc();
   const end = this.startOfTomorrowUtc();
 
@@ -1840,7 +1844,7 @@ private async countConfirmedStale(townId: string | null, staleCutoff: Date): Pro
     confirmedStaleTop,
   };
   }
-    async financeSummary(adminUser: any) {
+    async financeSummary(adminUser: any, requestedTownId?: string | null) {
     const now = new Date();
 
     const startOfToday = new Date(now);
@@ -1852,16 +1856,16 @@ private async countConfirmedStale(townId: string | null, staleCutoff: Date): Pro
     startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
     startOfWeek.setHours(0, 0, 0, 0);
 
-    const townFilter =
-      adminUser?.role === 'GLOBAL_SUPER_ADMIN'
-        ? {}
-        : { townId: adminUser?.townId };
+    const effectiveTownId =
+  adminUser?.role === 'GLOBAL_SUPER_ADMIN'
+    ? requestedTownId ?? null
+    : adminUser?.townId ?? null;
 
-    const paymentTownFilter =
-      adminUser?.role === 'GLOBAL_SUPER_ADMIN'
-        ? {}
-        : { order: { townId: adminUser?.townId } };
+const townFilter = effectiveTownId ? { townId: effectiveTownId } : {};
 
+const paymentTownFilter = effectiveTownId
+  ? { order: { townId: effectiveTownId } }
+  : {};
     const [
       todayPayments,
       weekPayments,
@@ -1994,7 +1998,7 @@ private async countConfirmedStale(townId: string | null, staleCutoff: Date): Pro
       generatedAt: now.toISOString(),
       scope: {
         role: adminUser?.role,
-        townId: adminUser?.role === 'GLOBAL_SUPER_ADMIN' ? null : adminUser?.townId,
+        townId: effectiveTownId,
       },
       totals: {
         todayRevenue: this.round2(Number(todayPayments._sum.amount ?? 0)),

@@ -6,6 +6,10 @@ import { apiFetch } from '@/lib/api';
 
 type FinanceSummary = {
   generatedAt: string;
+  scope?: {
+    role: string;
+    townId: string | null;
+  };
   totals: {
     todayRevenue: number;
     weekRevenue: number;
@@ -41,39 +45,110 @@ type ProfitIntelligence = {
   health: 'GOOD' | 'WARNING' | 'CRITICAL';
 };
 
-function money(value: number | null | undefined) {
+type Town = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+type RevenueTrendPoint = {
+  period: string;
+  revenue: number;
+};
+
+type RevenueTrendResponse = {
+  rows: RevenueTrendPoint[];
+};
+
+type TownLeaderboardRow = {
+  townId: string;
+  townName?: string;
+  town?: string;
+  name?: string;
+  revenue?: number;
+  profit?: number;
+  orders?: number;
+  totalRevenue?: number;
+  totalProfit?: number;
+  orderCount?: number;
+};
+
+type TownLeaderboardResponse = {
+  rows: TownLeaderboardRow[];
+};
+
+type TownsResponse = {
+  rows: Town[];
+};
+
+function money(v: number | null | undefined) {
   return new Intl.NumberFormat('en-GB', {
     style: 'currency',
     currency: 'GHS',
-  }).format(Number(value ?? 0));
+  }).format(Number(v ?? 0));
 }
 
-function number(value: number | null | undefined) {
-  return new Intl.NumberFormat('en-GB').format(Number(value ?? 0));
+function number(v: number | null | undefined) {
+  return new Intl.NumberFormat('en-GB').format(Number(v ?? 0));
 }
 
 export default function FinanceReportsPage() {
   const [data, setData] = useState<FinanceSummary | null>(null);
   const [profit, setProfit] = useState<ProfitIntelligence | null>(null);
+  const [towns, setTowns] = useState<Town[]>([]);
+  const [selectedTownId, setSelectedTownId] = useState('');
+  const [isGlobal, setIsGlobal] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  const [trend, setTrend] = useState<RevenueTrendPoint[]>([]);
+  const [leaderboard, setLeaderboard] = useState<TownLeaderboardRow[]>([]);
+  
   async function load() {
     setLoading(true);
     setError(null);
 
     try {
-      const [summaryRes, profitRes] = await Promise.all([
-        apiFetch<FinanceSummary>('/admin/reports/finance-summary', {
-          auth: true,
-        }),
-        apiFetch<ProfitIntelligence>('/admin/reports/profit-intelligence', {
-          auth: true,
-        }),
-      ]);
+      const me = await apiFetch<any>('/admin-auth/me', { auth: true });
 
-      setData(summaryRes);
-      setProfit(profitRes);
+      const global = me?.role === 'GLOBAL_SUPER_ADMIN';
+      setIsGlobal(global);
+
+      if (global) {
+        const townsRes = await apiFetch<TownsResponse>('/admin/reports/towns', {
+          auth: true,
+        });
+        setTowns(townsRes?.rows || []);
+      }
+
+      const query = selectedTownId ? `?townId=${selectedTownId}` : '';
+const trendQuery = selectedTownId
+  ? `?townId=${selectedTownId}&days=7`
+  : '?days=7';
+
+const [summaryRes, profitRes, trendRes, leaderboardRes] = await Promise.all([
+  apiFetch<FinanceSummary>(`/admin/reports/finance-summary${query}`, {
+    auth: true,
+  }),
+  apiFetch<ProfitIntelligence>(
+    `/admin/reports/profit-intelligence${query}`,
+    { auth: true },
+  ),
+  apiFetch<RevenueTrendResponse>(
+    `/admin/reports/revenue-trend${trendQuery}`,
+    { auth: true },
+  ),
+  isGlobal
+    ? apiFetch<TownLeaderboardResponse>('/admin/reports/town-leaderboard', {
+        auth: true,
+      })
+    : Promise.resolve({ rows: [] }),
+]);
+
+setData(summaryRes);
+setProfit(profitRes);
+setTrend(trendRes?.rows || []);
+setLeaderboard(leaderboardRes?.rows || []);
     } catch (err: any) {
       setError(err?.message || 'Failed to load finance report');
     } finally {
@@ -83,7 +158,7 @@ export default function FinanceReportsPage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [selectedTownId]);
 
   const totals = data?.totals;
 
@@ -101,149 +176,195 @@ export default function FinanceReportsPage() {
         ? 'amber'
         : 'emerald';
 
-  if (loading) {
-    return <div className="p-6 text-slate-600">Loading finance dashboard...</div>;
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
-        {error}
-      </div>
-    );
-  }
+  if (loading) return <div className="p-6">Loading...</div>;
+  if (error) return <div className="p-6 text-red-600">{error}</div>;
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl bg-gradient-to-br from-emerald-700 to-emerald-900 p-6 text-white shadow-lg shadow-emerald-900/10">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      {/* HEADER */}
+      <div className="rounded-3xl bg-gradient-to-br from-emerald-700 to-emerald-900 p-6 text-white">
+        <div className="flex justify-between items-center">
           <div>
-            <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-wide">
-              Finance
-            </div>
-            <h1 className="mt-3 text-3xl font-black">Finance Dashboard</h1>
-            <p className="mt-2 text-sm text-emerald-50">
-              Revenue, profit, COD collection and settlement visibility.
-            </p>
-            <p className="mt-1 text-xs text-emerald-100">
-              Last updated:{' '}
-              {data?.generatedAt
-                ? new Date(data.generatedAt).toLocaleString()
-                : '—'}
-            </p>
+            <h1 className="text-3xl font-black">Finance Dashboard</h1>
+
+            {/* 👇 Town badge */}
+            {!isGlobal && data?.scope?.townId && (
+              <div className="mt-2 text-sm font-bold text-emerald-100">
+                📍 Your Town
+              </div>
+            )}
           </div>
 
-          <button
-            onClick={load}
-            className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-emerald-800"
-          >
-            Refresh
-          </button>
+          <div className="flex gap-2">
+            {/* 👇 Town selector (GLOBAL ONLY) */}
+            {isGlobal && (
+              <select
+                value={selectedTownId}
+                onChange={(e) => setSelectedTownId(e.target.value)}
+                className="rounded-xl px-3 py-2 text-black"
+              >
+                <option value="">All towns</option>
+                {towns.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <button
+              onClick={load}
+              className="rounded-xl bg-white px-4 py-2 text-emerald-800 font-bold"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-4">
-        <Metric title="Revenue today" value={money(profit?.today?.revenue)} tone="emerald" />
-        <Metric title="Profit today" value={money(profit?.today?.profit)} tone="emerald" />
-        <Metric title="Profit margin" value={`${Number(profit?.today?.margin ?? 0).toFixed(1)}%`} tone={profitTone} />
-        <Metric title="Profit health" value={profit?.health || '—'} tone={profitTone} />
+      {/* PROFIT */}
+      <div className="grid grid-cols-4 gap-4">
+        <Metric title="Revenue today" value={money(profit?.today.revenue)} tone="emerald" />
+        <Metric title="Profit today" value={money(profit?.today.profit)} tone="emerald" />
+        <Metric title="Margin" value={`${profit?.today.margin?.toFixed(1)}%`} tone={profitTone} />
+        <Metric title="Health" value={profit?.health || '-'} tone={profitTone} />
       </div>
 
-      {profit?.health === 'CRITICAL' || profit?.health === 'WARNING' ? (
-        <div
-          className={`rounded-3xl p-5 text-sm font-bold ring-1 ${
-            profit.health === 'CRITICAL'
-              ? 'bg-red-50 text-red-800 ring-red-200'
-              : 'bg-amber-50 text-amber-800 ring-amber-200'
-          }`}
-        >
-          {profit.health === 'CRITICAL'
-            ? '⚠ Profit margin is critically low today. Review pricing, delivery fees, product costs, or refunds.'
-            : '⚠ Profit margin is below the preferred range today. Keep an eye on costs and pricing.'}
-        </div>
-      ) : (
-        <div className="rounded-3xl bg-emerald-50 p-5 text-sm font-bold text-emerald-800 ring-1 ring-emerald-100">
-          ✅ Profit margin looks healthy today.
-        </div>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-4">
-        <Metric title="Today revenue" value={money(totals?.todayRevenue)} tone="emerald" />
-        <Metric title="This week revenue" value={money(totals?.weekRevenue)} tone="slate" />
-        <Metric title="Today profit" value={money(totals?.todayProfit)} tone="emerald" />
-        <Metric title="This week profit" value={money(totals?.weekProfit)} tone="slate" />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-4">
-        <Metric title="COD collected today" value={money(totals?.todayCodCollected)} tone="emerald" />
+      {/* COD */}
+      <div className="grid grid-cols-4 gap-4">
         <Metric title="COD outstanding" value={money(totals?.codOutstandingAmount)} tone="amber" />
-        <Metric title="Outstanding COD orders" value={number(totals?.codOutstandingOrders)} tone="amber" />
-        <Metric
-          title="COD risk"
-          value={codRiskLevel}
-          tone={
-            codRiskLevel === 'High'
-              ? 'red'
-              : codRiskLevel === 'Medium'
-                ? 'amber'
-                : 'emerald'
-          }
-        />
+        <Metric title="COD orders" value={number(totals?.codOutstandingOrders)} tone="amber" />
+        <Metric title="COD risk" value={codRiskLevel} tone="amber" />
+        <Metric title="Collected today" value={money(totals?.todayCodCollected)} tone="emerald" />
       </div>
+<div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-emerald-100">
+  <div className="mb-5 flex items-center justify-between">
+    <div>
+      <h2 className="text-xl font-black text-slate-900">7-day revenue trend</h2>
+      <p className="mt-1 text-sm text-slate-600">
+        Daily successful payment revenue for the selected scope.
+      </p>
+    </div>
+  </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Metric title="Delivered today" value={number(totals?.todayDeliveredOrders)} tone="slate" />
-        <Metric title="Settled today" value={number(totals?.todaySettledOrders)} tone="slate" />
-        <Metric title="Today COGS" value={money(totals?.todayCogs)} tone="slate" />
-      </div>
+  {trend.length === 0 ? (
+    <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
+      No revenue trend data yet.
+    </div>
+  ) : (
+    <div className="space-y-3">
+      {trend.map((point) => {
+        const max = Math.max(...trend.map((x) => Number(x.revenue || 0)), 1);
+        const width = Math.max((Number(point.revenue || 0) / max) * 100, 4);
 
-      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-emerald-100">
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-black text-slate-900">
-              Outstanding COD by driver
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Drivers holding cash that still needs to be collected.
-            </p>
+        return (
+          <div key={point.period}>
+            <div className="mb-1 flex justify-between text-xs font-bold text-slate-600">
+              <span>{point.period}</span>
+              <span>{money(point.revenue)}</span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-emerald-50">
+              <div
+                className="h-full rounded-full bg-emerald-600"
+                style={{ width: `${width}%` }}
+              />
+            </div>
           </div>
+        );
+      })}
+    </div>
+  )}
+</div>
+
+{isGlobal ? (
+  <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-emerald-100">
+    <div className="mb-5">
+      <h2 className="text-xl font-black text-slate-900">Town comparison</h2>
+      <p className="mt-1 text-sm text-slate-600">
+        Compare town performance across revenue, profit and orders.
+      </p>
+    </div>
+
+    {leaderboard.length === 0 ? (
+      <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
+        No town leaderboard data yet.
+      </div>
+    ) : (
+      <div className="space-y-3">
+        {leaderboard.slice(0, 10).map((row, index) => {
+          const revenue =
+            row.revenue ?? row.totalRevenue ?? 0;
+          const profit =
+            row.profit ?? row.totalProfit ?? 0;
+          const orders =
+            row.orders ?? row.orderCount ?? 0;
+          const townName =
+            row.townName ?? row.town ?? row.name ?? `Town ${index + 1}`;
+
+          return (
+            <div
+              key={row.townId || townName}
+              className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div>
+                <div className="font-black text-slate-900">
+                  #{index + 1} {townName}
+                </div>
+                <div className="mt-1 text-sm text-slate-500">
+                  {number(orders)} orders
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-right">
+                <div>
+                  <div className="text-xs font-bold text-slate-500">Revenue</div>
+                  <div className="font-black text-emerald-700">
+                    {money(revenue)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-500">Profit</div>
+                  <div className="font-black text-slate-900">
+                    {money(profit)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+) : null}
+      {/* DRIVERS */}
+      <div className="bg-white p-6 rounded-3xl shadow-sm">
+        <div className="flex justify-between mb-4">
+          <h2 className="text-xl font-bold">COD by Driver</h2>
 
           <Link
             href="/ops/cod"
-            className="rounded-2xl bg-emerald-600 px-4 py-3 text-center text-sm font-bold text-white hover:bg-emerald-700"
+            className="bg-emerald-600 text-white px-4 py-2 rounded-xl"
           >
-            Open COD Cash
+            Open COD
           </Link>
         </div>
 
-        {!data?.codOutstandingByDriver?.length ? (
-          <div className="rounded-2xl bg-emerald-50 p-5 text-sm font-semibold text-emerald-800">
-            No outstanding COD cash. Everything is settled.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {data.codOutstandingByDriver.map((driver) => (
-              <div
-                key={driver.driverId || 'unassigned'}
-                className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <div className="font-bold text-slate-900">
-                    {driver.driverName || 'Unassigned'}
-                  </div>
-                  <div className="mt-1 text-sm text-slate-500">
-                    {driver.driverPhone || 'No phone'} · {driver.ordersCount}{' '}
-                    orders
-                  </div>
-                </div>
-
-                <div className="text-lg font-black text-amber-700">
-                  {money(driver.totalOutstanding)}
-                </div>
+        {data?.codOutstandingByDriver.map((d) => (
+          <div
+            key={d.driverId || 'x'}
+            className="flex justify-between border p-3 rounded-xl mb-2"
+          >
+            <div>
+              <div className="font-bold">{d.driverName}</div>
+              <div className="text-sm text-gray-500">
+                {d.ordersCount} orders
               </div>
-            ))}
+            </div>
+            <div className="font-bold text-amber-700">
+              {money(d.totalOutstanding)}
+            </div>
           </div>
-        )}
+        ))}
       </div>
     </div>
   );
@@ -256,23 +377,12 @@ function Metric({
 }: {
   title: string;
   value: string;
-  tone: 'emerald' | 'amber' | 'red' | 'slate';
+  tone: string;
 }) {
-  const toneClass =
-    tone === 'emerald'
-      ? 'bg-emerald-50 text-emerald-800 ring-emerald-100'
-      : tone === 'amber'
-        ? 'bg-amber-50 text-amber-800 ring-amber-100'
-        : tone === 'red'
-          ? 'bg-red-50 text-red-800 ring-red-100'
-          : 'bg-white text-slate-900 ring-slate-200';
-
   return (
-    <div className={`rounded-3xl p-5 shadow-sm ring-1 ${toneClass}`}>
-      <div className="text-xs font-black uppercase tracking-wide opacity-70">
-        {title}
-      </div>
-      <div className="mt-3 text-2xl font-black">{value}</div>
+    <div className="rounded-xl bg-white p-4 shadow-sm">
+      <div className="text-xs text-gray-500">{title}</div>
+      <div className="text-xl font-bold">{value}</div>
     </div>
   );
 }

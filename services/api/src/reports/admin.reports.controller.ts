@@ -6,6 +6,7 @@ import { RolesGuard } from '../common/auth/roles.guard';
 import { Roles, AdminRole } from '../common/auth/roles.decorator';
 import { OpsDashboardQueryDto } from './dto/ops-dashboard.query.dto';
 import { RevenueTrendQueryDto } from './dto/revenue-trend.query.dto';
+import { TownLeaderboardQueryDto } from './dto/town-leaderboard.query.dto';
 
 @Controller('admin/reports')
 @UseGuards(AdminJwtGuard, RolesGuard)
@@ -28,13 +29,9 @@ export class AdminReportsController {
     return this.reportsService.getTownOptions();
   }
 @Get('profit-intelligence')
-@Roles(
-  AdminRole.GLOBAL_SUPER_ADMIN,
-  AdminRole.TOWN_SUPER_ADMIN,
-  AdminRole.WAREHOUSE_ADMIN,
-)
-async profitIntelligence(@Query('townId') townId?: string) {
-  return this.reportsService.getProfitIntelligence(townId ?? null);
+@Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
+async profitIntelligence(@Query('townId') townId: string | undefined, @Req() req: any) {
+  return this.reportsService.getProfitIntelligence(req.adminUser, townId ?? null);
 }
   @Get('revenue-trend')
   @Roles(
@@ -64,9 +61,14 @@ async profitIntelligence(@Query('townId') townId?: string) {
 
     return this.reportsService.getRevenueTrend(query as any);
   }
-    @Get('finance-summary')
-  @Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
-  async financeSummary(@Query() _query: any, @Req() req: any) {
-    return this.reportsService.financeSummary(req.adminUser);
+   @Get('finance-summary')
+@Roles(AdminRole.GLOBAL_SUPER_ADMIN, AdminRole.TOWN_SUPER_ADMIN)
+async financeSummary(@Query('townId') townId: string | undefined, @Req() req: any) {
+  return this.reportsService.financeSummary(req.adminUser, townId ?? null);
+}
+  @Get('town-leaderboard')
+  @Roles(AdminRole.GLOBAL_SUPER_ADMIN)
+  async townLeaderboard(@Query() query: TownLeaderboardQueryDto) {
+    return this.reportsService.townLeaderboard(query);
   }
 }
