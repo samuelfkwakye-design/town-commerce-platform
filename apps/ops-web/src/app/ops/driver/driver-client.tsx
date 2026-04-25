@@ -30,11 +30,7 @@ type DriverOrder = {
   driverName: string | null;
   driverPhone: string | null;
   driverAssignedAt: string | null;
-  town: {
-    id: string;
-    name: string;
-    slug: string;
-  };
+  town: { id: string; name: string; slug: string };
   driver: {
     id: string;
     name: string;
@@ -46,6 +42,7 @@ type DriverOrder = {
 function formatMoney(value: string | number) {
   const n = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(n)) return '—';
+
   return new Intl.NumberFormat('en-GB', {
     style: 'currency',
     currency: 'GHS',
@@ -85,10 +82,12 @@ export default function DriverClient() {
 
   useEffect(() => {
     const savedToken = localStorage.getItem('driverToken');
+
     if (!savedToken) {
       router.replace('/ops/driver/login');
       return;
     }
+
     setToken(savedToken);
   }, [router]);
 
@@ -103,22 +102,18 @@ export default function DriverClient() {
 
       try {
         const [meData, ordersData] = await Promise.all([
-  apiFetch<DriverMe>('/driver-auth/me', {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  }),
-  apiFetch<DriverOrder[]>('/driver/orders', {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  }),
-]);
+          apiFetch<DriverMe>('/driver-auth/me', {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          apiFetch<DriverOrder[]>('/driver/orders', {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
 
-if (!cancelled) {
-  setDriver(meData);
-  setOrders(Array.isArray(ordersData) ? ordersData : []);
-}
+        if (!cancelled) {
+          setDriver(meData);
+          setOrders(Array.isArray(ordersData) ? ordersData : []);
+        }
       } catch (err: any) {
         if (!cancelled) {
           setError(err?.message || 'Failed to load driver dashboard');
@@ -140,14 +135,13 @@ if (!cancelled) {
   }, [token, router]);
 
   async function refreshOrders(currentToken: string) {
-  const data = await apiFetch<DriverOrder[]>('/driver/orders', {
-    headers: {
-      Authorization: `Bearer ${currentToken}`,
-    },
-  });
+    const data = await apiFetch<DriverOrder[]>('/driver/orders', {
+      headers: { Authorization: `Bearer ${currentToken}` },
+    });
 
-  setOrders(Array.isArray(data) ? data : []);
-}
+    setOrders(Array.isArray(data) ? data : []);
+  }
+
   async function doAction(orderId: string, action: 'pickup' | 'delivered') {
     if (!token) return;
 
@@ -155,52 +149,47 @@ if (!cancelled) {
     setError(null);
 
     try {
-  await apiFetch(`/driver/orders/${orderId}/${action}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+      await apiFetch(`/driver/orders/${orderId}/${action}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-  // ✅ Instant feedback
-  const message =
-    action === 'pickup'
-      ? 'Pickup confirmed. The customer has been notified.'
-      : 'Delivery confirmed. The order has been completed.';
+      const message =
+        action === 'pickup'
+          ? 'Pickup confirmed. The customer has been notified.'
+          : 'Delivery confirmed. The order has been completed.';
 
-  setSuccessMessage(message);
-  setError(null);
-  if (action === 'delivered') {
-  setCompletedOrderId(orderId);
-}
+      setSuccessMessage(message);
+      setError(null);
 
-  // 📳 Haptic feedback (mobile)
-  if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-    navigator.vibrate(100);
+      if (action === 'delivered') {
+        setCompletedOrderId(orderId);
+      }
+
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(100);
+      }
+
+      if (action === 'delivered') {
+        setTimeout(async () => {
+          await refreshOrders(token);
+          setCompletedOrderId(null);
+        }, 1200);
+      } else {
+        await refreshOrders(token);
+      }
+
+      setTimeout(() => {
+        setSuccessMessage(null);
+      }, 5000);
+    } catch (err: any) {
+      setError(err?.message || 'Action failed');
+    } finally {
+      setActionLoadingId(null);
+    }
   }
 
- if (action === 'delivered') {
-  setTimeout(async () => {
-    await refreshOrders(token);
-    setCompletedOrderId(null);
-  }, 1200);
-} else {
-  await refreshOrders(token);
-}
-
-  // ⏳ Auto-clear message
-  setTimeout(() => {
-    setSuccessMessage(null);
-  }, 5000);
-
-} catch (err: any) {
-  setError(err?.message || 'Action failed');
-} finally {
-  setActionLoadingId(null);
-}
-}
-
-function logout() {
+  function logout() {
     localStorage.removeItem('driverToken');
     router.replace('/ops/driver/login');
   }
@@ -209,8 +198,8 @@ function logout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-10">
-        <div className="mx-auto max-w-3xl rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <div className="min-h-screen bg-emerald-50 px-4 py-10">
+        <div className="mx-auto max-w-3xl rounded-3xl bg-white p-6 shadow-sm ring-1 ring-emerald-100">
           <div className="text-sm text-slate-600">Loading driver dashboard...</div>
         </div>
       </div>
@@ -218,48 +207,52 @@ function logout() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-6">
+    <div className="min-h-screen bg-emerald-50 px-4 py-5">
       <div className="mx-auto max-w-3xl space-y-4">
-        <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="rounded-3xl bg-emerald-700 p-5 text-white shadow-sm">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700">
+              <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-sm font-semibold">
                 Marketa Driver
               </div>
-              <h1 className="mt-3 text-2xl font-bold text-slate-900">
-                {driver?.name || 'Driver'}
-              </h1>
-              <p className="mt-1 text-sm text-slate-600">
-                Phone: {driver?.phone || '—'}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
+              <h1 className="mt-3 text-2xl font-bold">{driver?.name || 'Driver'}</h1>
+              <p className="mt-1 text-sm text-emerald-50">Phone: {driver?.phone || '—'}</p>
+              <p className="mt-1 text-sm text-emerald-50">
                 Availability: {driver?.availability || '—'}
               </p>
             </div>
 
             <button
               onClick={logout}
-              className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-emerald-800"
             >
               Log out
             </button>
           </div>
         </div>
 
+        {successMessage ? (
+          <div className="rounded-3xl border border-emerald-200 bg-white px-4 py-4 text-sm font-bold text-emerald-800 shadow-sm">
+            ✅ {successMessage}
+          </div>
+        ) : null}
+
         {error ? (
-          <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-3xl border border-red-200 bg-red-50 px-4 py-4 text-sm font-semibold text-red-700">
             {error}
           </div>
         ) : null}
 
-        <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-emerald-100">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Assigned orders</h2>
-            <div className="text-sm text-slate-500">{activeOrders.length} active</div>
+            <h2 className="text-lg font-bold text-slate-900">Assigned orders</h2>
+            <div className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
+              {activeOrders.length} active
+            </div>
           </div>
 
           {activeOrders.length === 0 ? (
-            <div className="rounded-2xl bg-slate-50 px-4 py-6 text-sm text-slate-600">
+            <div className="rounded-3xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-600">
               No assigned orders yet.
             </div>
           ) : (
@@ -272,20 +265,20 @@ function logout() {
                   <div
                     key={order.id}
                     className={`rounded-3xl border p-4 transition-all duration-500 ${
-  completedOrderId === order.id
-    ? 'border-emerald-300 bg-emerald-50 scale-[0.99]'
-    : 'border-slate-200 bg-white'
-}`}
->
-{completedOrderId === order.id ? (
-  <div className="mb-3 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white">
-    ✅ Delivery confirmed
-  </div>
-) : null}
-                  
+                      completedOrderId === order.id
+                        ? 'scale-[0.99] border-emerald-300 bg-emerald-50'
+                        : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    {completedOrderId === order.id ? (
+                      <div className="mb-3 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white">
+                        ✅ Delivery confirmed
+                      </div>
+                    ) : null}
+
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <div className="text-base font-semibold text-slate-900">
+                        <div className="text-base font-bold text-slate-900">
                           Order {order.id.slice(-8)}
                         </div>
                         <div className="mt-1 text-sm text-slate-600">
@@ -294,22 +287,22 @@ function logout() {
                         <div className="mt-1 text-sm text-slate-600">
                           Town: {order.town?.name || '—'}
                         </div>
-                        <div className="mt-1 text-sm text-slate-600">
+                        <div className="mt-1 text-sm font-semibold text-slate-800">
                           Total: {formatMoney(order.total)}
                         </div>
                       </div>
 
-                      <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                      <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                         {order.status}
                       </div>
                     </div>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl bg-slate-50 p-3">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
                           Recipient
                         </div>
-                        <div className="mt-2 text-sm text-slate-800">
+                        <div className="mt-2 text-sm font-semibold text-slate-800">
                           {order.deliveryRecipientName || '—'}
                         </div>
                         <div className="mt-1 text-sm text-slate-600">
@@ -321,12 +314,10 @@ function logout() {
                       </div>
 
                       <div className="rounded-2xl bg-slate-50 p-3">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
                           Address
                         </div>
-                        <div className="mt-2 text-sm text-slate-800">
-                          {address || '—'}
-                        </div>
+                        <div className="mt-2 text-sm text-slate-800">{address || '—'}</div>
                         {order.deliveryNotes ? (
                           <div className="mt-2 text-sm text-slate-600">
                             Notes: {order.deliveryNotes}
@@ -340,14 +331,14 @@ function logout() {
                       {formatDate(order.createdAt)}
                     </div>
 
-                    <div className="mt-4 flex flex-wrap gap-3">
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                       {order.status === 'CONFIRMED' ? (
                         <button
                           onClick={() => doAction(order.id, 'pickup')}
                           disabled={isBusy}
-                          className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="w-full rounded-2xl bg-emerald-600 px-5 py-4 text-base font-bold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                         >
-                          {isBusy ? 'Processing...' : 'Picked up'}
+                          {isBusy ? 'Confirming pickup...' : 'Confirm pickup'}
                         </button>
                       ) : null}
 
@@ -355,10 +346,19 @@ function logout() {
                         <button
                           onClick={() => doAction(order.id, 'delivered')}
                           disabled={isBusy}
-                          className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+                          className="w-full rounded-2xl bg-slate-950 px-5 py-4 text-base font-bold text-white shadow-sm hover:bg-black disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                         >
-                          {isBusy ? 'Processing...' : 'Delivered'}
+                          {isBusy ? 'Confirming delivery...' : 'Confirm delivered'}
                         </button>
+                      ) : null}
+
+                      {order.deliveryPhone ? (
+                        <a
+                          href={`tel:${order.deliveryPhone}`}
+                          className="w-full rounded-2xl border border-slate-300 px-5 py-4 text-center text-base font-bold text-slate-700 sm:w-auto"
+                        >
+                          Call customer
+                        </a>
                       ) : null}
                     </div>
                   </div>
