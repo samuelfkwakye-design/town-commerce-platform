@@ -136,34 +136,34 @@ export default function OpsLayoutShell({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="flex">
-        <aside className="w-64 border-r bg-white p-4">
-          <div className="mb-4">
-            <div className="flex justify-end mb-2">
-  <AdminNotificationsPanel />
-</div>
-            <div className="text-lg font-semibold">Ops</div>
-            <div className="text-xs text-gray-500">Town Commerce Platform</div>
+  <div className="min-h-screen bg-gray-50">
+    <div className="flex">
+      <aside className="w-64 border-r bg-white p-4">
+        <div className="mb-3 flex justify-end">
+          <AdminNotificationsPanel />
+        </div>
 
-            <div className="mt-3 rounded-md border bg-slate-50 px-3 py-2">
-              <div className="text-sm font-medium text-slate-900">
-                {currentAdmin.firstName || currentAdmin.username || currentAdmin.email}
-              </div>
-              <div className="text-xs text-slate-500">{currentAdmin.email}</div>
+        <div className="mb-4">
+          <div className="text-lg font-semibold">Ops</div>
+          <div className="text-xs text-gray-500">Town Commerce Platform</div>
 
-              <div className="mt-1 inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-700">
-                {currentAdmin.role}
-              </div>
-
-              {(isTownSuperAdmin || isWarehouseAdmin) && currentAdmin.town ? (
-                <div className="mt-2 text-xs text-slate-500">
-                  Town: {currentAdmin.town.name}
-                </div>
-              ) : null}
+          <div className="mt-3 rounded-md border bg-slate-50 px-3 py-2">
+            <div className="text-sm font-medium text-slate-900">
+              {currentAdmin.firstName || currentAdmin.username || currentAdmin.email}
             </div>
-          </div>
+            <div className="text-xs text-slate-500">{currentAdmin.email}</div>
 
+            <div className="mt-1 inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-700">
+              {currentAdmin.role}
+            </div>
+
+            {(isTownSuperAdmin || isWarehouseAdmin) && currentAdmin.town ? (
+              <div className="mt-2 text-xs text-slate-500">
+                Town: {currentAdmin.town.name}
+              </div>
+            ) : null}
+          </div>
+        </div>
           <nav className="space-y-1">
             <NavItem href="/ops/dashboard" label="Dashboard" />
             <NavItem href="/ops/orders" label="Orders" />

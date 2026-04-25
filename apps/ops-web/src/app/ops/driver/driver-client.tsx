@@ -198,8 +198,9 @@ if (!cancelled) {
 } finally {
   setActionLoadingId(null);
 }
+}
 
-  function logout() {
+function logout() {
     localStorage.removeItem('driverToken');
     router.replace('/ops/driver/login');
   }
@@ -369,5 +370,4 @@ if (!cancelled) {
       </div>
     </div>
   );
-}
 }
