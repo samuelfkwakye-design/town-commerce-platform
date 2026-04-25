@@ -52,6 +52,10 @@ export default function DriverPayoutsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [payingDriverId, setPayingDriverId] = useState<string | null>(null);
 
+  const [selectedDriver, setSelectedDriver] = useState<PayoutRow | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
+
   const rows = data?.rows || [];
 
   const driversWithOutstanding = useMemo(
@@ -79,16 +83,38 @@ export default function DriverPayoutsPage() {
     load();
   }, []);
 
-  async function markPaid(row: PayoutRow) {
+  function openPaymentModal(row: PayoutRow) {
     if (row.outstandingAmount <= 0) return;
 
-    const ok = confirm(
-      `Confirm payout of ${money(row.outstandingAmount)} to ${row.driverName}?`,
-    );
+    setSelectedDriver(row);
+    setPaymentAmount(String(row.outstandingAmount));
+    setPaymentNote(`Weekly payout for ${row.deliveries} deliveries`);
+    setError(null);
+    setSuccess(null);
+  }
 
-    if (!ok) return;
+  function closePaymentModal() {
+    setSelectedDriver(null);
+    setPaymentAmount('');
+    setPaymentNote('');
+  }
 
-    setPayingDriverId(row.driverId);
+  async function submitPayment() {
+    if (!selectedDriver) return;
+
+    const amount = Number(paymentAmount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Enter a valid payment amount greater than 0.');
+      return;
+    }
+
+    if (amount > selectedDriver.outstandingAmount) {
+      setError('Payment amount cannot be greater than the outstanding amount.');
+      return;
+    }
+
+    setPayingDriverId(selectedDriver.driverId);
     setError(null);
     setSuccess(null);
 
@@ -97,13 +123,17 @@ export default function DriverPayoutsPage() {
         method: 'POST',
         auth: true,
         body: JSON.stringify({
-          driverId: row.driverId,
-          amount: row.outstandingAmount,
-          note: `Weekly payout for ${row.deliveries} deliveries`,
+          driverId: selectedDriver.driverId,
+          amount,
+          note: paymentNote.trim() || `Driver payout for ${selectedDriver.driverName}`,
         }),
       });
 
-      setSuccess(`Payout recorded for ${row.driverName}.`);
+      setSuccess(
+        `Payment of ${money(amount)} recorded for ${selectedDriver.driverName}.`,
+      );
+
+      closePaymentModal();
       await load();
     } catch (err: any) {
       setError(err?.message || 'Failed to record payout');
@@ -217,14 +247,14 @@ export default function DriverPayoutsPage() {
 
                   <div className="text-right">
                     <button
-                      onClick={() => markPaid(row)}
+                      onClick={() => openPaymentModal(row)}
                       disabled={busy || row.outstandingAmount <= 0}
                       className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {busy
                         ? 'Recording...'
                         : row.outstandingAmount > 0
-                          ? 'Mark paid'
+                          ? 'Record payment'
                           : 'Paid'}
                     </button>
                   </div>
@@ -234,6 +264,103 @@ export default function DriverPayoutsPage() {
           </div>
         )}
       </div>
+
+      {selectedDriver ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">
+                  Record driver payment
+                </h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  {selectedDriver.driverName} · Outstanding:{' '}
+                  <span className="font-bold text-amber-700">
+                    {money(selectedDriver.outstandingAmount)}
+                  </span>
+                </p>
+              </div>
+
+              <button
+                onClick={closePaymentModal}
+                className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div>
+                <label className="text-sm font-bold text-slate-700">
+                  Amount paid
+                </label>
+                <input
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                />
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => setPaymentAmount(String(selectedDriver.outstandingAmount))}
+                    className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                  >
+                    Full amount
+                  </button>
+                  <button
+                    onClick={() =>
+                      setPaymentAmount(String(Math.round((selectedDriver.outstandingAmount / 2) * 100) / 100))
+                    }
+                    className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200"
+                  >
+                    Half
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-bold text-slate-700">Note</label>
+                <textarea
+                  value={paymentNote}
+                  onChange={(e) => setPaymentNote(e.target.value)}
+                  rows={3}
+                  className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                />
+              </div>
+
+              <div className="rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+                Remaining after payment:{' '}
+                {money(
+                  Math.max(
+                    selectedDriver.outstandingAmount - Number(paymentAmount || 0),
+                    0,
+                  ),
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                onClick={closePaymentModal}
+                className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitPayment}
+                disabled={payingDriverId === selectedDriver.driverId}
+                className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {payingDriverId === selectedDriver.driverId
+                  ? 'Recording...'
+                  : 'Record payment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
