@@ -107,43 +107,64 @@ export default function AdminNotificationsPanel() {
               </div>
             ) : (
               items.map((notification) => (
-                <button
-                  key={notification.id}
-                  type="button"
-                  onClick={() => openNotification(notification)}
-                  className={`block w-full border-b border-slate-100 p-3 text-left text-sm transition hover:bg-slate-50 ${
-                    notification.isRead ? 'bg-white' : 'bg-emerald-50'
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    <span className="mt-0.5 text-base">
-                      {notification.type === 'ORDER_DELIVERED' ? '✅' : '📦'}
-                    </span>
+  <div
+    key={notification.id}
+    className={`relative border-b border-slate-100 p-3 text-left text-sm transition ${
+      notification.isRead ? 'bg-white' : 'bg-emerald-50'
+    }`}
+  >
+    {/* CLICKABLE AREA */}
+    <div
+      onClick={() => openNotification(notification)}
+      className="cursor-pointer pr-8 hover:bg-slate-50"
+    >
+      <div className="flex items-start gap-2">
+        <span className="mt-0.5 text-base">
+          {notification.type === 'ORDER_DELIVERED' ? '✅' : '📦'}
+        </span>
 
-                    <div className="min-w-0 flex-1">
-                      <div
-                        className={`font-semibold ${
-                          notification.isRead
-                            ? 'text-slate-700'
-                            : 'text-slate-950'
-                        }`}
-                      >
-                        {notification.title}
-                      </div>
+        <div className="min-w-0 flex-1">
+          <div
+            className={`font-semibold ${
+              notification.isRead
+                ? 'text-slate-700'
+                : 'text-slate-950'
+            }`}
+          >
+            {notification.title}
+          </div>
 
-                      <div className="mt-1 text-xs leading-5 text-slate-600">
-                        {notification.message}
-                      </div>
+          <div className="mt-1 text-xs leading-5 text-slate-600">
+            {notification.message}
+          </div>
 
-                      {notification.orderId ? (
-                        <div className="mt-2 text-xs font-semibold text-emerald-700">
-                          Open order →
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </button>
-              ))
+          {notification.orderId ? (
+            <div className="mt-2 text-xs font-semibold text-emerald-700">
+              Open order →
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+
+    {/* MARK AS READ BUTTON */}
+    {!notification.isRead && (
+      <button
+        onClick={async (e) => {
+          e.stopPropagation(); // 🚨 prevents opening order
+          await apiFetch(`/admin/notifications/${notification.id}/read`, {
+            method: 'PATCH',
+            auth: true,
+          });
+          await load();
+        }}
+        className="absolute right-2 top-2 text-xs text-blue-600 hover:text-blue-800"
+      >
+        Mark read
+      </button>
+    )}
+  </div>
+))
             )}
           </div>
         </div>
