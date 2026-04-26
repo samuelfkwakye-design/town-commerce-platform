@@ -59,6 +59,37 @@ export class AdminDriversController {
   update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
     return this.service.update(id, body, req.adminUser);
   }
+    @Patch(':id/availability')
+  @Roles(
+    AdminRole.GLOBAL_SUPER_ADMIN,
+    AdminRole.TOWN_SUPER_ADMIN,
+    AdminRole.WAREHOUSE_ADMIN,
+  )
+  updateAvailability(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Req() req: any,
+  ) {
+    return this.service.update(
+      id,
+      { availability: body.availability },
+      req.adminUser,
+    );
+  }
+
+  @Patch(':id/active')
+  @Roles(
+    AdminRole.GLOBAL_SUPER_ADMIN,
+    AdminRole.TOWN_SUPER_ADMIN,
+    AdminRole.WAREHOUSE_ADMIN,
+  )
+  updateActive(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.service.update(
+      id,
+      { isActive: Boolean(body.isActive) },
+      req.adminUser,
+    );
+  }
 
   @Delete(':id')
   @Roles(AdminRole.GLOBAL_SUPER_ADMIN)
