@@ -39,9 +39,7 @@ function NavItem({
       {badge && badge > 0 ? (
         <span
           className={`ml-3 rounded-full px-2 py-0.5 text-xs font-bold ${
-            active
-              ? 'bg-white/20 text-white'
-              : 'bg-amber-100 text-amber-800'
+            active ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
           }`}
         >
           {badge}
@@ -65,6 +63,7 @@ export default function OpsLayoutShell({
   const [checked, setChecked] = useState(false);
   const [alertsCount, setAlertsCount] = useState(0);
   const [highAlertsCount, setHighAlertsCount] = useState(0);
+
   const isAuthPage =
     pathname === '/ops/login' ||
     pathname === '/ops/forgot-password' ||
@@ -85,54 +84,17 @@ export default function OpsLayoutShell({
             : null;
 
         if (!token) {
-          if (!isAuthPage) router.replace('/ops/login');
           if (!cancelled) {
             setCurrentAdmin(null);
             setChecked(true);
           }
+
+          if (!isAuthPage) {
+            router.replace('/ops/login');
+          }
+
           return;
         }
-
-        useEffect(() => {
-  if (!currentAdmin) return;
-
-  if (!isGlobalSuperAdmin && !isTownSuperAdmin) return;
-
-  let cancelled = false;
-
-  async function loadAlerts() {
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL || ''}/admin/alerts`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
-          },
-        },
-      );
-
-      if (!res.ok) return;
-
-      const data = (await res.json()) as AlertsSummary;
-
-      if (!cancelled) {
-        setAlertsCount(Number(data?.totals?.alerts || 0));
-        setHighAlertsCount(Number(data?.totals?.high || 0));
-      }
-    } catch {
-      // keep sidebar stable if alert polling fails
-    }
-  }
-
-  loadAlerts();
-
-  const interval = window.setInterval(loadAlerts, 10000);
-
-  return () => {
-    cancelled = true;
-    window.clearInterval(interval);
-  };
-}, [currentAdmin, isGlobalSuperAdmin, isTownSuperAdmin]);
 
         const admin = await getCurrentAdmin();
 
@@ -141,24 +103,32 @@ export default function OpsLayoutShell({
         if (!admin) {
           localStorage.removeItem('admin_token');
           document.cookie = 'admin_token=; path=/; max-age=0; samesite=lax';
+
           setCurrentAdmin(null);
           setChecked(true);
 
-          if (!isAuthPage) router.replace('/ops/login');
+          if (!isAuthPage) {
+            router.replace('/ops/login');
+          }
+
           return;
         }
 
         setCurrentAdmin(admin);
         setChecked(true);
 
-        if (pathname === '/ops/login') router.replace('/ops');
+        if (pathname === '/ops/login') {
+          router.replace('/ops');
+        }
       } catch {
         if (cancelled) return;
 
         setCurrentAdmin(null);
         setChecked(true);
 
-        if (!isAuthPage) router.replace('/ops/login');
+        if (!isAuthPage) {
+          router.replace('/ops/login');
+        }
       }
     }
 
@@ -168,6 +138,48 @@ export default function OpsLayoutShell({
       cancelled = true;
     };
   }, [pathname, isAuthPage, router]);
+
+  useEffect(() => {
+    if (!currentAdmin) return;
+    if (!isGlobalSuperAdmin && !isTownSuperAdmin) return;
+
+    let cancelled = false;
+
+    async function loadAlerts() {
+      try {
+        const token = localStorage.getItem('admin_token') || '';
+
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_BASE_URL || ''}/admin/alerts`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        if (!res.ok) return;
+
+        const data = (await res.json()) as AlertsSummary;
+
+        if (!cancelled) {
+          setAlertsCount(Number(data?.totals?.alerts || 0));
+          setHighAlertsCount(Number(data?.totals?.high || 0));
+        }
+      } catch {
+        // keep sidebar stable if alert polling fails
+      }
+    }
+
+    loadAlerts();
+
+    const interval = window.setInterval(loadAlerts, 10000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [currentAdmin, isGlobalSuperAdmin, isTownSuperAdmin]);
 
   if (isAuthPage) {
     return (
@@ -233,21 +245,23 @@ export default function OpsLayoutShell({
 
           <nav className="space-y-1.5">
             <NavItem href="/ops/dashboard" label="Dashboard" />
+
             <NavItem
-  href="/ops/alerts"
-  label={highAlertsCount > 0 ? 'Alerts ⚠' : 'Alerts'}
-  badge={alertsCount}
-/>
+              href="/ops/alerts"
+              label={highAlertsCount > 0 ? 'Alerts ⚠' : 'Alerts'}
+              badge={alertsCount}
+            />
+
             <NavItem href="/ops/orders" label="Orders" />
             <NavItem href="/ops/customers" label="Customers" />
             <NavItem href="/ops/drivers" label="Drivers" />
 
             {isGlobalSuperAdmin || isTownSuperAdmin ? (
-  <>
-    <NavItem href="/ops/cod" label="COD Cash" />
-    <NavItem href="/ops/driver-payouts" label="Driver Payouts" />
-  </>
-) : null}
+              <>
+                <NavItem href="/ops/cod" label="COD Cash" />
+                <NavItem href="/ops/driver-payouts" label="Driver Payouts" />
+              </>
+            ) : null}
 
             <NavItem href="/ops/stock" label="Stock" />
             <NavItem href="/ops/reports" label="Reports" />
