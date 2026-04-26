@@ -91,5 +91,25 @@ export class AdminNotificationsService {
     });
 
     return { ok: true };
+  }  async deleteOne(admin: CurrentAdmin, id: string) {
+    await this.prisma.adminNotification.deleteMany({
+      where: {
+        id,
+        ...this.whereForAdmin(admin),
+      },
+    });
+
+    return { ok: true };
   }
+
+  async deleteAll(admin: CurrentAdmin) {
+    await this.prisma.adminNotification.deleteMany({
+      where: {
+        ...this.whereForAdmin(admin),
+      },
+    });
+
+    return { ok: true };
+  }
+
 }

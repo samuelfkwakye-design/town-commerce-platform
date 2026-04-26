@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
 import { AdminJwtGuard } from '../../admin-auth/guards/admin-jwt.guard';
 import { RolesGuard } from '../../common/auth/roles.guard';
 import { AdminRole, Roles } from '../../common/auth/roles.decorator';
@@ -32,5 +32,14 @@ export class AdminNotificationsController {
   @Patch('read-all')
   markAllRead(@Req() req: any) {
     return this.adminNotificationsService.markAllRead(req.adminUser);
+  }
+    @Delete(':id')
+  deleteOne(@Req() req: any, @Param('id') id: string) {
+    return this.adminNotificationsService.deleteOne(req.adminUser, id);
+  }
+
+  @Delete()
+  deleteAll(@Req() req: any) {
+    return this.adminNotificationsService.deleteAll(req.adminUser);
   }
 }

@@ -16,6 +16,19 @@ type DriverCod = {
   }[];
 };
 
+type ConfirmAction =
+  | {
+      type: 'order';
+      orderId: string;
+      driverName?: string | null;
+      amount?: number;
+    }
+  | {
+      type: 'driver';
+      driver: DriverCod;
+    }
+  | null;
+
 function formatMoney(n: number) {
   return new Intl.NumberFormat('en-GB', {
     style: 'currency',
@@ -30,10 +43,12 @@ function formatDate(value: string) {
 export default function CodPage() {
   const [data, setData] = useState<DriverCod[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [expandedDriver, setExpandedDriver] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
 
   const totalOutstanding = useMemo(
     () => data.reduce((sum, d) => sum + Number(d.totalOutstanding || 0), 0),
@@ -45,18 +60,27 @@ export default function CodPage() {
     [data],
   );
 
-  async function loadData() {
+  async function loadData(options?: { silent?: boolean }) {
+    if (options?.silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
     setError(null);
 
     try {
       const res = await apiFetch<DriverCod[]>('/admin/cod/outstanding', {
         auth: true,
+        cache: 'no-store',
       });
+
       setData(res || []);
     } catch (err: any) {
       setError(err?.message || 'Failed to load COD data');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
@@ -64,13 +88,7 @@ export default function CodPage() {
     loadData();
   }, []);
 
-  async function markOrderCollected(orderId: string, driverName?: string | null) {
-    const ok = confirm(
-      `Confirm COD cash has been collected for order ${orderId.slice(-8)}?`,
-    );
-
-    if (!ok) return;
-
+  async function collectOrder(orderId: string, driverName?: string | null) {
     setActionLoading(orderId);
     setError(null);
     setSuccess(null);
@@ -79,31 +97,22 @@ export default function CodPage() {
       await apiFetch(`/admin/orders/${orderId}/mark-cod-collected`, {
         method: 'PATCH',
         auth: true,
-        body: JSON.stringify({
+        body: {
           note: `COD cash collected from ${driverName || 'driver'}`,
-        }),
+        },
       });
 
       setSuccess(`COD collected for order ${orderId.slice(-8)}.`);
-      await loadData();
+      await loadData({ silent: true });
     } catch (err: any) {
       setError(err?.message || 'Failed to mark COD as collected');
     } finally {
       setActionLoading(null);
+      setConfirmAction(null);
     }
   }
 
-  async function markDriverCollected(driver: DriverCod) {
-    const ok = confirm(
-      `Confirm you collected ${formatMoney(
-        driver.totalOutstanding,
-      )} from ${driver.driverName || 'this driver'} for ${
-        driver.orders.length
-      } order(s)?`,
-    );
-
-    if (!ok) return;
-
+  async function collectDriver(driver: DriverCod) {
     setActionLoading(`driver-${driver.driverId}`);
     setError(null);
     setSuccess(null);
@@ -113,9 +122,9 @@ export default function CodPage() {
         await apiFetch(`/admin/orders/${order.orderId}/mark-cod-collected`, {
           method: 'PATCH',
           auth: true,
-          body: JSON.stringify({
+          body: {
             note: `Bulk COD cash collected from ${driver.driverName || 'driver'}`,
-          }),
+          },
         });
       }
 
@@ -125,13 +134,47 @@ export default function CodPage() {
         }.`,
       );
 
-      await loadData();
+      await loadData({ silent: true });
     } catch (err: any) {
       setError(err?.message || 'Failed to collect all COD for driver');
     } finally {
       setActionLoading(null);
+      setConfirmAction(null);
     }
   }
+
+  async function confirmCollection() {
+    if (!confirmAction) return;
+
+    if (confirmAction.type === 'order') {
+      await collectOrder(confirmAction.orderId, confirmAction.driverName);
+      return;
+    }
+
+    await collectDriver(confirmAction.driver);
+  }
+
+  const confirmTitle =
+    confirmAction?.type === 'driver'
+      ? 'Confirm driver COD collection'
+      : 'Confirm order COD collection';
+
+  const confirmMessage =
+    confirmAction?.type === 'driver'
+      ? `You are confirming that ${formatMoney(
+          confirmAction.driver.totalOutstanding,
+        )} has been collected from ${
+          confirmAction.driver.driverName || 'this driver'
+        } for ${confirmAction.driver.orders.length} order(s).`
+      : confirmAction?.type === 'order'
+        ? `You are confirming that COD cash has been collected for order ${confirmAction.orderId.slice(
+            -8,
+          )}${
+            confirmAction.amount
+              ? ` (${formatMoney(confirmAction.amount)})`
+              : ''
+          }.`
+        : '';
 
   if (loading) {
     return (
@@ -143,6 +186,45 @@ export default function CodPage() {
 
   return (
     <div className="space-y-6">
+      {confirmAction ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="text-xl font-black text-slate-900">
+              {confirmTitle}
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              {confirmMessage}
+            </p>
+
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+              Only confirm this after the cash has physically been handed over
+              and counted.
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmAction(null)}
+                disabled={Boolean(actionLoading)}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmCollection}
+                disabled={Boolean(actionLoading)}
+                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {actionLoading ? 'Processing...' : 'Confirm collection'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="rounded-3xl bg-gradient-to-br from-emerald-700 to-emerald-900 p-6 text-white shadow-lg shadow-emerald-900/10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -151,7 +233,8 @@ export default function CodPage() {
             </div>
             <h1 className="mt-3 text-3xl font-black">COD Cash</h1>
             <p className="mt-2 text-sm text-emerald-50">
-              Track cash held by drivers and mark collections when money is handed over.
+              Track cash held by drivers and mark collections when money is
+              handed over.
             </p>
           </div>
 
@@ -164,10 +247,12 @@ export default function CodPage() {
             </Link>
 
             <button
-              onClick={loadData}
-              className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-emerald-800"
+              type="button"
+              onClick={() => loadData({ silent: true })}
+              disabled={refreshing}
+              className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Refresh
+              {refreshing ? 'Refreshing...' : 'Refresh'}
             </button>
           </div>
         </div>
@@ -241,8 +326,8 @@ export default function CodPage() {
                       {driver.driverName || 'Driver'}
                     </div>
                     <div className="mt-1 text-sm text-slate-600">
-                      {driver.driverPhone || 'No phone'} · {driver.orders.length}{' '}
-                      order(s)
+                      {driver.driverPhone || 'No phone'} ·{' '}
+                      {driver.orders.length} order(s)
                     </div>
                   </div>
 
@@ -253,6 +338,7 @@ export default function CodPage() {
 
                     <div className="flex flex-wrap gap-2">
                       <button
+                        type="button"
                         onClick={() =>
                           setExpandedDriver(isExpanded ? null : driver.driverId)
                         }
@@ -262,7 +348,8 @@ export default function CodPage() {
                       </button>
 
                       <button
-                        onClick={() => markDriverCollected(driver)}
+                        type="button"
+                        onClick={() => setConfirmAction({ type: 'driver', driver })}
                         disabled={driverBusy}
                         className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                       >
@@ -294,8 +381,14 @@ export default function CodPage() {
                           </div>
 
                           <button
+                            type="button"
                             onClick={() =>
-                              markOrderCollected(order.orderId, driver.driverName)
+                              setConfirmAction({
+                                type: 'order',
+                                orderId: order.orderId,
+                                driverName: driver.driverName,
+                                amount: order.amount,
+                              })
                             }
                             disabled={actionLoading === order.orderId}
                             className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"

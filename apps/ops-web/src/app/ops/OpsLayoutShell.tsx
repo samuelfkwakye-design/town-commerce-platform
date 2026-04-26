@@ -173,7 +173,7 @@ export default function OpsLayoutShell({
 
     loadAlerts();
 
-    const interval = window.setInterval(loadAlerts, 10000);
+    const interval = window.setInterval(loadAlerts, 60000);
 
     return () => {
       cancelled = true;
