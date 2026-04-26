@@ -52,7 +52,9 @@ export async function getCurrentAdmin(): Promise<CurrentAdmin | null> {
     });
 
     return normaliseAdmin(data);
-  } catch {
+    } catch (err) {
+    console.error('getCurrentAdmin failed:', err);
+    alert(`Session check failed: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
 }
