@@ -2302,11 +2302,13 @@ private async recalculateTotalsTx(
   const deliveryFee = new Prisma.Decimal(order.deliveryFee ?? 0);
   const serviceFee = new Prisma.Decimal(order.serviceFee ?? 0);
 
-  const payNowTotal = deliveryFee.add(serviceFee);
-  const payOnDeliveryTotal = itemsSubtotal;
-
   const subtotal = itemsSubtotal;
   const total = itemsSubtotal.add(deliveryFee).add(serviceFee);
+
+  const isCodOrder = order.goodsPaymentMethod === 'COD';
+
+  const payNowTotal = isCodOrder ? new Prisma.Decimal(0) : total;
+  const payOnDeliveryTotal = isCodOrder ? total : new Prisma.Decimal(0);
 
   await tx.order.update({
     where: { id: orderId },
