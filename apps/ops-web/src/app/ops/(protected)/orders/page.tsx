@@ -6,6 +6,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { ExportOrdersCsvButton } from '@/components/ExportOrdersCsvButton';
 
+function labelStatus(s: string) {
+  if (s === 'FULFILLED') return 'DELIVERED';
+  return s;
+}
+
 type AdminRole =
   | 'GLOBAL_SUPER_ADMIN'
   | 'TOWN_SUPER_ADMIN'
@@ -459,7 +464,9 @@ function OpsOrdersPageInner() {
     const bits: string[] = [];
 
     if (selectedTown) bits.push(`Town: ${selectedTown.name}`);
-    if (statusParam && statusParam !== 'ALL') bits.push(`Status: ${statusParam}`);
+    if (statusParam && statusParam !== 'ALL') {
+  bits.push(`Status: ${labelStatus(statusParam)}`);
+}
     if (qParam) bits.push(`Search: "${qParam}"`);
     if (fromParam) bits.push(`From: ${compactDate(fromParam)}`);
     if (toParam) bits.push(`To: ${compactDate(toParam)}`);
@@ -689,22 +696,22 @@ function OpsOrdersPageInner() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {STATUSES.map((s) => (
-          <button
-            key={s}
-            onClick={() => {
-              setCursorStack([null]);
-              updateQuery({ status: s, cursor: null });
-            }}
-            className={`rounded-full border px-3 py-1 text-sm ${
-              statusParam === s
-                ? 'bg-slate-900 text-white border-slate-900'
-                : 'bg-white border-slate-300'
-            }`}
-          >
-            {s}
-          </button>
-        ))}
+       {STATUSES.map((s) => (
+  <button
+    key={s}
+    onClick={() => {
+      setCursorStack([null]);
+      updateQuery({ status: s, cursor: null });
+    }}
+    className={`rounded-full border px-3 py-1 text-sm ${
+      statusParam === s
+        ? 'bg-slate-900 text-white border-slate-900'
+        : 'bg-white border-slate-300'
+    }`}
+  >
+    {labelStatus(s)}
+  </button>
+))}
       </div>
 
       {adminLoading || loading ? (
@@ -808,8 +815,8 @@ function OpsOrdersPageInner() {
 
                   <td className="p-3">
                     <span className={`rounded-full px-2 py-1 text-xs border ${badgeClass(o.status)}`}>
-                      {o.status}
-                    </span>
+  {labelStatus(o.status)}
+</span>
                   </td>
 
                   <td className="p-3">
