@@ -79,6 +79,7 @@ type TownLite = {
 const STATUSES = [
   'ALL',
   'DRAFT',
+  'CONFIRMED',
   'FULFILLED',
   'SETTLED',
   'REFUNDED',
