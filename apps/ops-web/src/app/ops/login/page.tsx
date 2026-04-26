@@ -45,8 +45,17 @@ document.cookie = `admin_token=${token}; path=/; max-age=${
 }; samesite=lax`;
 
       router.replace('/ops');
-    } catch (err: any) {
-      setError(err.message || 'Login failed');
+        } catch (err: any) {
+      console.error(err);
+
+      const message =
+        err?.message ||
+        err?.response?.message ||
+        JSON.stringify(err) ||
+        'Login failed';
+
+      setError(message);
+      alert(message);
     } finally {
       setLoading(false);
     }
