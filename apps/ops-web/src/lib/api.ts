@@ -35,9 +35,7 @@ async function getAdminToken(auth?: boolean): Promise<string | null> {
     }
 
     try {
-      const match = document.cookie.match(
-        /(?:^|;\s*)admin_token=([^;]+)/,
-      );
+      const match = document.cookie.match(/(?:^|;\s*)admin_token=([^;]+)/);
       return match ? decodeURIComponent(match[1]) : null;
     } catch {
       return null;
@@ -61,7 +59,6 @@ export async function apiFetch<T = any>(
   }
 
   let body: BodyInit | null | undefined = undefined;
-
   const rawBody = init.body;
 
   const isFormData =
@@ -94,13 +91,7 @@ export async function apiFetch<T = any>(
   } else if (rawBody != null) {
     body = rawBody as BodyInit;
   }
-if (path.includes('/admin-auth/me')) {
-  alert(
-    `Calling /admin-auth/me\nBase: ${base}\nToken exists: ${
-      token ? 'YES' : 'NO'
-    }\nToken starts: ${token ? token.slice(0, 20) : 'none'}`
-  );
-}
+
   const res = await fetch(`${base}${path}`, {
     ...init,
     headers,
@@ -108,9 +99,7 @@ if (path.includes('/admin-auth/me')) {
     cache: init.cache ?? 'no-store',
     credentials: 'include',
   });
-if (path.includes('/admin-auth/me')) {
-  alert(`/admin-auth/me response status: ${res.status}`);
-}
+
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
 

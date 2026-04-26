@@ -45,29 +45,15 @@ function normaliseAdmin(raw: any): CurrentAdmin | null {
 
 export async function getCurrentAdmin(): Promise<CurrentAdmin | null> {
   try {
-    const token =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('admin_token')
-        : null;
-
-    alert(`Checking session. Token exists: ${token ? 'YES' : 'NO'}`);
-
     const data = await apiFetch('/admin-auth/me', {
       method: 'GET',
       auth: true,
       cache: 'no-store',
     });
 
-    alert('Session check succeeded');
-
     return normaliseAdmin(data);
   } catch (err) {
     console.error('getCurrentAdmin failed:', err);
-    alert(
-      `Session check failed: ${
-        err instanceof Error ? err.message : String(err)
-      }`
-    );
     return null;
   }
 }
