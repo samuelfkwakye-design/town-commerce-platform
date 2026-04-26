@@ -420,7 +420,7 @@ return (
     ) : null}
 
     <div className="mx-auto w-full max-w-md space-y-4 sm:max-w-2xl">
-      <div className="sticky top-3 z-10 rounded-[2rem] bg-emerald-700 p-5 text-white shadow-lg shadow-emerald-900/10">
+      <div className="sticky top-3 z-30 rounded-[2rem] border border-emerald-500 bg-emerald-700 p-5 text-white shadow-2xl shadow-emerald-900/20 backdrop-blur">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-sm font-semibold">
