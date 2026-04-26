@@ -261,51 +261,56 @@ function OpsOrdersPageInner() {
     currentAdmin?.role === 'TOWN_SUPER_ADMIN' ||
     currentAdmin?.role === 'WAREHOUSE_ADMIN';
 
-  function updateQuery(next: {
-    status?: string;
-    q?: string;
-    from?: string;
-    to?: string;
-    townId?: string;
-    cursor?: string | null;
-    limit?: number;
-  }) {
-    const sp = new URLSearchParams(searchParams.toString());
+ function updateQuery(next: {
+  status?: string;
+  q?: string;
+  from?: string;
+  to?: string;
+  townId?: string;
+  cursor?: string | null;
+  limit?: number;
+}) {
+  const sp = new URLSearchParams(searchParams.toString());
 
-    const apply = (key: string, value: string | undefined) => {
-      if (value && value.trim().length > 0) sp.set(key, value.trim());
-      else sp.delete(key);
-    };
+  const apply = (key: string, value: string | undefined) => {
+    if (value && value.trim().length > 0) sp.set(key, value.trim());
+    else sp.delete(key);
+  };
 
-    apply('status', next.status);
-    apply('q', next.q);
-    apply('from', next.from);
-    apply('to', next.to);
-    apply('townId', next.townId);
-    if (
-  next.status !== undefined ||
-  next.q !== undefined ||
-  next.from !== undefined ||
-  next.to !== undefined ||
-  next.townId !== undefined
-) {
-  sp.delete('cursor');
-}
+  const has = (key: keyof typeof next) =>
+    Object.prototype.hasOwnProperty.call(next, key);
 
-    if (typeof next.limit === 'number' && Number.isFinite(next.limit)) {
-      sp.set('limit', String(next.limit));
-    }
+  // Only update keys that were explicitly passed
+  if (has('status')) apply('status', next.status);
+  if (has('q')) apply('q', next.q);
+  if (has('from')) apply('from', next.from);
+  if (has('to')) apply('to', next.to);
+  if (has('townId')) apply('townId', next.townId);
 
-    if (next.cursor !== undefined) {
-      const c = next.cursor;
-      if (c && c.trim().length > 0) sp.set('cursor', c.trim());
-      else sp.delete('cursor');
-    }
-
-    const qs = sp.toString();
-    router.replace(qs ? `?${qs}` : '?');
+  // Reset cursor only when filters actually change
+  if (
+    has('status') ||
+    has('q') ||
+    has('from') ||
+    has('to') ||
+    has('townId')
+  ) {
+    sp.delete('cursor');
   }
 
+  if (typeof next.limit === 'number' && Number.isFinite(next.limit)) {
+    sp.set('limit', String(next.limit));
+  }
+
+  if (next.cursor !== undefined) {
+    const c = next.cursor;
+    if (c && c.trim().length > 0) sp.set('cursor', c.trim());
+    else sp.delete('cursor');
+  }
+
+  const qs = sp.toString();
+  router.replace(qs ? `?${qs}` : '?');
+}
   useEffect(() => {
     if (debouncedQ !== qParam) {
       updateQuery({ q: debouncedQ, cursor: null });
