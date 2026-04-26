@@ -593,7 +593,13 @@ export default function DriverClient() {
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                       {order.status === 'CONFIRMED' ? (
                         <button
-                          onClick={() => doAction(order.id, 'pickup')}
+                          onClick={() => {
+  const ok = confirm('Confirm you have picked up this order?');
+
+  if (!ok) return;
+
+  doAction(order.id, 'pickup');
+}}
                           disabled={isBusy}
                           className="w-full rounded-2xl bg-emerald-600 px-5 py-4 text-base font-bold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                         >
@@ -603,7 +609,15 @@ export default function DriverClient() {
 
                       {order.status === 'FULFILLED' ? (
                         <button
-                          onClick={() => doAction(order.id, 'delivered')}
+                          onClick={() => {
+  const ok = confirm(
+    'Are you sure you have delivered this order to the customer?'
+  );
+
+  if (!ok) return;
+
+  doAction(order.id, 'delivered');
+}}
                           disabled={isBusy}
                           className="w-full rounded-2xl bg-slate-950 px-5 py-4 text-base font-bold text-white shadow-sm hover:bg-black disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                         >
@@ -612,13 +626,25 @@ export default function DriverClient() {
                       ) : null}
 
                       {order.deliveryPhone ? (
-                        <a
-                          href={`tel:${order.deliveryPhone}`}
-                          className="w-full rounded-2xl border border-slate-300 px-5 py-4 text-center text-base font-bold text-slate-700 sm:w-auto"
-                        >
-                          Call customer
-                        </a>
-                      ) : null}
+  <button
+    onClick={() => {
+      const phone = order.deliveryPhone!;
+      const isMobile =
+        typeof navigator !== 'undefined' &&
+        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        window.location.href = `tel:${phone}`;
+      } else {
+        navigator.clipboard.writeText(phone);
+        alert(`Phone number copied: ${phone}`);
+      }
+    }}
+    className="w-full rounded-2xl border border-slate-300 px-5 py-4 text-center text-base font-bold text-slate-700 sm:w-auto"
+  >
+    Call customer
+  </button>
+) : null}
                     </div>
                   </div>
                 );
