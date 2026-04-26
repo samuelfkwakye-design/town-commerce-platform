@@ -282,6 +282,15 @@ function OpsOrdersPageInner() {
     apply('from', next.from);
     apply('to', next.to);
     apply('townId', next.townId);
+    if (
+  next.status !== undefined ||
+  next.q !== undefined ||
+  next.from !== undefined ||
+  next.to !== undefined ||
+  next.townId !== undefined
+) {
+  sp.delete('cursor');
+}
 
     if (typeof next.limit === 'number' && Number.isFinite(next.limit)) {
       sp.set('limit', String(next.limit));
