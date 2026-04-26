@@ -80,7 +80,9 @@ export default function DriversPage() {
   const [loadingDrivers, setLoadingDrivers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [actionBusyId, setActionBusyId] = useState<string | null>(null);
-
+  const [pendingDeleteDriver, setPendingDeleteDriver] = useState<Driver | null>(
+  null,
+);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -280,38 +282,43 @@ export default function DriversPage() {
   }
 
   async function deleteDriver(driver: Driver) {
-    setSuccessMessage('');
-    setErrorMessage('');
+  setSuccessMessage('');
+  setErrorMessage('');
 
-    if (!canDeleteDriver) {
-      setErrorMessage('Only global super admins can delete drivers.');
-      return;
-    }
-
-    const ok = window.confirm(
-      `Delete ${driver.name}? This will hide the driver from the list but keep historical order records.`,
-    );
-
-    if (!ok) return;
-
-    setActionBusyId(`${driver.id}-delete`);
-
-    try {
-      await apiFetch(`/admin/drivers/${driver.id}`, {
-        method: 'DELETE',
-        auth: true,
-      });
-
-      setDrivers((prev) => prev.filter((d) => d.id !== driver.id));
-      setSuccessMessage(`${driver.name} deleted from driver list.`);
-    } catch (error) {
-      console.error('Failed to delete driver', error);
-      const msg = error instanceof Error ? error.message : String(error);
-      setErrorMessage(msg || 'Failed to delete driver.');
-    } finally {
-      setActionBusyId(null);
-    }
+  if (!canDeleteDriver) {
+    setErrorMessage('Only global super admins can delete drivers.');
+    return;
   }
+
+  setPendingDeleteDriver(driver);
+}
+
+async function confirmDeleteDriver() {
+  if (!pendingDeleteDriver) return;
+
+  const driver = pendingDeleteDriver;
+
+  setActionBusyId(`${driver.id}-delete`);
+  setSuccessMessage('');
+  setErrorMessage('');
+
+  try {
+    await apiFetch(`/admin/drivers/${driver.id}`, {
+      method: 'DELETE',
+      auth: true,
+    });
+
+    setDrivers((prev) => prev.filter((d) => d.id !== driver.id));
+    setSuccessMessage(`${driver.name} deleted from driver list.`);
+    setPendingDeleteDriver(null);
+  } catch (error) {
+    console.error('Failed to delete driver', error);
+    const msg = error instanceof Error ? error.message : String(error);
+    setErrorMessage(msg || 'Failed to delete driver.');
+  } finally {
+    setActionBusyId(null);
+  }
+}
 
   useEffect(() => {
     async function bootstrap() {
@@ -361,6 +368,50 @@ export default function DriversPage() {
 
   return (
     <div className="space-y-6 p-6">
+      {pendingDeleteDriver ? (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 p-4">
+    <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+      <div className="text-xl font-black text-slate-900">
+        Delete driver?
+      </div>
+
+      <p className="mt-3 text-sm leading-6 text-slate-600">
+        This will hide{' '}
+        <span className="font-bold text-slate-900">
+          {pendingDeleteDriver.name}
+        </span>{' '}
+        from the driver list. Historical orders and records will remain.
+      </p>
+
+      <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+        This action should only be used when the driver should no longer appear
+        in operations.
+      </div>
+
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={() => setPendingDeleteDriver(null)}
+          disabled={actionBusyId === `${pendingDeleteDriver.id}-delete`}
+          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          onClick={confirmDeleteDriver}
+          disabled={actionBusyId === `${pendingDeleteDriver.id}-delete`}
+          className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {actionBusyId === `${pendingDeleteDriver.id}-delete`
+            ? 'Deleting...'
+            : 'Delete driver'}
+        </button>
+      </div>
+    </div>
+  </div>
+) : null}
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
