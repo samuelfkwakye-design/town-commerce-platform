@@ -47,7 +47,10 @@ export class AdminDriversService {
     const effectiveTownId = this.getEffectiveTownId(townId, admin);
 
     return this.prisma.driver.findMany({
-      where: effectiveTownId ? { townId: effectiveTownId } : {},
+  where: {
+    ...(effectiveTownId ? { townId: effectiveTownId } : {}),
+    deletedAt: null,
+  },
       orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
       include: {
         town: { select: { id: true, name: true, slug: true } },
@@ -172,8 +175,11 @@ export class AdminDriversService {
   async remove(id: string, admin: CurrentAdminUser) {
     await this.get(id, admin);
 
-    return this.prisma.driver.delete({
-      where: { id },
-    });
+    return this.prisma.driver.update({
+  where: { id },
+  data: {
+    deletedAt: new Date(),
+  },
+});
   }
 }

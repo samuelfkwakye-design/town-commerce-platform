@@ -9,6 +9,9 @@ type AdminRole =
   | 'TOWN_SUPER_ADMIN'
   | 'WAREHOUSE_ADMIN';
 
+type Availability = 'AVAILABLE' | 'BUSY' | 'OFFLINE';
+type AvailabilityFilter = 'ALL' | Availability;
+
 type CurrentAdmin = {
   id: string;
   name?: string | null;
@@ -27,7 +30,7 @@ type Driver = {
   id: string;
   name: string;
   phone: string;
-  availability: 'AVAILABLE' | 'BUSY' | 'OFFLINE';
+  availability: Availability;
   priority: number;
   isActive: boolean;
   lastAssignedAt?: string | null;
@@ -53,7 +56,7 @@ function formatDateTime(value?: string | null) {
   }).format(date);
 }
 
-function availabilityBadgeClass(availability: Driver['availability']) {
+function availabilityBadgeClass(availability: Availability) {
   switch (availability) {
     case 'AVAILABLE':
       return 'bg-green-50 text-green-700 ring-green-200';
@@ -71,12 +74,19 @@ export default function DriversPage() {
   const [towns, setTowns] = useState<Town[]>([]);
   const [selectedTown, setSelectedTown] = useState('');
   const [drivers, setDrivers] = useState<Driver[]>([]);
+
   const [loadingAdmin, setLoadingAdmin] = useState(true);
   const [loadingTowns, setLoadingTowns] = useState(true);
   const [loadingDrivers, setLoadingDrivers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [actionBusyId, setActionBusyId] = useState<string | null>(null);
+
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  const [search, setSearch] = useState('');
+  const [availabilityFilter, setAvailabilityFilter] =
+    useState<AvailabilityFilter>('ALL');
 
   const [newDriver, setNewDriver] = useState({
     name: '',
@@ -98,51 +108,31 @@ export default function DriversPage() {
     currentAdmin?.role === 'TOWN_SUPER_ADMIN' ||
     currentAdmin?.role === 'WAREHOUSE_ADMIN';
 
+  const canDeleteDriver = currentAdmin?.role === 'GLOBAL_SUPER_ADMIN';
+
   const selectedTownName = useMemo(() => {
-    return towns.find((town) => town.id === selectedTown)?.name ?? 'Selected town';
+    return (
+      towns.find((town) => town.id === selectedTown)?.name ?? 'Selected town'
+    );
   }, [towns, selectedTown]);
 
-  async function loadCurrentAdmin() {
-    setLoadingAdmin(true);
-    try {
-      const res = await apiFetch<CurrentAdmin>('/admin-auth/me', { auth: true });
-      setCurrentAdmin(res || null);
+  const filteredDrivers = useMemo(() => {
+    const term = search.trim().toLowerCase();
 
-      if (res?.townId) {
-        setSelectedTown(res.townId);
-      }
-    } catch (error) {
-      console.error('Failed to load current admin', error);
-      setErrorMessage('Failed to load admin session.');
-      setCurrentAdmin(null);
-    } finally {
-      setLoadingAdmin(false);
-    }
-  }
+    return drivers.filter((driver) => {
+      const matchesSearch =
+        !term ||
+        driver.name.toLowerCase().includes(term) ||
+        driver.phone.toLowerCase().includes(term) ||
+        driver.town?.name?.toLowerCase().includes(term);
 
-  async function loadTowns(admin?: CurrentAdmin | null) {
-    setLoadingTowns(true);
-    try {
-      const res = await apiFetch<Town[]>('/towns');
-      const nextTowns = Array.isArray(res) ? res : [];
-      setTowns(nextTowns);
+      const matchesAvailability =
+        availabilityFilter === 'ALL' ||
+        driver.availability === availabilityFilter;
 
-      if (admin?.townId) {
-        setSelectedTown(admin.townId);
-        return;
-      }
-
-      if (!selectedTown && nextTowns.length > 0) {
-        setSelectedTown(nextTowns[0].id);
-      }
-    } catch (error) {
-      console.error('Failed to load towns', error);
-      setErrorMessage('Failed to load towns.');
-      setTowns([]);
-    } finally {
-      setLoadingTowns(false);
-    }
-  }
+      return matchesSearch && matchesAvailability;
+    });
+  }, [drivers, search, availabilityFilter]);
 
   async function loadDrivers(townId?: string) {
     if (!townId) {
@@ -154,9 +144,15 @@ export default function DriversPage() {
     setErrorMessage('');
 
     try {
-      const res = await apiFetch<DriversResponse>(`/admin/drivers?townId=${townId}`, {
-  auth: true,
-});
+      const res = await apiFetch<DriversResponse>(
+        `/admin/drivers?townId=${encodeURIComponent(townId)}`,
+        {
+          method: 'GET',
+          auth: true,
+          cache: 'no-store',
+        },
+      );
+
       setDrivers(extractDrivers(res));
     } catch (error) {
       console.error('Failed to load drivers', error);
@@ -184,17 +180,17 @@ export default function DriversPage() {
     setSubmitting(true);
 
     try {
-      await apiFetch('/admin/drivers', {
-  method: 'POST',
-  auth: true,
-  body: {
-    townId: selectedTown,
-    name: newDriver.name.trim(),
-    phone: newDriver.phone.trim(),
-    priority: Number(newDriver.priority) || 100,
-    availability: 'AVAILABLE',
-  },
-});
+      const created = await apiFetch<Driver>('/admin/drivers', {
+        method: 'POST',
+        auth: true,
+        body: {
+          townId: selectedTown,
+          name: newDriver.name.trim(),
+          phone: newDriver.phone.trim(),
+          priority: Number(newDriver.priority) || 100,
+          availability: 'AVAILABLE',
+        },
+      });
 
       setNewDriver({
         name: '',
@@ -202,18 +198,18 @@ export default function DriversPage() {
         priority: 100,
       });
 
-      await loadDrivers(selectedTown);
+      setDrivers((prev) => [created, ...prev]);
       setSuccessMessage('Driver added successfully.');
     } catch (error) {
-  console.error('Failed to create driver', error);
-  const msg = error instanceof Error ? error.message : String(error);
-  setErrorMessage(msg || 'Failed to add driver. Please try again.');
-} finally {
+      console.error('Failed to create driver', error);
+      const msg = error instanceof Error ? error.message : String(error);
+      setErrorMessage(msg || 'Failed to add driver. Please try again.');
+    } finally {
       setSubmitting(false);
     }
   }
 
-  async function setAvailability(id: string, availability: Driver['availability']) {
+  async function setAvailability(id: string, availability: Availability) {
     setSuccessMessage('');
     setErrorMessage('');
 
@@ -222,17 +218,27 @@ export default function DriversPage() {
       return;
     }
 
+    setActionBusyId(`${id}-${availability}`);
+
     try {
       await apiFetch(`/admin/drivers/${id}/availability`, {
-  method: 'PATCH',
-  auth: true,
-  body: { availability },
-});
-      await loadDrivers(selectedTown);
+        method: 'PATCH',
+        auth: true,
+        body: { availability },
+      });
+
+      setDrivers((prev) =>
+        prev.map((driver) =>
+          driver.id === id ? { ...driver, availability } : driver,
+        ),
+      );
+
       setSuccessMessage(`Driver marked ${availability.toLowerCase()}.`);
     } catch (error) {
       console.error('Failed to update availability', error);
       setErrorMessage('Failed to update driver availability.');
+    } finally {
+      setActionBusyId(null);
     }
   }
 
@@ -245,20 +251,65 @@ export default function DriversPage() {
       return;
     }
 
+    setActionBusyId(`${id}-active`);
+
     try {
       await apiFetch(`/admin/drivers/${id}/active`, {
-  method: 'PATCH',
-  auth: true,
-  body: { isActive },
-});
+        method: 'PATCH',
+        auth: true,
+        body: { isActive },
+      });
 
-      await loadDrivers(selectedTown);
+      setDrivers((prev) =>
+        prev.map((driver) =>
+          driver.id === id ? { ...driver, isActive } : driver,
+        ),
+      );
+
       setSuccessMessage(
-        isActive ? 'Driver activated successfully.' : 'Driver deactivated successfully.',
+        isActive
+          ? 'Driver activated successfully.'
+          : 'Driver deactivated successfully.',
       );
     } catch (error) {
       console.error('Failed to update driver active status', error);
       setErrorMessage('Failed to update driver active status.');
+    } finally {
+      setActionBusyId(null);
+    }
+  }
+
+  async function deleteDriver(driver: Driver) {
+    setSuccessMessage('');
+    setErrorMessage('');
+
+    if (!canDeleteDriver) {
+      setErrorMessage('Only global super admins can delete drivers.');
+      return;
+    }
+
+    const ok = window.confirm(
+      `Delete ${driver.name}? This will hide the driver from the list but keep historical order records.`,
+    );
+
+    if (!ok) return;
+
+    setActionBusyId(`${driver.id}-delete`);
+
+    try {
+      await apiFetch(`/admin/drivers/${driver.id}`, {
+        method: 'DELETE',
+        auth: true,
+      });
+
+      setDrivers((prev) => prev.filter((d) => d.id !== driver.id));
+      setSuccessMessage(`${driver.name} deleted from driver list.`);
+    } catch (error) {
+      console.error('Failed to delete driver', error);
+      const msg = error instanceof Error ? error.message : String(error);
+      setErrorMessage(msg || 'Failed to delete driver.');
+    } finally {
+      setActionBusyId(null);
     }
   }
 
@@ -268,10 +319,20 @@ export default function DriversPage() {
       setErrorMessage('');
 
       try {
-        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me', { auth: true });
+        const admin = await apiFetch<CurrentAdmin>('/admin-auth/me', {
+          method: 'GET',
+          auth: true,
+          cache: 'no-store',
+        });
+
         setCurrentAdmin(admin || null);
 
-        const townsRes = await apiFetch<Town[]>('/towns');
+        const townsRes = await apiFetch<Town[]>('/towns', {
+          method: 'GET',
+          auth: true,
+          cache: 'no-store',
+        });
+
         const nextTowns = Array.isArray(townsRes) ? townsRes : [];
         setTowns(nextTowns);
 
@@ -302,7 +363,9 @@ export default function DriversPage() {
     <div className="space-y-6 p-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Drivers</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            Drivers
+          </h1>
           <p className="mt-1 text-sm text-slate-600">
             Manage delivery drivers, availability, priority, and active status.
           </p>
@@ -331,13 +394,18 @@ export default function DriversPage() {
       <div className="grid gap-6 xl:grid-cols-[320px,minmax(0,1fr)]">
         <div className="space-y-6">
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-900">Town scope</h2>
+            <h2 className="text-base font-semibold text-slate-900">
+              Town scope
+            </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Global admins can switch towns. Town-scoped roles stay within their assigned town.
+              Global admins can switch towns. Town-scoped roles stay within
+              their assigned town.
             </p>
 
             <div className="mt-4 space-y-2">
-              <label className="block text-sm font-medium text-slate-700">Town</label>
+              <label className="block text-sm font-medium text-slate-700">
+                Town
+              </label>
               <select
                 value={selectedTown}
                 onChange={(e) => setSelectedTown(e.target.value)}
@@ -364,7 +432,9 @@ export default function DriversPage() {
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-900">Add driver</h2>
+            <h2 className="text-base font-semibold text-slate-900">
+              Add driver
+            </h2>
             <p className="mt-1 text-sm text-slate-600">
               Create a new driver for {selectedTownName}.
             </p>
@@ -376,7 +446,9 @@ export default function DriversPage() {
             ) : (
               <div className="mt-4 space-y-3">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Name</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Name
+                  </label>
                   <input
                     value={newDriver.name}
                     onChange={(e) =>
@@ -391,7 +463,9 @@ export default function DriversPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Phone</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Phone
+                  </label>
                   <input
                     value={newDriver.phone}
                     onChange={(e) =>
@@ -422,11 +496,13 @@ export default function DriversPage() {
                     className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
                   />
                   <p className="mt-1 text-xs text-slate-500">
-                    Lower numbers can be treated as higher priority later in auto-assignment.
+                    Lower numbers can be treated as higher priority later in
+                    auto-assignment.
                   </p>
                 </div>
 
                 <button
+                  type="button"
                   onClick={createDriver}
                   disabled={submitting || !selectedTown}
                   className="w-full rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
@@ -439,29 +515,65 @@ export default function DriversPage() {
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-2 border-b border-slate-200 px-5 py-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">Driver list</h2>
-              <p className="text-sm text-slate-600">
-                {selectedTown ? `Showing drivers for ${selectedTownName}.` : 'Select a town.'}
-              </p>
+          <div className="border-b border-slate-200 px-5 py-4">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">
+                  Driver list
+                </h2>
+                <p className="text-sm text-slate-600">
+                  {selectedTown
+                    ? `Showing drivers for ${selectedTownName}.`
+                    : 'Select a town.'}
+                </p>
+              </div>
+
+              <div className="text-sm text-slate-500">
+                {loadingDrivers
+                  ? 'Loading drivers...'
+                  : `${filteredDrivers.length} of ${drivers.length} driver(s)`}
+              </div>
             </div>
 
-            <div className="text-sm text-slate-500">
-              {loadingDrivers ? 'Loading drivers...' : `${drivers.length} driver(s)`}
+            <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search driver name, phone, or town..."
+                className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
+              />
+
+              <select
+                value={availabilityFilter}
+                onChange={(e) =>
+                  setAvailabilityFilter(e.target.value as AvailabilityFilter)
+                }
+                className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-slate-500"
+              >
+                <option value="ALL">All availability</option>
+                <option value="AVAILABLE">Available</option>
+                <option value="BUSY">Busy</option>
+                <option value="OFFLINE">Offline</option>
+              </select>
             </div>
           </div>
 
           {loadingDrivers ? (
-            <div className="px-5 py-10 text-sm text-slate-500">Loading drivers...</div>
+            <div className="px-5 py-10 text-sm text-slate-500">
+              Loading drivers...
+            </div>
           ) : drivers.length === 0 ? (
             <div className="px-5 py-10 text-sm text-slate-500">
               No drivers found for this town yet.
             </div>
+          ) : filteredDrivers.length === 0 ? (
+            <div className="px-5 py-10 text-sm text-slate-500">
+              No drivers match your search/filter.
+            </div>
           ) : (
             <>
               <div className="hidden overflow-x-auto lg:block">
-                <table className="w-full min-w-[980px] text-sm">
+                <table className="w-full min-w-[1080px] text-sm">
                   <thead className="bg-slate-50 text-left text-slate-600">
                     <tr>
                       <th className="px-5 py-3 font-medium">Name</th>
@@ -475,149 +587,218 @@ export default function DriversPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {drivers.map((driver) => (
-                      <tr key={driver.id} className="border-t border-slate-100 align-top">
-                        <td className="px-5 py-4">
-                          <Link
-                            href={`/ops/drivers/${driver.id}`}
-                            className="font-medium text-blue-700 hover:underline"
-                          >
-                            {driver.name}
-                          </Link>
-                        </td>
-                        <td className="px-5 py-4 text-slate-700">{driver.phone}</td>
-                        <td className="px-5 py-4 text-slate-700">
-                          {driver.town?.name ?? selectedTownName}
-                        </td>
-                        <td className="px-5 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${availabilityBadgeClass(
-                              driver.availability,
-                            )}`}
-                          >
-                            {driver.availability}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-slate-700">{driver.priority}</td>
-                        <td className="px-5 py-4 text-slate-700">
-                          {formatDateTime(driver.lastAssignedAt)}
-                        </td>
-                        <td className="px-5 py-4 text-slate-700">
-                          {driver.isActive ? 'Yes' : 'No'}
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              onClick={() => setAvailability(driver.id, 'AVAILABLE')}
-                              className="rounded-xl border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100"
+                    {filteredDrivers.map((driver) => {
+                      const busy = actionBusyId?.startsWith(driver.id);
+
+                      return (
+                        <tr
+                          key={driver.id}
+                          className="border-t border-slate-100 align-top"
+                        >
+                          <td className="px-5 py-4">
+                            <Link
+                              href={`/ops/drivers/${driver.id}`}
+                              className="font-medium text-blue-700 hover:underline"
                             >
-                              Available
-                            </button>
-                            <button
-                              onClick={() => setAvailability(driver.id, 'BUSY')}
-                              className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                              {driver.name}
+                            </Link>
+                          </td>
+                          <td className="px-5 py-4 text-slate-700">
+                            {driver.phone}
+                          </td>
+                          <td className="px-5 py-4 text-slate-700">
+                            {driver.town?.name ?? selectedTownName}
+                          </td>
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${availabilityBadgeClass(
+                                driver.availability,
+                              )}`}
                             >
-                              Busy
-                            </button>
-                            <button
-                              onClick={() => setAvailability(driver.id, 'OFFLINE')}
-                              className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200"
-                            >
-                              Offline
-                            </button>
-                            <button
-                              onClick={() => toggleActive(driver.id, !driver.isActive)}
-                              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                            >
-                              {driver.isActive ? 'Deactivate' : 'Activate'}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {driver.availability}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-slate-700">
+                            {driver.priority}
+                          </td>
+                          <td className="px-5 py-4 text-slate-700">
+                            {formatDateTime(driver.lastAssignedAt)}
+                          </td>
+                          <td className="px-5 py-4 text-slate-700">
+                            {driver.isActive ? 'Yes' : 'No'}
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setAvailability(driver.id, 'AVAILABLE')
+                                }
+                                disabled={busy}
+                                className="rounded-xl border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Available
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setAvailability(driver.id, 'BUSY')
+                                }
+                                disabled={busy}
+                                className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Busy
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setAvailability(driver.id, 'OFFLINE')
+                                }
+                                disabled={busy}
+                                className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Offline
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  toggleActive(driver.id, !driver.isActive)
+                                }
+                                disabled={busy}
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {driver.isActive ? 'Deactivate' : 'Activate'}
+                              </button>
+
+                              {canDeleteDriver ? (
+                                <button
+                                  type="button"
+                                  onClick={() => deleteDriver(driver)}
+                                  disabled={busy}
+                                  className="rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  Delete
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
 
               <div className="space-y-4 p-4 lg:hidden">
-                {drivers.map((driver) => (
-                  <div
-                    key={driver.id}
-                    className="rounded-2xl border border-slate-200 p-4 shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <Link
-                          href={`/ops/drivers/${driver.id}`}
-                          className="text-base font-semibold text-blue-700 hover:underline"
+                {filteredDrivers.map((driver) => {
+                  const busy = actionBusyId?.startsWith(driver.id);
+
+                  return (
+                    <div
+                      key={driver.id}
+                      className="rounded-2xl border border-slate-200 p-4 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <Link
+                            href={`/ops/drivers/${driver.id}`}
+                            className="text-base font-semibold text-blue-700 hover:underline"
+                          >
+                            {driver.name}
+                          </Link>
+                          <div className="mt-1 text-sm text-slate-600">
+                            {driver.phone}
+                          </div>
+                        </div>
+
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${availabilityBadgeClass(
+                            driver.availability,
+                          )}`}
                         >
-                          {driver.name}
-                        </Link>
-                        <div className="mt-1 text-sm text-slate-600">{driver.phone}</div>
+                          {driver.availability}
+                        </span>
                       </div>
 
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${availabilityBadgeClass(
-                          driver.availability,
-                        )}`}
-                      >
-                        {driver.availability}
-                      </span>
-                    </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <div className="text-slate-500">Town</div>
+                          <div className="font-medium text-slate-900">
+                            {driver.town?.name ?? selectedTownName}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">Priority</div>
+                          <div className="font-medium text-slate-900">
+                            {driver.priority}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">Active</div>
+                          <div className="font-medium text-slate-900">
+                            {driver.isActive ? 'Yes' : 'No'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">Last assigned</div>
+                          <div className="font-medium text-slate-900">
+                            {formatDateTime(driver.lastAssignedAt)}
+                          </div>
+                        </div>
+                      </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <div className="text-slate-500">Town</div>
-                        <div className="font-medium text-slate-900">
-                          {driver.town?.name ?? selectedTownName}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-slate-500">Priority</div>
-                        <div className="font-medium text-slate-900">{driver.priority}</div>
-                      </div>
-                      <div>
-                        <div className="text-slate-500">Active</div>
-                        <div className="font-medium text-slate-900">
-                          {driver.isActive ? 'Yes' : 'No'}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-slate-500">Last assigned</div>
-                        <div className="font-medium text-slate-900">
-                          {formatDateTime(driver.lastAssignedAt)}
-                        </div>
-                      </div>
-                    </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAvailability(driver.id, 'AVAILABLE')
+                          }
+                          disabled={busy}
+                          className="rounded-xl border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Available
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAvailability(driver.id, 'BUSY')}
+                          disabled={busy}
+                          className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Busy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAvailability(driver.id, 'OFFLINE')}
+                          disabled={busy}
+                          className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Offline
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggleActive(driver.id, !driver.isActive)
+                          }
+                          disabled={busy}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {driver.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
 
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        onClick={() => setAvailability(driver.id, 'AVAILABLE')}
-                        className="rounded-xl border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100"
-                      >
-                        Available
-                      </button>
-                      <button
-                        onClick={() => setAvailability(driver.id, 'BUSY')}
-                        className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"
-                      >
-                        Busy
-                      </button>
-                      <button
-                        onClick={() => setAvailability(driver.id, 'OFFLINE')}
-                        className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200"
-                      >
-                        Offline
-                      </button>
-                      <button
-                        onClick={() => toggleActive(driver.id, !driver.isActive)}
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        {driver.isActive ? 'Deactivate' : 'Activate'}
-                      </button>
+                        {canDeleteDriver ? (
+                          <button
+                            type="button"
+                            onClick={() => deleteDriver(driver)}
+                            disabled={busy}
+                            className="rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Delete
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
