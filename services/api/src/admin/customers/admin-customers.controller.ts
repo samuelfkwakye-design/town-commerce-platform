@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { AdminCustomersService } from './admin-customers.service';
 import { AdminJwtGuard } from '../../admin-auth/guards/admin-jwt.guard';
 import { RolesGuard } from '../../common/auth/roles.guard';
@@ -16,12 +16,16 @@ export class AdminCustomersController {
     AdminRole.WAREHOUSE_ADMIN,
   )
   listCustomers(
+    @Req() req: any,
     @Query('search') search?: string,
     @Query('townId') townId?: string,
   ) {
-    return this.adminCustomersService.listCustomers({
-      search,
-      townId,
-    });
+    return this.adminCustomersService.listCustomers(
+      {
+        search,
+        townId,
+      },
+      req.adminUser,
+    );
   }
 }

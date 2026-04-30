@@ -1,18 +1,47 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AdminRole } from '../../common/auth/roles.decorator';
 
 type ListCustomersParams = {
   search?: string;
   townId?: string;
 };
 
+type CurrentAdminUser = {
+  sub: string;
+  role: AdminRole;
+  townId?: string | null;
+};
+
 @Injectable()
 export class AdminCustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listCustomers(params: ListCustomersParams) {
+  private isGlobal(admin: CurrentAdminUser) {
+    return admin.role === AdminRole.GLOBAL_SUPER_ADMIN;
+  }
+
+  private getEffectiveTownId(
+    requestedTownId: string | undefined,
+    admin: CurrentAdminUser,
+  ) {
+    if (this.isGlobal(admin)) {
+      return requestedTownId?.trim() || undefined;
+    }
+
+    if (!admin.townId) {
+      throw new ForbiddenException('Admin has no town assigned');
+    }
+
+    return admin.townId;
+  }
+
+  async listCustomers(
+    params: ListCustomersParams,
+    admin: CurrentAdminUser,
+  ) {
     const search = params.search?.trim();
-    const townId = params.townId?.trim();
+    const effectiveTownId = this.getEffectiveTownId(params.townId, admin);
 
     const customers = await this.prisma.customer.findMany({
       where: {
@@ -26,6 +55,16 @@ export class AdminCustomersService {
               ],
             }
           : {}),
+
+        ...(effectiveTownId
+          ? {
+              orders: {
+                some: {
+                  townId: effectiveTownId,
+                },
+              },
+            }
+          : {}),
       },
       orderBy: {
         createdAt: 'desc',
@@ -33,10 +72,10 @@ export class AdminCustomersService {
       include: {
         addresses: true,
         orders: {
-          ...(townId
+          ...(effectiveTownId
             ? {
                 where: {
-                  townId,
+                  townId: effectiveTownId,
                 },
               }
             : {}),
@@ -52,6 +91,9 @@ export class AdminCustomersService {
               },
             },
           },
+          orderBy: {
+            createdAt: 'desc',
+          },
         },
       },
     });
@@ -65,14 +107,12 @@ export class AdminCustomersService {
         .join(' ')
         .trim();
 
-      const relevantOrder = townId
-        ? customer.orders.find((o) => o.townId === townId)
-        : customer.orders[0];
+      const relevantOrder = customer.orders[0];
 
       const townLabel =
-        defaultAddress?.town ||
         relevantOrder?.town?.name ||
         relevantOrder?.town?.slug ||
+        defaultAddress?.town ||
         null;
 
       return {
