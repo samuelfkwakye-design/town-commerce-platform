@@ -82,3 +82,38 @@ export function getCartSubtotal(cart: CartItem[]) {
     );
   }, 0);
 }
+  export function addOrMergeCartItem(cart: CartItem[], item: CartItem): CartItem[] {
+  const existingIndex = cart.findIndex((current) => {
+    if (current.townProductId !== item.townProductId) return false;
+    if (current.pricingModel !== item.pricingModel) return false;
+
+    if (item.pricingModel === "VARIANT") {
+      return (
+        (current as any).townProductVariantId ===
+        (item as any).townProductVariantId
+      );
+    }
+
+    return true;
+  });
+
+  if (existingIndex === -1) {
+    return [...cart, item];
+  }
+
+  const next = [...cart];
+  const existing = next[existingIndex] as any;
+
+  if (item.pricingModel === "WEIGHT") {
+    existing.weightGrams =
+      Number(existing.weightGrams || 0) + Number((item as any).weightGrams || 0);
+  } else {
+    existing.quantity =
+      Number(existing.quantity || 0) + Number((item as any).quantity || 0);
+  }
+
+  next[existingIndex] = existing;
+
+  return next;
+
+}

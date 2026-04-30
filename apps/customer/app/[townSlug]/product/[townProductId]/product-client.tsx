@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogResponse, CartItem } from "@/lib/types";
 import {
+  addOrMergeCartItem,
   dispatchCartItemAdded,
   dispatchCartUpdated,
   loadCart,
@@ -247,8 +248,8 @@ export default function ProductClient({
         quantity,
       };
 
-      cart.push(item);
-      saveCart(cart);
+      const nextCart = addOrMergeCartItem(cart, item);
+      saveCart(nextCart);
       dispatchCartUpdated();
       dispatchCartItemAdded({
         townSlug,
@@ -272,8 +273,8 @@ export default function ProductClient({
         weightGrams,
       };
 
-      cart.push(item);
-      saveCart(cart);
+      const nextCart = addOrMergeCartItem(cart, item);
+      saveCart(nextCart);
       dispatchCartUpdated();
       dispatchCartItemAdded({
         townSlug,
@@ -304,8 +305,8 @@ export default function ProductClient({
       quantity,
     };
 
-    cart.push(item);
-    saveCart(cart);
+    const nextCart = addOrMergeCartItem(cart, item);
+    saveCart(nextCart);
     dispatchCartUpdated();
     dispatchCartItemAdded({
       townSlug,

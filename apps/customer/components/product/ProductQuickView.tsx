@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
+  addOrMergeCartItem,
   dispatchCartItemAdded,
   dispatchCartUpdated,
   loadCart,
@@ -211,8 +212,8 @@ export default function ProductQuickView({
         quantity,
       };
 
-      cart.push(item);
-      saveCart(cart);
+      const nextCart = addOrMergeCartItem(cart, item);
+      saveCart(nextCart);
       dispatchCartUpdated();
       dispatchCartItemAdded({
         townSlug,
@@ -236,8 +237,8 @@ export default function ProductQuickView({
         weightGrams,
       };
 
-      cart.push(item);
-      saveCart(cart);
+      const nextCart = addOrMergeCartItem(cart, item);
+      saveCart(nextCart);
       dispatchCartUpdated();
       dispatchCartItemAdded({
         townSlug,
@@ -272,8 +273,8 @@ export default function ProductQuickView({
         quantity,
       };
 
-      cart.push(item);
-      saveCart(cart);
+      const nextCart = addOrMergeCartItem(cart, item);
+      saveCart(nextCart);
       dispatchCartUpdated();
       dispatchCartItemAdded({
         townSlug,
