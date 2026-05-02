@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AdminRole } from '../../common/auth/roles.decorator';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 type CurrentAdminUser = {
   sub: string;
@@ -15,7 +16,10 @@ type CurrentAdminUser = {
 
 @Injectable()
 export class AdminDriversService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   private isGlobal(admin: CurrentAdminUser) {
     return admin.role === AdminRole.GLOBAL_SUPER_ADMIN;
@@ -39,6 +43,7 @@ export class AdminDriversService {
     admin: CurrentAdminUser,
   ) {
     if (this.isGlobal(admin)) return requestedTownId;
+
     this.assertTownAccess(admin);
     return admin.townId!;
   }
@@ -47,10 +52,10 @@ export class AdminDriversService {
     const effectiveTownId = this.getEffectiveTownId(townId, admin);
 
     return this.prisma.driver.findMany({
-  where: {
-    ...(effectiveTownId ? { townId: effectiveTownId } : {}),
-    deletedAt: null,
-  },
+      where: {
+        ...(effectiveTownId ? { townId: effectiveTownId } : {}),
+        deletedAt: null,
+      },
       orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
       include: {
         town: { select: { id: true, name: true, slug: true } },
@@ -76,6 +81,7 @@ export class AdminDriversService {
 
     return driver;
   }
+
   async getOrders(id: string, admin: CurrentAdminUser) {
     await this.get(id, admin);
 
@@ -101,15 +107,16 @@ export class AdminDriversService {
       },
     });
   }
+
   async create(
     data: {
-  name: string;
-  phone: string;
-  townId?: string;
-  priority?: number;
-  motorNumber?: string;
-  idNumber?: string;
-},
+      name: string;
+      phone: string;
+      townId?: string;
+      priority?: number;
+      motorNumber?: string;
+      idNumber?: string;
+    },
     admin: CurrentAdminUser,
   ) {
     const effectiveTownId = this.getEffectiveTownId(data.townId, admin);
@@ -126,7 +133,7 @@ export class AdminDriversService {
       throw new BadRequestException('phone is required');
     }
 
-    return this.prisma.driver.create({
+    const driver = await this.prisma.driver.create({
       data: {
         name: data.name.trim(),
         phone: data.phone.trim(),
@@ -142,6 +149,24 @@ export class AdminDriversService {
         town: { select: { id: true, name: true, slug: true } },
       },
     });
+
+    try {
+      await this.notificationsService['sms'].sendSms(
+        driver.phone,
+        `Welcome to Somameha 🚀
+
+You have been added as a delivery driver.
+
+Motor: ${driver.motorNumber || 'Not set'}
+ID: ${driver.idNumber || 'Not set'}
+
+You can now start receiving delivery jobs.`,
+      );
+    } catch (error) {
+      console.error('Failed to send driver creation SMS', error);
+    }
+
+    return driver;
   }
 
   async update(
@@ -162,26 +187,27 @@ export class AdminDriversService {
     return this.prisma.driver.update({
       where: { id },
       data: {
-  name: data.name?.trim() ?? existing.name,
-  phone: data.phone?.trim() ?? existing.phone,
-  availability: data.availability ?? existing.availability,
-  priority:
-    data.priority != null ? Number(data.priority) : existing.priority,
-  isActive:
-    typeof data.isActive === 'boolean'
-      ? data.isActive
-      : existing.isActive,
-
-  motorNumber:
-    data.motorNumber !== undefined
-      ? data.motorNumber?.trim() || null
-      : existing.motorNumber,
-
-  idNumber:
-    data.idNumber !== undefined
-      ? data.idNumber?.trim() || null
-      : existing.idNumber,
-},
+        name: data.name?.trim() ?? existing.name,
+        phone: data.phone?.trim() ?? existing.phone,
+        availability: data.availability ?? existing.availability,
+        priority:
+          data.priority != null ? Number(data.priority) : existing.priority,
+        isActive:
+          typeof data.isActive === 'boolean'
+            ? data.isActive
+            : existing.isActive,
+        motorNumber:
+          data.motorNumber !== undefined
+            ? data.motorNumber?.trim() || null
+            : existing.motorNumber,
+        idNumber:
+          data.idNumber !== undefined
+            ? data.idNumber?.trim() || null
+            : existing.idNumber,
+      },
+      include: {
+        town: { select: { id: true, name: true, slug: true } },
+      },
     });
   }
 
@@ -189,10 +215,10 @@ export class AdminDriversService {
     await this.get(id, admin);
 
     return this.prisma.driver.update({
-  where: { id },
-  data: {
-    deletedAt: new Date(),
-  },
-});
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
   }
 }
