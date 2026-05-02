@@ -1066,7 +1066,17 @@ return fullOrder;
   const order = await this.prisma.order.findUnique({
     where: { id },
     include: {
-      town: true,
+  town: true,
+
+  driver: {
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      motorNumber: true,
+      idNumber: true,
+    },
+  },
 
       items: {
         include: {
@@ -1455,6 +1465,7 @@ async updateOrder(orderId: string, dto: UpdateOrderDto) {
           customerName: reassigned.deliveryRecipientName || null,
           driverName: selectedDriver.name,
           driverPhone: selectedDriver.phone,
+          driverMotorNumber: selectedDriver.motorNumber,
           orderId: reassigned.id,
           townSlug: reassigned.town?.slug ?? null,
         });

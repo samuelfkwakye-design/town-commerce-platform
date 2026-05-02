@@ -97,11 +97,12 @@ export class NotificationsService {
     return this.sms.sendSms(phone, message);
   }
 
-  async sendDriverAssignedSms(input: {
+    async sendDriverAssignedSms(input: {
     phoneNumber?: string | null;
     customerName?: string | null;
     driverName: string;
     driverPhone: string;
+    driverMotorNumber?: string | null;
     orderId: string;
     townSlug?: string | null;
   }) {
@@ -113,14 +114,16 @@ export class NotificationsService {
       return { ok: false, reason: 'missing_phone' };
     }
 
-    const firstName = this.firstName(input.customerName);
+        const firstName = this.firstName(input.customerName);
+    const motorNumber = input.driverMotorNumber?.trim();
 
     const message =
       `Hi ${firstName},\n\n` +
       `Your Somame order is on the way.\n\n` +
       `Driver: ${input.driverName}\n` +
-      `Phone: ${input.driverPhone}\n\n` +
-      `Ref: ${input.orderId}`;
+      `Phone: ${input.driverPhone}\n` +
+      (motorNumber ? `Motor: ${motorNumber}\n` : '') +
+      `\nRef: ${input.orderId}`;
 
     return this.sms.sendSms(phone, message);
   }

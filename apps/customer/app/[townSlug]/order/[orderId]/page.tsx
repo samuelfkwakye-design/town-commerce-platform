@@ -99,7 +99,8 @@ export default async function OrderPage({
   const order = await apiFetch<any>(`/orders/${encodeURIComponent(orderId)}`);
   const tone = statusTone(order?.status);
   const customer = customerStatus(order?.status);
-
+  const driverName = order?.driver?.name || order?.driverName || "";
+  const driverMotor = order?.driver?.motorNumber || "";
   const progressSteps = [
     "Order received",
     "Being reviewed",
@@ -583,6 +584,88 @@ export default async function OrderPage({
           </div>
         </div>
       </section>
+      {driverName ? (
+        <section
+          style={{
+            marginTop: 18,
+            border: "1px solid #bbf7d0",
+            borderRadius: 20,
+            padding: 18,
+            background: "linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)",
+          }}
+        >
+          <h2 style={{ margin: 0, color: "#0f172a", fontSize: 20 }}>
+            Your delivery driver
+          </h2>
+
+          <div
+            style={{
+              marginTop: 8,
+              color: "#475569",
+              fontSize: 14,
+              lineHeight: 1.6,
+            }}
+          >
+            Please check the driver name and motor number before handing over
+            payment.
+          </div>
+
+          <div
+            style={{
+              marginTop: 14,
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                border: "1px solid #dcfce7",
+                borderRadius: 16,
+                padding: 14,
+                background: "white",
+              }}
+            >
+              <div style={{ color: "#64748b", fontSize: 13, marginBottom: 6 }}>
+                Driver
+              </div>
+              <div
+                style={{
+                  color: "#0f172a",
+                  fontSize: 18,
+                  fontWeight: 900,
+                  wordBreak: "break-word",
+                }}
+              >
+                {driverName}
+              </div>
+            </div>
+
+            <div
+              style={{
+                border: "1px solid #dcfce7",
+                borderRadius: 16,
+                padding: 14,
+                background: "white",
+              }}
+            >
+              <div style={{ color: "#64748b", fontSize: 13, marginBottom: 6 }}>
+                Motor number
+              </div>
+              <div
+                style={{
+                  color: "#0f172a",
+                  fontSize: 18,
+                  fontWeight: 900,
+                  wordBreak: "break-word",
+                }}
+              >
+                {driverMotor || "Not available yet"}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {showProgress ? (
         <section className="tc-section">
