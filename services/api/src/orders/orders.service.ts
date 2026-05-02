@@ -2095,7 +2095,23 @@ if (tp.pricingModel === PricingModel.VARIANT) {
       }),
     ]);
 
-    return settled;
+    // Send SMS to driver after COD collected
+try {
+  if (order.driverPhone) {
+    await this.notificationsService.sendRawSms(
+      order.driverPhone,
+      `Payment received for order ${order.id}. You are cleared.`
+    );
+  }
+} catch (error) {
+  this.logger.warn(
+    `Failed to send COD collected SMS for order ${orderId}: ${
+      error instanceof Error ? error.message : String(error)
+    }`,
+  );
+}
+
+return settled;
   }
 
   async cancelOrder(id: string) {

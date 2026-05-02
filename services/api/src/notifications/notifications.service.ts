@@ -218,6 +218,10 @@ export class NotificationsService {
     return this.sms.sendSms(phone, message);
   }
 
+  async sendRawSms(phoneNumber: string, message: string) {
+  return this.sms.sendSms(phoneNumber, message);
+}
+
   async sendDriverUnassignedSms(input: {
     phoneNumber?: string | null;
     driverName?: string | null;

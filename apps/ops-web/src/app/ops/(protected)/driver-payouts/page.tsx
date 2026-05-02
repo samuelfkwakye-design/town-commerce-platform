@@ -122,11 +122,11 @@ export default function DriverPayoutsPage() {
       await apiFetch('/admin/driver-payouts/pay', {
         method: 'POST',
         auth: true,
-        body: JSON.stringify({
-          driverId: selectedDriver.driverId,
-          amount,
-          note: paymentNote.trim() || `Driver payout for ${selectedDriver.driverName}`,
-        }),
+        body: {
+  driverId: selectedDriver.driverId,
+  amount,
+  note: paymentNote.trim() || `Driver payout for ${selectedDriver.driverName}`,
+},
       });
 
       setSuccess(
