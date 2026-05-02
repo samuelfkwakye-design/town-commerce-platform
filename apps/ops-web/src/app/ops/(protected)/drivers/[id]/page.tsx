@@ -16,6 +16,8 @@ type Driver = {
   isActive: boolean;
   lastAssignedAt?: string | null;
   town?: Town | null;
+  motorNumber?: string | null;
+  idNumber?: string | null;
 };
 
 type DriverOrder = {
@@ -160,7 +162,19 @@ export default async function DriverDetailPage({
                 {driver.phone}
               </div>
             </div>
+            <div>
+  <div className="text-sm text-slate-500">Motor number</div>
+  <div className="mt-1 text-sm font-medium text-slate-900">
+    {driver.motorNumber || '—'}
+  </div>
+</div>
 
+<div>
+  <div className="text-sm text-slate-500">ID number</div>
+  <div className="mt-1 text-sm font-medium text-slate-900">
+    {driver.idNumber || '—'}
+  </div>
+</div>
             <div>
               <div className="text-sm text-slate-500">Availability</div>
               <div className="mt-1 text-sm font-medium text-slate-900">
