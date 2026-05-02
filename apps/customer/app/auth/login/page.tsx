@@ -131,7 +131,7 @@ function LoginPageInner() {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       required
-                      className="w-full border-none bg-transparent text-base outline-none placeholder:text-slate-400"
+                      className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-bold placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none"
                     />
                   </div>
                 </div>
@@ -158,7 +158,7 @@ function LoginPageInner() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      className="w-full border-none bg-transparent text-base outline-none placeholder:text-slate-400"
+                     className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-bold placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none"
                     />
                   </div>
                 </div>

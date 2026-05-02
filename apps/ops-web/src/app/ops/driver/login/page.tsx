@@ -56,7 +56,7 @@ export default function DriverLoginPage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="024XXXXXXX"
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-emerald-500"
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 shadow-sm transition-all duration-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 focus:shadow-md outline-none"
             />
           </div>
 
