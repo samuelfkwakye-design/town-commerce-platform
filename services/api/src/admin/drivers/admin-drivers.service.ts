@@ -103,11 +103,13 @@ export class AdminDriversService {
   }
   async create(
     data: {
-      name: string;
-      phone: string;
-      townId?: string;
-      priority?: number;
-    },
+  name: string;
+  phone: string;
+  townId?: string;
+  priority?: number;
+  motorNumber?: string;
+  idNumber?: string;
+},
     admin: CurrentAdminUser,
   ) {
     const effectiveTownId = this.getEffectiveTownId(data.townId, admin);
@@ -133,6 +135,8 @@ export class AdminDriversService {
         priority: Number.isFinite(Number(data.priority))
           ? Number(data.priority)
           : 100,
+        motorNumber: data.motorNumber?.trim() || null,
+        idNumber: data.idNumber?.trim() || null,
       },
       include: {
         town: { select: { id: true, name: true, slug: true } },
@@ -148,6 +152,8 @@ export class AdminDriversService {
       availability?: 'AVAILABLE' | 'BUSY' | 'OFFLINE';
       priority?: number;
       isActive?: boolean;
+      motorNumber?: string | null;
+      idNumber?: string | null;
     },
     admin: CurrentAdminUser,
   ) {
@@ -156,19 +162,26 @@ export class AdminDriversService {
     return this.prisma.driver.update({
       where: { id },
       data: {
-        name: data.name?.trim() ?? existing.name,
-        phone: data.phone?.trim() ?? existing.phone,
-        availability: data.availability ?? existing.availability,
-        priority:
-          data.priority != null ? Number(data.priority) : existing.priority,
-        isActive:
-          typeof data.isActive === 'boolean'
-            ? data.isActive
-            : existing.isActive,
-      },
-      include: {
-        town: { select: { id: true, name: true, slug: true } },
-      },
+  name: data.name?.trim() ?? existing.name,
+  phone: data.phone?.trim() ?? existing.phone,
+  availability: data.availability ?? existing.availability,
+  priority:
+    data.priority != null ? Number(data.priority) : existing.priority,
+  isActive:
+    typeof data.isActive === 'boolean'
+      ? data.isActive
+      : existing.isActive,
+
+  motorNumber:
+    data.motorNumber !== undefined
+      ? data.motorNumber?.trim() || null
+      : existing.motorNumber,
+
+  idNumber:
+    data.idNumber !== undefined
+      ? data.idNumber?.trim() || null
+      : existing.idNumber,
+},
     });
   }
 

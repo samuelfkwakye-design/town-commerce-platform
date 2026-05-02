@@ -471,7 +471,9 @@ model Driver {
   townId         String
   name           String
   phone          String
-  deletedAt    DateTime?
+  motorNumber    String?
+  idNumber       String?
+  deletedAt      DateTime?
   isActive       Boolean            @default(true)
   availability   DriverAvailability @default(AVAILABLE)
   priority       Int                @default(100)

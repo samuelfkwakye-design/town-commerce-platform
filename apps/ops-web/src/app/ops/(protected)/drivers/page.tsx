@@ -30,6 +30,8 @@ type Driver = {
   id: string;
   name: string;
   phone: string;
+  motorNumber?: string | null;
+  idNumber?: string | null;
   availability: Availability;
   priority: number;
   isActive: boolean;
@@ -91,10 +93,12 @@ export default function DriversPage() {
     useState<AvailabilityFilter>('ALL');
 
   const [newDriver, setNewDriver] = useState({
-    name: '',
-    phone: '',
-    priority: 100,
-  });
+  name: '',
+  phone: '',
+  motorNumber: '',
+  idNumber: '',
+  priority: 100,
+});
 
   const isGlobalAdmin = currentAdmin?.role === 'GLOBAL_SUPER_ADMIN';
   const isTownScopedAdmin =
@@ -186,19 +190,23 @@ export default function DriversPage() {
         method: 'POST',
         auth: true,
         body: {
-          townId: selectedTown,
-          name: newDriver.name.trim(),
-          phone: newDriver.phone.trim(),
-          priority: Number(newDriver.priority) || 100,
-          availability: 'AVAILABLE',
-        },
+  townId: selectedTown,
+  name: newDriver.name.trim(),
+  phone: newDriver.phone.trim(),
+  motorNumber: newDriver.motorNumber.trim(),
+  idNumber: newDriver.idNumber.trim(),
+  priority: Number(newDriver.priority) || 100,
+  availability: 'AVAILABLE',
+},
       });
 
       setNewDriver({
-        name: '',
-        phone: '',
-        priority: 100,
-      });
+  name: '',
+  phone: '',
+  motorNumber: '',
+  idNumber: '',
+  priority: 100,
+});
 
       setDrivers((prev) => [created, ...prev]);
       setSuccessMessage('Driver added successfully.');
@@ -512,7 +520,39 @@ async function confirmDeleteDriver() {
                     className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
                   />
                 </div>
+               <div>
+  <label className="mb-1 block text-sm font-medium text-slate-700">
+    Motor number
+  </label>
+  <input
+    value={newDriver.motorNumber}
+    onChange={(e) =>
+      setNewDriver((prev) => ({
+        ...prev,
+        motorNumber: e.target.value,
+      }))
+    }
+    placeholder="e.g. GX-1234-24"
+    className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
+  />
+</div>
 
+<div>
+  <label className="mb-1 block text-sm font-medium text-slate-700">
+    ID number
+  </label>
+  <input
+    value={newDriver.idNumber}
+    onChange={(e) =>
+      setNewDriver((prev) => ({
+        ...prev,
+        idNumber: e.target.value,
+      }))
+    }
+    placeholder="Driver ID number"
+    className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
+  />
+</div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">
                     Phone
