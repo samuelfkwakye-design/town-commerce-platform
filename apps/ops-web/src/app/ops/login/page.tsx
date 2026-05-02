@@ -78,7 +78,7 @@ document.cookie = `admin_token=${token}; path=/; max-age=${
           placeholder="Email or Username"
           value={login}
           onChange={(e) => setLogin(e.target.value)}
-          className="mb-3 w-full rounded border px-3 py-2"
+          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-bold placeholder:font-normal placeholder:text-slate-400"
         />
 
         <input
@@ -86,7 +86,7 @@ document.cookie = `admin_token=${token}; path=/; max-age=${
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="mb-2 w-full rounded border px-3 py-2"
+          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-bold placeholder:font-normal placeholder:text-slate-400"
         />
 
         <div className="mb-4 text-right">
