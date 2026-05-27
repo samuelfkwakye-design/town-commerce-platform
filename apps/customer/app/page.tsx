@@ -234,7 +234,7 @@ export default function Page() {
               </h1>
 
               <p className="mt-3 text-base font-medium text-[#0f172a] sm:text-lg md:text-xl">
-                Yɛ bɛto am wo. Shop your town with ease.
+                Yɛ bɛto am wo quick. Shop your town with ease.
               </p>
 
               <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-700 sm:text-base md:text-lg">
