@@ -38,7 +38,7 @@ export default async function TownsPage() {
               Towns
             </h1>
             <p className="text-sm text-slate-500">
-              Manage towns available across the Town Commerce platform.
+              Manage towns available across the KOSTOMA platform.
             </p>
           </div>
 

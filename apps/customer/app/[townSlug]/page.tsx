@@ -298,7 +298,7 @@ export default async function TownCatalogPage({
               <div className="grid gap-6 bg-gradient-to-r from-[#0f172a] to-[#1e293b] p-4 sm:p-6 lg:grid-cols-[1.25fr_0.75fr] lg:p-8">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-200 sm:text-sm">
-                    Town Commerce
+                    KOSTOMA
                   </p>
 
                   <h1 className="mt-2 break-words text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">

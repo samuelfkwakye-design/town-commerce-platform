@@ -153,7 +153,7 @@ export class AdminDriversService {
     try {
       await this.notificationsService['sms'].sendSms(
         driver.phone,
-        `Welcome to Somameha 🚀
+        `Welcome to KOSTOMA 🚀
 
 You have been added as a delivery driver.
 

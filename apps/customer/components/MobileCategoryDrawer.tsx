@@ -97,7 +97,7 @@ export default function MobileCategoryDrawer({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.16em] text-orange-500">
-                    Somame
+                    KOSTOMA
                   </div>
                   <div className="mt-1 text-lg font-bold text-slate-900">
                     All categories

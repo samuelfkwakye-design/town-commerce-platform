@@ -279,12 +279,12 @@ const [copyMessage, setCopyMessage] = useState<string | null>(null);
 
       const message =
         action === 'pickup'
-          ? 'Pickup confirmed. Somameha has notified the customer.'
+          ? 'Pickup confirmed. KOSTOMA has notified the customer.'
           : result?.codPendingHandover
             ? `Delivery confirmed. Please hand over ${formatMoney(
                 result?.codAmountDue,
               )} to the town super admin.`
-            : 'Delivery confirmed. Order completed via Somameha.';
+            : 'Delivery confirmed. Order completed via KOSTOMA.';
 
       setSuccessMessage(message);
       setError(null);
@@ -424,7 +424,7 @@ return (
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-sm font-semibold">
-              Somameha Driver
+              KOSTOMA Driver
             </div>
             <h1 className="mt-3 text-2xl font-bold">{driver?.name || 'Driver'}</h1>
             <p className="mt-1 text-sm text-emerald-50">Phone: {driver?.phone || '—'}</p>

@@ -63,7 +63,7 @@ export default async function OpsLayoutShell({ children }: Props) {
       <div className="border-b bg-white">
         <div className="flex flex-wrap items-center justify-between gap-4 p-4">
           <div>
-            <div className="font-semibold">Town Commerce Ops</div>
+            <div className="font-semibold">KOSTOMA Ops</div>
             <div className="text-xs text-gray-500">
               {admin
                 ? `${admin.role}${admin.townId ? ' (Town scoped)' : ''}`

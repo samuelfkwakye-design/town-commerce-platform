@@ -39,7 +39,7 @@ export default function DriverLoginPage() {
       <div className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
         <div className="mb-6">
           <div className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700">
-            Somame Driver
+            KOSTOMA Driver
           </div>
           <h1 className="mt-4 text-2xl font-bold text-slate-900">Driver login</h1>
           <p className="mt-2 text-sm text-slate-600">

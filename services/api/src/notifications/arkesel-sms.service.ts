@@ -4,7 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 export class ArkeselSmsService {
   private readonly logger = new Logger(ArkeselSmsService.name);
   private readonly apiKey = process.env.ARKESEL_API_KEY || '';
-  private readonly senderId = process.env.ARKESEL_SENDER_ID || 'Somame';
+  private readonly senderId = process.env.ARKESEL_SENDER_ID || 'KOSTOMA';
   private readonly endpoint = 'https://sms.arkesel.com/api/v2/sms/send';
 
   private normalizePhone(raw?: string | null): string {

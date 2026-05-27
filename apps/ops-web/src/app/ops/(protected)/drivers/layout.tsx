@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Drivers",
-  description: "Manage drivers, availability, and assignments in Somame Ops.",
+  description: "Manage drivers, availability, and assignments in KOSTOMA Ops.",
 };
 
 export default function DriversLayout({

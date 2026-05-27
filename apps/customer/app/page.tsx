@@ -230,7 +230,7 @@ export default function Page() {
               </div>
 
               <h1 className="max-w-2xl text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl">
-                <span className="text-orange-500">Somame</span>
+                <span className="text-orange-500">KOSTOMA</span>
               </h1>
 
               <p className="mt-3 text-base font-medium text-[#0f172a] sm:text-lg md:text-xl">
@@ -238,7 +238,7 @@ export default function Page() {
               </p>
 
               <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-700 sm:text-base md:text-lg">
-                Somame connects customers to local town markets in a fast, simple
+                Kostoma connects customers to local town markets in a fast, simple
                 and trusted way. Search for your town, browse available products,
                 and get essentials delivered with convenience.
               </p>
@@ -320,7 +320,7 @@ export default function Page() {
               <div className="rounded-3xl border border-orange-100 bg-white p-4 shadow-xl shadow-orange-100/30 sm:rounded-[32px] sm:p-6">
                 <div className="rounded-3xl bg-gradient-to-r from-[#0f172a] to-[#1e293b] p-5 text-white sm:rounded-[24px] sm:p-6">
                   <div className="text-xs font-medium uppercase tracking-[0.2em] text-orange-200 sm:text-sm">
-                    Somame
+                    KOSTOMA
                   </div>
                   <div className="mt-3 text-2xl font-bold leading-tight sm:text-3xl">
                     Your town market,
@@ -370,13 +370,13 @@ export default function Page() {
       >
         <div className="mb-8 max-w-2xl sm:mb-10">
           <div className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-orange-500">
-            Why Somame
+            Why KOSTOMA
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-[#0f172a] sm:text-3xl md:text-4xl">
             A modern way to shop your local market
           </h2>
           <p className="mt-4 text-sm text-slate-600 sm:text-base">
-            Built for convenience, clarity and local commerce. Somame helps
+            Built for convenience, clarity and local commerce. Kostoma helps
             customers discover products in their town and order them with ease.
           </p>
         </div>
@@ -521,7 +521,7 @@ export default function Page() {
       <footer className="border-t border-orange-100 bg-white px-4 py-8 sm:px-6 md:px-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
           <div>
-            <span className="font-semibold text-orange-500">Somame</span>{" "}
+            <span className="font-semibold text-orange-500">KOSTOMA</span>{" "}
             <span className="text-[#0f172a]">— Send for it.</span>
           </div>
           <div>Local shopping made simple.</div>

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 export const metadata = {
-  title: "Town Commerce",
-  description: "Town Commerce customer storefront",
+  title: "KOSTOMA",
+description: "KOSTOMA customer storefront",
 };
 
 export default function RootLayout({

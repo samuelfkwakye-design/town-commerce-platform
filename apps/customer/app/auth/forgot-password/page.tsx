@@ -92,7 +92,7 @@ export default function ForgotPasswordPage() {
           <CardContent className="p-0">
             <div className="bg-gradient-to-r from-orange-500 to-orange-400 px-5 py-6 text-white sm:px-8 sm:py-8">
               <div className="text-xs font-medium uppercase tracking-[0.2em] text-orange-100 sm:text-sm">
-                Somame
+                KOSTOMA
               </div>
               <h1 className="mt-3 text-2xl font-bold sm:text-3xl">
                 Forgot password

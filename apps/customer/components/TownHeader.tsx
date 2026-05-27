@@ -337,7 +337,7 @@ export default function TownHeader({
             <div className="min-w-0">
               <Link href={`/${townSlug}`}>
                 <div className="text-2xl font-extrabold tracking-tight text-orange-500">
-                  Somame
+                  KOSTOMA
                 </div>
               </Link>
 

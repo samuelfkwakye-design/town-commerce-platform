@@ -56,7 +56,7 @@ export class NotificationsService {
 
     const message =
       `Hi ${firstName},\n\n` +
-      `Your Somame order is confirmed.\n` +
+      `Your KOSTOMA order is confirmed.\n` +
       `Ref: ${input.orderId}\n` +
       `Total: ${currency} ${this.money(input.totalAmount)}\n\n` +
       `Track order:\n${orderUrl}\n\n` +
@@ -88,7 +88,7 @@ export class NotificationsService {
 
     const message =
       `Hi ${firstName},\n\n` +
-      `Your Somame order has been confirmed and is now being prepared.\n` +
+      `Your KOSTOMA order has been confirmed and is now being prepared.\n` +
       `Ref: ${input.orderId}\n` +
       `Total: ${currency} ${this.money(input.totalAmount)}\n\n` +
       `Track order:\n${orderUrl}\n\n` +
@@ -119,7 +119,7 @@ export class NotificationsService {
 
     const message =
       `Hi ${firstName},\n\n` +
-      `Your Somame order is on the way.\n\n` +
+      `Your KOSTOMA order is on the way.\n\n` +
       `Driver: ${input.driverName}\n` +
       `Phone: ${input.driverPhone}\n` +
       (motorNumber ? `Motor: ${motorNumber}\n` : '') +
@@ -153,7 +153,7 @@ export class NotificationsService {
 
     const message =
       `Hi ${firstName},\n\n` +
-      `You have been assigned a Somame delivery.\n` +
+      `You have been assigned a KOSTOMA delivery.\n` +
       `Order: ${input.orderId}\n` +
       `Customer: ${customerName}\n` +
       `Customer phone: ${customerPhone}\n` +
@@ -184,7 +184,7 @@ export class NotificationsService {
 
     const message =
       `Hi ${firstName},\n\n` +
-      `Your Somameha order has been picked up and is on the way.\n` +
+      `Your Kostoma order has been picked up and is on the way.\n` +
       `Driver: ${driverName}\n` +
       (driverPhone ? `Driver phone: ${driverPhone}\n` : '') +
       `Ref: ${input.orderId}`;
@@ -211,8 +211,8 @@ export class NotificationsService {
 
     const message =
       `Hi ${firstName},\n\n` +
-      `Your Somameha order has been delivered by ${driverName}.\n` +
-      `Thank you for shopping with Somameha.\n` +
+      `Your Kostoma order has been delivered by ${driverName}.\n` +
+      `Thank you for shopping with KOSTOMA.\n` +
       `Ref: ${input.orderId}`;
 
     return this.sms.sendSms(phone, message);
@@ -239,7 +239,7 @@ export class NotificationsService {
 
     const message =
       `Hi ${firstName},\n\n` +
-      `You have been removed from Somame order ${input.orderId}.\n` +
+      `You have been removed from KOSTOMA order ${input.orderId}.\n` +
       `Please ignore any previous delivery instruction for this order.`;
 
     return this.sms.sendSms(phone, message);

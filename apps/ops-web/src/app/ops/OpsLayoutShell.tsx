@@ -212,7 +212,7 @@ export default function OpsLayoutShell({
           <div className="mb-4 flex items-center justify-between">
             <div>
               <div className="text-xl font-black tracking-tight text-emerald-800">
-                Somameha
+                KOSTOMA
               </div>
               <div className="text-xs font-semibold text-slate-500">
                 Operations Console

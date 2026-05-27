@@ -58,11 +58,11 @@ function LoginPageInner() {
         <div className="hidden lg:block">
           <div className="max-w-xl">
             <div className="mb-4 inline-flex items-center rounded-full border border-orange-200 bg-white px-4 py-2 text-sm font-medium text-orange-700 shadow-sm">
-              Welcome back to Somame
+              Welcome back to Kostoma
             </div>
 
             <h1 className="text-5xl font-extrabold tracking-tight text-slate-900">
-              <span className="text-orange-500">Somame</span>
+              <span className="text-orange-500">KOSTOMA</span>
             </h1>
 
             <p className="mt-3 text-xl font-medium text-slate-700">
@@ -71,7 +71,7 @@ function LoginPageInner() {
 
             <p className="mt-6 max-w-lg text-base leading-7 text-slate-600">
               Sign in with your phone number to continue shopping in your local
-              market, manage your orders, and enjoy a smoother Somame
+              market, manage your orders, and enjoy a smoother Kostoma
               experience.
             </p>
 
@@ -109,7 +109,7 @@ function LoginPageInner() {
           <CardContent className="p-0">
             <div className="bg-gradient-to-r from-orange-500 to-orange-400 px-5 py-6 text-white sm:px-8 sm:py-8">
               <div className="text-xs font-medium uppercase tracking-[0.2em] text-orange-100 sm:text-sm">
-                Somame
+                KOSTOMA
               </div>
               <h2 className="mt-3 text-2xl font-bold sm:text-3xl">Login</h2>
               <p className="mt-2 text-sm text-orange-50">

@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Town Commerce",
-  description: "Town Commerce Customer App",
+  title: "KOSTOMA",
+description: "KOSTOMA customer storefront",
 };
 
 export default function RootLayout({

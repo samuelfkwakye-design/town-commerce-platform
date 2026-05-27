@@ -3,13 +3,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Somame Ops",
-    template: "%s — Somame Ops",
-  },
+  default: "KOSTOMA Ops",
+  template: "%s — KOSTOMA Ops",
+},
   description:
-    "Manage orders, drivers, stock, and operations for the Somame Town Commerce Platform.",
+  "Manage orders, drivers, stock, and operations for KOSTOMA.",
 };
-
 export default function RootLayout({
   children,
 }: {

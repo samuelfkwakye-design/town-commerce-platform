@@ -49,7 +49,7 @@ export default async function Page() {
     <div className="min-h-screen bg-slate-100">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-          <p className="text-sm font-medium text-orange-600">Town Commerce</p>
+          <p className="text-sm font-medium text-orange-600">KOSTOMA</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
             Catalog Test — {data.town.name}
           </h1>
