@@ -255,7 +255,7 @@ export default function Page() {
         />
       </div>
 
-      <div className="absolute bottom-3 left-4 right-4 rounded-2xl border border-white/70 bg-white/92 p-3 shadow-xl backdrop-blur md:bottom-5 md:left-6 md:right-auto md:w-[340px] md:rounded-3xl md:p-4">
+      <div className="absolute bottom-4 left-5 right-5 rounded-2xl border border-white/70 bg-white/92 p-3 shadow-xl backdrop-blur md:bottom-5 md:left-6 md:right-auto md:w-[340px] md:rounded-3xl md:p-4">
         <div className="flex items-center gap-3">
           <div className="rounded-2xl bg-orange-50 p-3 text-orange-500">
             <ShoppingBag className="h-5 w-5" />
@@ -313,7 +313,7 @@ export default function Page() {
         <div className="absolute -right-20 top-28 h-72 w-72 rounded-full bg-amber-100/80 blur-3xl" />
         <div className="absolute bottom-8 left-1/2 h-52 w-52 rounded-full bg-orange-100/70 blur-3xl" />
 
-        <div className="relative mx-auto max-w-7xl px-4 pb-20 pt-10 sm:px-6 sm:pb-20 sm:pt-12 md:px-8 lg:pb-20">
+        <div className="relative mx-auto max-w-7xl px-4 pb-32 pt-10 sm:px-6 sm:pb-32 sm:pt-12 md:px-8 lg:pb-20">
           {/* MOBILE HERO */}
           <div className="lg:hidden">
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-orange-200 bg-white/80 px-4 py-2 text-xs font-bold text-orange-700 shadow-sm backdrop-blur">

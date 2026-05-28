@@ -1,11 +1,21 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Lock, Mail, MapPin, Phone, User } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Lock,
+  Mail,
+  MapPin,
+  Phone,
+  ShieldCheck,
+  Sparkles,
+  User,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api";
 
 type Town = {
@@ -116,74 +126,88 @@ function RegisterPageInner() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-white px-4 py-6 sm:px-6 sm:py-10">
-      <div className="mx-auto grid min-h-[80vh] max-w-6xl items-center gap-6 sm:gap-8 lg:grid-cols-2">
-        <div className="hidden lg:block">
-          <div className="max-w-xl">
-            <div className="mb-4 inline-flex items-center rounded-full border border-orange-200 bg-white px-4 py-2 text-sm font-medium text-orange-700 shadow-sm">
-              Join Kostoma today
+    <main className="min-h-screen overflow-hidden bg-[#fffaf5] text-[#0f172a]">
+      <section className="relative min-h-screen bg-[radial-gradient(circle_at_top_left,#ffedd5_0,#fffaf5_35%,#ffffff_100%)] px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
+        <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-orange-200/50 blur-3xl" />
+        <div className="absolute -right-20 top-28 h-72 w-72 rounded-full bg-amber-100/70 blur-3xl" />
+
+        <div className="relative mx-auto grid min-h-[88vh] max-w-7xl items-center gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12">
+          <div className="order-2 lg:order-1">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white/80 px-4 py-2 text-sm font-bold text-orange-700 shadow-sm backdrop-blur"
+            >
+              <Sparkles className="h-4 w-4" />
+              Back to KOSTOMA
+            </Link>
+
+            <div className="mt-6">
+              <Image
+                src="/brand/kostoma-logo.png"
+                alt="KOSTOMA"
+                width={700}
+                height={220}
+                priority
+                className="h-auto w-full max-w-[430px] mix-blend-multiply"
+              />
             </div>
 
-            <h1 className="text-5xl font-extrabold tracking-tight text-slate-900">
-              <span className="text-orange-500">KOSTOMA</span>
+            <h1 className="mt-7 max-w-xl text-4xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+              Create your account and start shopping local.
             </h1>
 
-            <p className="mt-3 text-xl font-medium text-slate-700">
-              Send for it. Shop your town with ease.
+            <p className="mt-5 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
+              Join KOSTOMA to shop your local town market, save your preferred
+              town, track orders, and enjoy carefully packed local delivery.
             </p>
 
-            <p className="mt-6 max-w-lg text-base leading-7 text-slate-600">
-              Create your Kostoma account to shop local markets, track your orders,
-              and enjoy a smoother experience across towns.
-            </p>
-
-            <div className="mt-8 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-3xl border border-orange-100 bg-white p-5 shadow-sm">
-                <div className="mb-3 inline-flex rounded-2xl bg-orange-50 p-3 text-orange-500">
-                  <User className="h-5 w-5" />
-                </div>
-                <div className="font-semibold text-slate-900">Quick sign-up</div>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Register in a few simple steps and start shopping in your chosen
-                  town immediately.
+            <div className="mt-7 grid gap-3 sm:grid-cols-3 lg:max-w-xl">
+              <div className="rounded-3xl border border-orange-100 bg-white/90 p-4 shadow-sm">
+                <CheckCircle2 className="h-5 w-5 text-orange-500" />
+                <div className="mt-3 font-black">Quick sign-up</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Create your account in minutes.
                 </p>
               </div>
 
-              <div className="rounded-3xl border border-orange-100 bg-white p-5 shadow-sm">
-                <div className="mb-3 inline-flex rounded-2xl bg-orange-50 p-3 text-orange-500">
-                  <MapPin className="h-5 w-5" />
-                </div>
-                <div className="font-semibold text-slate-900">Your default town</div>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Choose your usual town now and change it later from your customer
-                  account.
+              <div className="rounded-3xl border border-orange-100 bg-white/90 p-4 shadow-sm">
+                <MapPin className="h-5 w-5 text-orange-500" />
+                <div className="mt-3 font-black">Choose town</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Save your local market area.
+                </p>
+              </div>
+
+              <div className="rounded-3xl border border-orange-100 bg-white/90 p-4 shadow-sm">
+                <ShieldCheck className="h-5 w-5 text-orange-500" />
+                <div className="mt-3 font-black">Shop easily</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Checkout and track orders.
                 </p>
               </div>
             </div>
           </div>
-        </div>
 
-        <Card className="overflow-hidden rounded-3xl border-orange-100 shadow-xl shadow-orange-100/40 sm:rounded-[32px]">
-          <CardContent className="p-0">
-            <div className="bg-gradient-to-r from-orange-500 to-orange-400 px-5 py-6 text-white sm:px-8 sm:py-8">
-              <div className="text-xs font-medium uppercase tracking-[0.2em] text-orange-100 sm:text-sm">
-                KOSTOMA
+          <div className="order-1 lg:order-2">
+            <div className="overflow-hidden rounded-[34px] border border-orange-100 bg-white shadow-2xl shadow-orange-100/50">
+              <div className="bg-gradient-to-br from-orange-500 via-orange-500 to-orange-400 px-6 py-7 text-white sm:px-8">
+                <div className="text-xs font-black uppercase tracking-[0.25em] text-orange-100">
+                  KOSTOMA
+                </div>
+
+                <h2 className="mt-3 text-3xl font-black">Create Account</h2>
+
+                <p className="mt-2 text-sm leading-6 text-orange-50">
+                  Register and start shopping in your local market.
+                </p>
               </div>
-              <h2 className="mt-3 text-2xl font-bold sm:text-3xl">
-                Create Account
-              </h2>
-              <p className="mt-2 text-sm text-orange-50">
-                Register and start shopping in your local market.
-              </p>
-            </div>
 
-            <div className="px-5 py-6 sm:px-8 sm:py-8">
-              <form onSubmit={handleSubmit} className="grid gap-5">
+              <form onSubmit={handleSubmit} className="grid gap-5 px-5 py-6 sm:px-8 sm:py-8">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                  <label className="mb-2 block text-sm font-bold text-slate-700">
                     Phone
                   </label>
-                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
+                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 focus-within:border-orange-300">
                     <Phone className="h-5 w-5 shrink-0 text-orange-500" />
                     <input
                       type="text"
@@ -191,73 +215,77 @@ function RegisterPageInner() {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       required
-                      className="w-full border-none bg-transparent text-base outline-none placeholder:text-slate-400"
+                      className="w-full border-none bg-transparent text-base font-semibold outline-none placeholder:font-normal placeholder:text-slate-400"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    First name
-                  </label>
-                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
-                    <User className="h-5 w-5 shrink-0 text-orange-500" />
-                    <input
-                      type="text"
-                      placeholder="Enter first name"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      required
-                      className="w-full border-none bg-transparent text-base outline-none placeholder:text-slate-400"
-                    />
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-slate-700">
+                      First name
+                    </label>
+                    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 focus-within:border-orange-300">
+                      <User className="h-5 w-5 shrink-0 text-orange-500" />
+                      <input
+                        type="text"
+                        placeholder="First name"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        required
+                        className="w-full border-none bg-transparent text-base font-semibold outline-none placeholder:font-normal placeholder:text-slate-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-slate-700">
+                      Last name
+                    </label>
+                    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 focus-within:border-orange-300">
+                      <User className="h-5 w-5 shrink-0 text-orange-500" />
+                      <input
+                        type="text"
+                        placeholder="Optional"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        className="w-full border-none bg-transparent text-base font-semibold outline-none placeholder:font-normal placeholder:text-slate-400"
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Last name
-                  </label>
-                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
-                    <User className="h-5 w-5 shrink-0 text-orange-500" />
-                    <input
-                      type="text"
-                      placeholder="Enter last name (optional)"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      className="w-full border-none bg-transparent text-base outline-none placeholder:text-slate-400"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                  <label className="mb-2 block text-sm font-bold text-slate-700">
                     Email
                   </label>
-                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
+                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 focus-within:border-orange-300">
                     <Mail className="h-5 w-5 shrink-0 text-orange-500" />
                     <input
                       type="email"
                       placeholder="Enter email (optional)"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full border-none bg-transparent text-base outline-none placeholder:text-slate-400"
+                      className="w-full border-none bg-transparent text-base font-semibold outline-none placeholder:font-normal placeholder:text-slate-400"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                  <label className="mb-2 block text-sm font-bold text-slate-700">
                     Default town
                   </label>
-                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
+                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 focus-within:border-orange-300">
                     <MapPin className="h-5 w-5 shrink-0 text-orange-500" />
                     <select
                       value={defaultTownId}
                       onChange={(e) => setDefaultTownId(e.target.value)}
-                      className="w-full border-none bg-transparent pr-6 text-base outline-none"
+                      className="w-full border-none bg-transparent pr-6 text-base font-semibold outline-none"
                     >
                       <option value="">
-                        {townsLoading ? "Loading towns..." : "Select your default town"}
+                        {townsLoading
+                          ? "Finding available towns..."
+                          : "Select your default town"}
                       </option>
                       {towns.map((town) => (
                         <option key={town.id} value={town.id}>
@@ -269,10 +297,10 @@ function RegisterPageInner() {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                  <label className="mb-2 block text-sm font-bold text-slate-700">
                     Password
                   </label>
-                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-orange-300">
+                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 focus-within:border-orange-300">
                     <Lock className="h-5 w-5 shrink-0 text-orange-500" />
                     <input
                       type="password"
@@ -280,13 +308,13 @@ function RegisterPageInner() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      className="w-full border-none bg-transparent text-base outline-none placeholder:text-slate-400"
+                      className="w-full border-none bg-transparent text-base font-semibold outline-none placeholder:font-normal placeholder:text-slate-400"
                     />
                   </div>
                 </div>
 
                 {error ? (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
                     {error}
                   </div>
                 ) : null}
@@ -294,26 +322,26 @@ function RegisterPageInner() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="h-12 rounded-2xl bg-orange-500 text-base font-semibold text-white hover:bg-orange-600"
+                  className="h-14 rounded-2xl bg-[#0f172a] text-base font-black text-white shadow-xl shadow-slate-900/10 hover:bg-[#1e293b]"
                 >
-                  {loading ? "Creating account..." : "Register"}
-                  {!loading ? <ArrowRight className="ml-2 h-4 w-4" /> : null}
+                  {loading ? "Creating account..." : "Create Account"}
+                  {!loading ? <ArrowRight className="ml-2 h-5 w-5" /> : null}
                 </Button>
-              </form>
 
-              <p className="mt-6 text-sm text-slate-600">
-                Already have an account?{" "}
-                <Link
-                  href={`/auth/login?redirect=${encodeURIComponent(redirect)}`}
-                  className="font-semibold text-orange-600 hover:text-orange-700"
-                >
-                  Login
-                </Link>
-              </p>
+                <p className="text-center text-sm text-slate-600">
+                  Already have an account?{" "}
+                  <Link
+                    href={`/auth/login?redirect=${encodeURIComponent(redirect)}`}
+                    className="font-black text-orange-600 hover:text-orange-700"
+                  >
+                    Login
+                  </Link>
+                </p>
+              </form>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
@@ -322,8 +350,8 @@ export default function RegisterPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-white px-4 py-6 sm:px-6 sm:py-10">
-          <div className="mx-auto max-w-6xl rounded-3xl border-orange-100 bg-white p-6 shadow-xl shadow-orange-100/40 sm:rounded-[32px] sm:p-8">
+        <main className="min-h-screen bg-[#fffaf5] px-4 py-6">
+          <div className="mx-auto max-w-3xl rounded-3xl border border-orange-100 bg-white p-6 shadow-xl shadow-orange-100/40">
             Loading...
           </div>
         </main>

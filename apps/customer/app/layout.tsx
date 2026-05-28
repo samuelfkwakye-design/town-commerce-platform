@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "KOSTOMA | Shop your local town market",
   description:
-    "KOSTOMA helps you shop your local town market and get essentials delivered. Fast, simple and trusted local delivery across UK towns.",
+    "KOSTOMA — shop your local town market in Ghana. Fresh everyday items from trusted local sellers, carefully packed and delivered to your doorstep.",
 };
 
 export default function RootLayout({
