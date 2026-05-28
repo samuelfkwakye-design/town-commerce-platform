@@ -255,20 +255,7 @@ export default function Page() {
         />
       </div>
 
-      <div className="absolute bottom-4 left-5 right-5 rounded-2xl border border-white/70 bg-white/92 p-3 shadow-xl backdrop-blur md:bottom-5 md:left-6 md:right-auto md:w-[340px] md:rounded-3xl md:p-4">
-        <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-orange-50 p-3 text-orange-500">
-            <ShoppingBag className="h-5 w-5" />
-          </div>
-
-          <div className="min-w-0">
-            <div className="font-black text-[#0f172a]">Delivered with care</div>
-            <div className="text-sm text-slate-600">
-              Neatly packed for your doorstep.
-            </div>
-          </div>
-        </div>
-      </div>
+      
     </div>
   );
 
