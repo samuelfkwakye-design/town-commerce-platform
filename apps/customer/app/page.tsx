@@ -251,7 +251,7 @@ export default function Page() {
           width={1400}
           height={1100}
           priority
-          className="aspect-[5/4] w-full rounded-[22px] object-cover sm:aspect-[4/3] sm:rounded-[26px] lg:aspect-[1.12/1]"
+          className="aspect-[5/4] w-full rounded-[22px] object-cover object-[18%_center] sm:aspect-[4/3] sm:rounded-[26px] lg:aspect-[1.12/1]"
         />
       </div>
 
