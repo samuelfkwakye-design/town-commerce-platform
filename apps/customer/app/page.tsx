@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api";
+import Image from "next/image";
 
 type Town = {
   id: string;
@@ -229,14 +230,16 @@ export default function Page() {
                 Local market delivery, reimagined
               </div>
 
-              <h1 className="max-w-2xl text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl">
-                <span className="text-orange-500">KOSTOMA</span>
-              </h1>
-
-              <p className="mt-3 text-base font-medium text-[#0f172a] sm:text-lg md:text-xl">
-                Yɛ bɛto am wo quick!! Shop your town with ease.
-              </p>
-
+              <div className="mt-2 mb-4">
+  <Image
+    src="/brand/kostoma-logo.png"
+    alt="KOSTOMA"
+    width={700}
+    height={220}
+    priority
+    className="h-auto w-full max-w-[700px]"
+  />
+</div>
               <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-700 sm:text-base md:text-lg">
                 Kostoma connects customers to local town markets in a fast, simple
                 and trusted way. Search for your town, browse available products,
