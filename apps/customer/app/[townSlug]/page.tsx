@@ -1,15 +1,35 @@
 import Link from "next/link";
 import {
   Apple,
+  Baby,
   Beef,
+  BookOpen,
+  BriefcaseBusiness,
+  BrickWall,
   CupSoda,
   Fish,
+  Gift,
   Grape,
+  Hammer,
+  Headphones,
+  HeartPulse,
+  Home,
+  Laptop,
+  Monitor,
+  NotebookPen,
   Package,
+  PaintBucket,
+  Pill,
   PlugZap,
+  Scissors,
   Shirt,
   ShoppingBasket,
+  Sofa,
+  Sparkles,
+  SprayCan,
   Store,
+  Smartphone,
+  Wrench,
   Wheat,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -34,15 +54,85 @@ function getCategoryIcon(name: string): LucideIcon {
   if (n.includes("fruit")) return Grape;
   if (n.includes("rice")) return Wheat;
   if (n.includes("grain")) return Wheat;
+  if (n.includes("food")) return Apple;
+  if (n.includes("grocery")) return ShoppingBasket;
+  if (n.includes("provision")) return Package;
+  if (n.includes("snack")) return Package;
+  if (n.includes("bakery") || n.includes("bread")) return Wheat;
+  if (n.includes("spice") || n.includes("season")) return Package;
+
   if (n.includes("drink")) return CupSoda;
   if (n.includes("beverage")) return CupSoda;
+  if (n.includes("sobolo")) return CupSoda;
+
   if (n.includes("meat")) return Beef;
   if (n.includes("fish")) return Fish;
-  if (n.includes("food")) return Apple;
+
   if (n.includes("cloth")) return Shirt;
+  if (n.includes("fashion")) return Shirt;
+  if (n.includes("shoe")) return Shirt;
+  if (n.includes("bag")) return Package;
+  if (n.includes("fabric") || n.includes("textile")) return Shirt;
+
+  if (n.includes("pharma")) return Pill;
+  if (n.includes("medicine")) return Pill;
+  if (n.includes("drug")) return Pill;
+  if (n.includes("health")) return HeartPulse;
+  if (n.includes("wellness")) return HeartPulse;
+  if (n.includes("first aid")) return HeartPulse;
+
+  if (n.includes("baby")) return Baby;
+  if (n.includes("kid")) return Baby;
+
+  if (n.includes("beauty")) return Sparkles;
+  if (n.includes("cosmetic")) return Sparkles;
+  if (n.includes("makeup")) return Sparkles;
+  if (n.includes("perfume")) return SprayCan;
+  if (n.includes("fragrance")) return SprayCan;
+  if (n.includes("hair")) return Scissors;
+  if (n.includes("skin")) return Sparkles;
+
   if (n.includes("elect")) return PlugZap;
   if (n.includes("appliance")) return PlugZap;
-  if (n.includes("provision")) return Package;
+  if (n.includes("phone")) return Smartphone;
+  if (n.includes("mobile")) return Smartphone;
+  if (n.includes("computer")) return Laptop;
+  if (n.includes("laptop")) return Laptop;
+  if (n.includes("tv")) return Monitor;
+  if (n.includes("audio")) return Headphones;
+  if (n.includes("charger")) return PlugZap;
+  if (n.includes("cable")) return PlugZap;
+
+  if (n.includes("furniture")) return Sofa;
+  if (n.includes("home")) return Home;
+  if (n.includes("kitchen")) return Home;
+  if (n.includes("bedding")) return Home;
+  if (n.includes("decor")) return Home;
+  if (n.includes("cleaning")) return Package;
+  if (n.includes("laundry")) return Package;
+
+  if (n.includes("building")) return BrickWall;
+  if (n.includes("cement")) return BrickWall;
+  if (n.includes("brick")) return BrickWall;
+  if (n.includes("paint")) return PaintBucket;
+  if (n.includes("plumbing")) return Wrench;
+  if (n.includes("tool")) return Hammer;
+  if (n.includes("hardware")) return Hammer;
+  if (n.includes("timber")) return Hammer;
+  if (n.includes("wood")) return Hammer;
+  if (n.includes("tiles")) return BrickWall;
+  if (n.includes("floor")) return BrickWall;
+
+  if (n.includes("stationery")) return NotebookPen;
+  if (n.includes("stationary")) return NotebookPen;
+  if (n.includes("book")) return BookOpen;
+  if (n.includes("school")) return NotebookPen;
+  if (n.includes("office")) return BriefcaseBusiness;
+
+  if (n.includes("art")) return Gift;
+  if (n.includes("craft")) return Gift;
+  if (n.includes("gift")) return Gift;
+  if (n.includes("toy")) return Gift;
 
   return Store;
 }
@@ -54,29 +144,68 @@ function getCategoryDescription(name: string, town: string) {
     return `Fresh produce, grains and local meals from trusted sellers in ${town}.`;
   }
 
-  if (n.includes("cloth")) {
-    return `Local fashion, fabrics and everyday wear from ${town} traders.`;
+  if (n.includes("provision")) {
+    return "Everyday essentials, pantry items and household basics from nearby shops.";
   }
 
-  if (n.includes("beverage") || n.includes("drink")) {
+  if (n.includes("beverage") || n.includes("drink") || n.includes("sobolo")) {
     return `Sobolo, soft drinks, water and refreshing local beverages in ${town}.`;
   }
 
-  if (n.includes("elect")) {
+  if (n.includes("cloth") || n.includes("fashion")) {
+    return `Local fashion, fabrics and everyday wear from ${town} traders.`;
+  }
+
+  if (n.includes("beauty") || n.includes("cosmetic") || n.includes("makeup")) {
+    return `Beauty products, cosmetics and personal care items from trusted sellers.`;
+  }
+
+  if (n.includes("perfume") || n.includes("fragrance")) {
+    return `Perfumes, fragrances and personal care products from local sellers.`;
+  }
+
+  if (n.includes("pharma") || n.includes("medicine") || n.includes("health")) {
+    return `Health, pharmacy and wellness essentials from trusted local vendors.`;
+  }
+
+  if (n.includes("baby") || n.includes("kid")) {
+    return `Baby, children’s and family essentials from nearby shops.`;
+  }
+
+  if (n.includes("phone") || n.includes("mobile")) {
+    return `Phones, accessories, chargers and mobile essentials from local traders.`;
+  }
+
+  if (n.includes("elect") || n.includes("appliance")) {
     return `Household electricals and everyday appliances from ${town} vendors.`;
   }
 
-  if (n.includes("provision")) {
-    return "Everyday essentials and pantry items from nearby local shops.";
+  if (n.includes("furniture")) {
+    return `Furniture and home pieces from sellers serving ${town}.`;
   }
 
-  if (n.includes("art") || n.includes("craft")) {
+  if (n.includes("home") || n.includes("kitchen")) {
+    return `Home, kitchen and household essentials from nearby local shops.`;
+  }
+
+  if (n.includes("building") || n.includes("cement") || n.includes("paint")) {
+    return `Building materials, paint and renovation supplies from local traders.`;
+  }
+
+  if (n.includes("tool") || n.includes("hardware")) {
+    return `Tools, hardware and repair essentials from trusted sellers.`;
+  }
+
+  if (n.includes("stationery") || n.includes("stationary") || n.includes("book")) {
+    return `Books, stationery and office supplies from local shops.`;
+  }
+
+  if (n.includes("art") || n.includes("craft") || n.includes("gift")) {
     return `Creative items, handmade goods and local craft products from ${town}.`;
   }
 
   return `Trusted local products and essentials available in ${town}.`;
 }
-
 function CategoryIcon({
   name,
   size = "md",
