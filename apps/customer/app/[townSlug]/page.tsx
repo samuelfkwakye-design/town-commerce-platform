@@ -31,6 +31,35 @@ function getCategoryEmoji(name: string) {
   if (n.includes("cloth")) return "👕";
   return "🛒";
 }
+function getCategoryDescription(name: string, town: string) {
+  const n = name.toLowerCase();
+
+  if (n.includes("food")) {
+    return `Fresh produce, grains and local meals from trusted sellers in ${town}.`;
+  }
+
+  if (n.includes("cloth")) {
+    return `Local fashion, fabrics and everyday wear from ${town} traders.`;
+  }
+
+  if (n.includes("beverage") || n.includes("drink")) {
+    return `Sobolo, soft drinks, water and refreshing local beverages in ${town}.`;
+  }
+
+  if (n.includes("elect")) {
+    return `Household electricals and everyday appliances from ${town} vendors.`;
+  }
+
+  if (n.includes("provision")) {
+    return `Everyday essentials and pantry items from nearby local shops.`;
+  }
+
+  if (n.includes("art") || n.includes("craft")) {
+    return `Creative items, handmade goods and local craft products from ${town}.`;
+  }
+
+  return `Trusted local products and essentials available in ${town}.`;
+}
 
 export default async function TownCatalogPage({
   params,
@@ -172,7 +201,7 @@ export default async function TownCatalogPage({
 
   return (
     <div className="min-h-screen space-y-5 bg-[#fffaf5] pt-3 sm:space-y-6 sm:pt-4">
-      <DeliveryBar />
+      {/* <DeliveryBar /> */}
 
       <section className="-mx-4 hidden border-y border-orange-100 bg-[#fffaf5]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 md:block">
         <div className="flex flex-wrap gap-2 sm:gap-3">
@@ -420,8 +449,7 @@ export default async function TownCatalogPage({
                     </h3>
 
                     <p className="mt-1 text-sm text-slate-500">
-                      Explore {cat.name.toLowerCase()} available in{" "}
-                      {data?.town?.name ?? townSlug}.
+                      {getCategoryDescription(cat.name, data?.town?.name ?? townSlug)}
                     </p>
 
                     <div className="mt-4 text-sm font-medium text-orange-600 group-hover:underline">
