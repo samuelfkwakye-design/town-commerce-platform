@@ -1,11 +1,24 @@
 import Link from "next/link";
+import {
+  Apple,
+  Beef,
+  CupSoda,
+  Fish,
+  Grape,
+  Package,
+  PlugZap,
+  Shirt,
+  ShoppingBasket,
+  Store,
+  Wheat,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import ProductCard from "@/components/ProductCard";
 import StickyCategoryNav from "@/components/StickyCategoryNav";
 import PopularToday from "@/components/PopularToday";
 import { apiFetch } from "@/lib/api";
 import type { CatalogResponse } from "@/lib/types";
 import TrustSignals from "@/components/TrustSignals";
-import DeliveryBar from "@/components/DeliveryBar";
 import MobileCategoryDrawerWrapper from "./page.mobile-drawer";
 
 function chipClass(active: boolean) {
@@ -14,23 +27,26 @@ function chipClass(active: boolean) {
     : "inline-flex items-center rounded-full border border-orange-100 bg-orange-50 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-orange-100 sm:px-4";
 }
 
-function getCategoryEmoji(name: string) {
+function getCategoryIcon(name: string): LucideIcon {
   const n = name.toLowerCase();
 
-  if (n.includes("vegetable")) return "🥬";
-  if (n.includes("fruit")) return "🍎";
-  if (n.includes("rice")) return "🍚";
-  if (n.includes("grain")) return "🌾";
-  if (n.includes("drink")) return "🥤";
-  if (n.includes("beverage")) return "🥤";
-  if (n.includes("snack")) return "🍪";
-  if (n.includes("meat")) return "🥩";
-  if (n.includes("fish")) return "🐟";
-  if (n.includes("bread")) return "🍞";
-  if (n.includes("food")) return "🍽️";
-  if (n.includes("cloth")) return "👕";
-  return "🛒";
+  if (n.includes("vegetable")) return ShoppingBasket;
+  if (n.includes("fruit")) return Grape;
+  if (n.includes("rice")) return Wheat;
+  if (n.includes("grain")) return Wheat;
+  if (n.includes("drink")) return CupSoda;
+  if (n.includes("beverage")) return CupSoda;
+  if (n.includes("meat")) return Beef;
+  if (n.includes("fish")) return Fish;
+  if (n.includes("food")) return Apple;
+  if (n.includes("cloth")) return Shirt;
+  if (n.includes("elect")) return PlugZap;
+  if (n.includes("appliance")) return PlugZap;
+  if (n.includes("provision")) return Package;
+
+  return Store;
 }
+
 function getCategoryDescription(name: string, town: string) {
   const n = name.toLowerCase();
 
@@ -51,7 +67,7 @@ function getCategoryDescription(name: string, town: string) {
   }
 
   if (n.includes("provision")) {
-    return `Everyday essentials and pantry items from nearby local shops.`;
+    return "Everyday essentials and pantry items from nearby local shops.";
   }
 
   if (n.includes("art") || n.includes("craft")) {
@@ -59,6 +75,21 @@ function getCategoryDescription(name: string, town: string) {
   }
 
   return `Trusted local products and essentials available in ${town}.`;
+}
+
+function CategoryIcon({
+  name,
+  size = "md",
+}: {
+  name: string;
+  size?: "sm" | "md" | "lg";
+}) {
+  const Icon = getCategoryIcon(name);
+
+  const sizeClass =
+    size === "sm" ? "h-5 w-5" : size === "lg" ? "h-7 w-7" : "h-6 w-6";
+
+  return <Icon className={sizeClass} />;
 }
 
 export default async function TownCatalogPage({
@@ -119,12 +150,6 @@ export default async function TownCatalogPage({
           <div className="mt-1 break-words">{fetchError}</div>
           <div className="mt-3 text-xs text-red-800">
             Town: <span className="font-mono break-all">{townSlug}</span>
-          </div>
-          <div className="mt-1 text-xs text-red-800">
-            Query:{" "}
-            <span className="font-mono break-all">
-              search={search || "''"} categorySlug={categorySlug || "''"}
-            </span>
           </div>
         </div>
       </div>
@@ -198,11 +223,10 @@ export default async function TownCatalogPage({
     }));
 
   const isSearchMode = !!search;
+  const townLabel = data?.town?.name ?? townSlug;
 
   return (
     <div className="min-h-screen space-y-5 bg-[#fffaf5] pt-3 sm:space-y-6 sm:pt-4">
-      {/* <DeliveryBar /> */}
-
       <section className="-mx-4 hidden border-y border-orange-100 bg-[#fffaf5]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 md:block">
         <div className="flex flex-wrap gap-2 sm:gap-3">
           <Link
@@ -294,9 +318,10 @@ export default async function TownCatalogPage({
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-start gap-3 sm:items-center">
-                    <span className="text-3xl">
-                      {getCategoryEmoji(validSelectedCategory.name)}
+                    <span className="inline-flex rounded-2xl bg-orange-50 p-3 text-orange-500">
+                      <CategoryIcon name={validSelectedCategory.name} />
                     </span>
+
                     <div className="min-w-0">
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-500 sm:text-sm">
                         Category
@@ -324,19 +349,19 @@ export default async function TownCatalogPage({
             </section>
           ) : (
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-[#0f172a] text-white shadow-sm sm:rounded-3xl">
-              <div className="grid gap-6 bg-gradient-to-r from-[#0f172a] to-[#1e293b] p-4 sm:p-6 lg:grid-cols-[1.25fr_0.75fr] lg:p-8">
+              <div className="grid gap-6 bg-gradient-to-br from-[#0f172a] via-[#16213a] to-[#1e293b] p-4 sm:p-6 lg:grid-cols-[1.25fr_0.75fr] lg:p-8">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-200 sm:text-sm">
                     KOSTOMA
                   </p>
 
                   <h1 className="mt-2 break-words text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
-                    {(data?.town?.name ?? townSlug) + " Market"}
+                    {townLabel} Market
                   </h1>
 
                   <p className="mt-4 max-w-2xl text-sm text-slate-200 sm:text-base md:text-lg">
-                    Fresh groceries and essentials from local sellers, delivered
-                    fast in your town.
+                    Fresh groceries and essentials from trusted local sellers,
+                    carefully packed and delivered fast in your town.
                   </p>
 
                   <div className="mt-5 flex flex-wrap gap-2 sm:gap-3">
@@ -368,16 +393,12 @@ export default async function TownCatalogPage({
                       />
                     </div>
 
-                    {featuredCategories[0]?.slug ? (
-                      <Link
-                        href={`/${townSlug}?categorySlug=${encodeURIComponent(
-                          featuredCategories[0].slug
-                        )}`}
-                        className="hidden rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100 md:inline-flex md:items-center md:justify-center"
-                      >
-                        Browse {featuredCategories[0].name}
-                      </Link>
-                    ) : null}
+                    <Link
+                      href={`/${townSlug}`}
+                      className="hidden rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100 md:inline-flex md:items-center md:justify-center"
+                    >
+                      Browse products
+                    </Link>
 
                     <Link
                       href={`/auth/login?redirect=${encodeURIComponent("/account/addresses")}`}
@@ -395,7 +416,9 @@ export default async function TownCatalogPage({
                       href={`/${townSlug}?categorySlug=${encodeURIComponent(cat.slug ?? "")}`}
                       className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur transition hover:bg-white/15"
                     >
-                      <div className="text-3xl">{getCategoryEmoji(cat.name)}</div>
+                      <div className="inline-flex rounded-2xl bg-orange-50 p-3 text-orange-500">
+                        <CategoryIcon name={cat.name} />
+                      </div>
                       <div className="mt-3 break-words text-base font-semibold text-white sm:text-lg">
                         {cat.name}
                       </div>
@@ -412,7 +435,7 @@ export default async function TownCatalogPage({
           {!categorySlug && popularItems.length > 0 ? (
             <PopularToday
               townSlug={townSlug}
-              townLabel={data?.town?.name ?? townSlug}
+              townLabel={townLabel}
               items={popularItems}
             />
           ) : null}
@@ -436,8 +459,8 @@ export default async function TownCatalogPage({
                     className="group rounded-2xl border border-orange-100 bg-gradient-to-b from-white to-orange-50/60 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:rounded-3xl sm:p-5"
                   >
                     <div className="flex items-start justify-between gap-3 sm:gap-4">
-                      <div className="rounded-2xl bg-white p-3 text-3xl shadow-sm sm:text-4xl">
-                        {getCategoryEmoji(cat.name)}
+                      <div className="rounded-2xl bg-orange-50 p-3 text-orange-500 shadow-sm">
+                        <CategoryIcon name={cat.name} size="lg" />
                       </div>
                       <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm">
                         {cat.products.length} items
@@ -449,7 +472,7 @@ export default async function TownCatalogPage({
                     </h3>
 
                     <p className="mt-1 text-sm text-slate-500">
-                      {getCategoryDescription(cat.name, data?.town?.name ?? townSlug)}
+                      {getCategoryDescription(cat.name, townLabel)}
                     </p>
 
                     <div className="mt-4 text-sm font-medium text-orange-600 group-hover:underline">
@@ -488,8 +511,8 @@ export default async function TownCatalogPage({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">
-                        {getCategoryEmoji(cat.name)}
+                      <span className="inline-flex rounded-xl bg-orange-50 p-2 text-orange-500">
+                        <CategoryIcon name={cat.name} size="sm" />
                       </span>
                       <h2 className="break-words text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
                         {cat.name}
