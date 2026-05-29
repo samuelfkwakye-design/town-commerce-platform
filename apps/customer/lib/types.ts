@@ -1,11 +1,28 @@
 export type CatalogResponse = {
-  town: { id: string; name: string; slug: string };
-  filters: { townSlug: string; search: string | null; categorySlug: string | null };
+  town: {
+    id: string;
+    name: string;
+    slug: string;
+    contactEmail?: string | null;
+    contactPhone?: string | null;
+    whatsappNumber?: string | null;
+    supportName?: string | null;
+    contactAddress?: string | null;
+    openingHours?: string | null;
+  };
+
+  filters: {
+    townSlug: string;
+    search: string | null;
+    categorySlug: string | null;
+  };
+
   categories: Array<{
     id: string | null;
     name: string;
     slug: string | null;
     sortOrder: number;
+
     products: Array<{
       townProductId: string;
       productId: string;
@@ -14,6 +31,7 @@ export type CatalogResponse = {
       pricingModel: "UNIT" | "WEIGHT" | "VARIANT";
       pricePerUnit: string | null;
       pricePerKg: string | null;
+
       variants: Array<{
         id: string;
         label: string;

@@ -17,11 +17,16 @@ export default async function TownLayout({
 
   let searchableCategories: SearchableCategory[] = [];
   let searchableProducts: SearchableProduct[] = [];
+  let townName = townSlug;
+  let whatsappNumber: string | null = null;
 
   try {
     const data = await apiFetch<CatalogResponse>(
       `/catalog?townSlug=${encodeURIComponent(townSlug)}&search=&categorySlug=`
     );
+
+    townName = data?.town?.name ?? townSlug;
+    whatsappNumber = data?.town?.whatsappNumber ?? null;
 
     const categories = Array.isArray(data?.categories) ? data.categories : [];
 
@@ -78,6 +83,8 @@ export default async function TownLayout({
   return (
     <TownShell
       townSlug={townSlug}
+      townName={townName}
+      whatsappNumber={whatsappNumber}
       categories={searchableCategories}
       products={searchableProducts}
     >
