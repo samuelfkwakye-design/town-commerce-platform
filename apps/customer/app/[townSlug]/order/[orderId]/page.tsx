@@ -922,19 +922,57 @@ export default async function OrderPage({
         </div>
       </div>
 
-      {!order.customerId ? (
-        <section className="tc-guest-box">
-          <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a" }}>
-            Save your details for next time
-          </h2>
+<section
+  className="tc-section"
+  style={{
+    border: "1px solid #fed7aa",
+    background: "linear-gradient(135deg, #fff7ed 0%, #ffffff 100%)",
+  }}
+>
+  <h2>Need help with this order?</h2>
 
-          <div
-            style={{
-              marginTop: 10,
-              color: "#475569",
-              fontSize: 15,
-              lineHeight: 1.6,
-            }}
+  <div
+    style={{
+      marginTop: 8,
+      color: "#475569",
+      fontSize: 15,
+      lineHeight: 1.6,
+    }}
+  >
+    Contact local support if you have questions about delivery,
+    payment, product availability, refunds or this order.
+  </div>
+
+  <div className="tc-actions" style={{ marginTop: 14 }}>
+    <Link
+      href={`/${townSlug}/contact`}
+      className="tc-btn-primary"
+    >
+      Contact Support
+    </Link>
+
+    <Link
+      href={`/${townSlug}`}
+      className="tc-btn-secondary"
+    >
+      Back to Market
+    </Link>
+  </div>
+</section>
+
+{!order.customerId ? (
+  <section className="tc-guest-box">
+    <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a" }}>
+      Save your details for next time
+    </h2>
+
+    <div
+      style={{
+        marginTop: 10,
+        color: "#475569",
+        fontSize: 15,
+        lineHeight: 1.6,
+      }}
           >
             Create an account to save your phone number and delivery details for faster
             checkout on your next order.

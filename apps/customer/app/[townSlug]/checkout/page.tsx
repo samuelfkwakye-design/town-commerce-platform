@@ -1131,15 +1131,33 @@ export default function CheckoutPage() {
               {isSubmitting ? "Placing order..." : "Place order"}
             </Button>
 
-            {!canSubmit ? (
-              <div className="mt-3 text-xs text-slate-500">
-                Complete the required fields before placing your order.
-              </div>
-            ) : null}
+           {!canSubmit ? (
+  <div className="mt-3 text-xs text-slate-500">
+    Complete the required fields before placing your order.
+  </div>
+) : null}
 
-            <div className="mt-4 text-sm text-slate-500">
-              You’ll see your order confirmation immediately after placing the order.
-            </div>
+<div className="mt-4 text-sm text-slate-500">
+  You’ll see your order confirmation immediately after placing the order.
+</div>
+
+<div className="mt-6 rounded-xl border border-orange-200 bg-orange-50 p-4">
+  <div className="font-semibold text-slate-900">
+    Need help before ordering?
+  </div>
+
+  <div className="mt-1 text-sm text-slate-600">
+    Contact local support if you have questions about delivery,
+    payments, products or your order.
+  </div>
+
+  <Link
+    href={`/${townSlug}/contact`}
+    className="mt-3 inline-flex items-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+  >
+    Contact Support
+  </Link>
+</div>
           </Card>
         </div>
       </div>
