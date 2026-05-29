@@ -20,7 +20,18 @@ export class CatalogService {
 
     const town = await this.prisma.town.findUnique({
       where: { slug: townSlug },
-      select: { id: true, name: true, slug: true },
+      select: {
+  id: true,
+  name: true,
+  slug: true,
+
+  contactEmail: true,
+  contactPhone: true,
+  whatsappNumber: true,
+  supportName: true,
+  contactAddress: true,
+  openingHours: true,
+},
     });
 
     if (!town) throw new NotFoundException(`Town not found: ${townSlug}`);
@@ -182,7 +193,18 @@ export class CatalogService {
 
     const town = await this.prisma.town.findUnique({
       where: { slug: townSlug },
-      select: { id: true, slug: true, name: true },
+      select: {
+  id: true,
+  slug: true,
+  name: true,
+
+  contactEmail: true,
+  contactPhone: true,
+  whatsappNumber: true,
+  supportName: true,
+  contactAddress: true,
+  openingHours: true,
+},
     });
 
     if (!town) {
@@ -261,7 +283,18 @@ export class CatalogService {
 
     const town = await this.prisma.town.findUnique({
       where: { slug: townSlug },
-      select: { id: true, slug: true, name: true },
+      select: {
+  id: true,
+  slug: true,
+  name: true,
+
+  contactEmail: true,
+  contactPhone: true,
+  whatsappNumber: true,
+  supportName: true,
+  contactAddress: true,
+  openingHours: true,
+},
     });
 
     if (!town) {

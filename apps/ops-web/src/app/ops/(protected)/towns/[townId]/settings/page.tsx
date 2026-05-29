@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { getCurrentAdmin } from '@/lib/admin/getCurrentAdmin';
+
 export const dynamic = 'force-dynamic';
 
 type AdminRole =
@@ -15,6 +16,12 @@ type Town = {
   name: string;
   slug: string;
   isActive?: boolean;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  whatsappNumber?: string | null;
+  supportName?: string | null;
+  contactAddress?: string | null;
+  openingHours?: string | null;
 };
 
 type TownSettings = {
@@ -81,18 +88,39 @@ async function saveTownSettings(formData: FormData) {
   const minimumOrder = String(formData.get('minimumOrder') || '0');
   const currency = String(formData.get('currency') || 'GHS');
 
+  const supportName = String(formData.get('supportName') || '');
+  const contactEmail = String(formData.get('contactEmail') || '');
+  const contactPhone = String(formData.get('contactPhone') || '');
+  const whatsappNumber = String(formData.get('whatsappNumber') || '');
+  const contactAddress = String(formData.get('contactAddress') || '');
+  const openingHours = String(formData.get('openingHours') || '');
+
   await apiFetch(`/admin/town-settings/${encodeURIComponent(effectiveTownId)}`, {
-  method: 'POST',
-  auth: true,
-  body: {
-    deliveryFee,
-    serviceFee,
-    minimumOrder,
-    currency,
-  },
-});
+    method: 'POST',
+    auth: true,
+    body: {
+      deliveryFee,
+      serviceFee,
+      minimumOrder,
+      currency,
+    },
+  });
+
+  await apiFetch(`/admin/towns/${encodeURIComponent(effectiveTownId)}`, {
+    method: 'PATCH',
+    auth: true,
+    body: {
+      supportName,
+      contactEmail,
+      contactPhone,
+      whatsappNumber,
+      contactAddress,
+      openingHours,
+    },
+  });
 
   revalidatePath(`/ops/towns/${effectiveTownId}/settings`);
+  revalidatePath('/ops/towns');
   redirect(`/ops/towns/${effectiveTownId}/settings?saved=1`);
 }
 
@@ -147,20 +175,20 @@ export default async function Page({
 
   try {
     settings = await apiFetch<TownSettings>(
-  `/admin/town-settings/${encodeURIComponent(effectiveTownId)}`,
-  { auth: true },
-);
+      `/admin/town-settings/${encodeURIComponent(effectiveTownId)}`,
+      { auth: true },
+    );
   } catch {
     settings = null;
   }
 
   return (
-    <main className="mx-auto max-w-2xl space-y-6 p-6">
+    <main className="mx-auto max-w-3xl space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Town Settings</h1>
           <p className="text-sm text-gray-500">
-            Configure checkout fees for {town.name}
+            Configure checkout fees and support contacts for {town.name}
           </p>
           <p className="mt-1 text-xs text-gray-500">
             Role: <span className="font-medium">{admin.role}</span>
@@ -185,51 +213,135 @@ export default async function Page({
         </div>
       ) : null}
 
-      <form action={saveTownSettings} className="space-y-4 rounded-xl border bg-white p-6">
+      <form action={saveTownSettings} className="space-y-6">
         <input type="hidden" name="townId" value={effectiveTownId} />
 
-        <div>
-          <label className="mb-1 block text-sm font-medium">Delivery Fee</label>
-          <input
-            name="deliveryFee"
-            type="number"
-            step="0.01"
-            defaultValue={settings?.deliveryFee ?? '0'}
-            className="w-full rounded border px-3 py-2"
-          />
-        </div>
+        <section className="space-y-4 rounded-xl border bg-white p-6">
+          <div>
+            <h2 className="text-lg font-semibold">Checkout Fees</h2>
+            <p className="text-sm text-gray-500">
+              These values control what customers pay at checkout.
+            </p>
+          </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium">Service Fee</label>
-          <input
-            name="serviceFee"
-            type="number"
-            step="0.01"
-            defaultValue={settings?.serviceFee ?? '0'}
-            className="w-full rounded border px-3 py-2"
-          />
-        </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Delivery Fee</label>
+            <input
+              name="deliveryFee"
+              type="number"
+              step="0.01"
+              defaultValue={settings?.deliveryFee ?? '0'}
+              className="w-full rounded border px-3 py-2"
+            />
+          </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium">Minimum Order</label>
-          <input
-            name="minimumOrder"
-            type="number"
-            step="0.01"
-            defaultValue={settings?.minimumOrder ?? '0'}
-            className="w-full rounded border px-3 py-2"
-          />
-        </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Service Fee</label>
+            <input
+              name="serviceFee"
+              type="number"
+              step="0.01"
+              defaultValue={settings?.serviceFee ?? '0'}
+              className="w-full rounded border px-3 py-2"
+            />
+          </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium">Currency</label>
-          <input
-            name="currency"
-            type="text"
-            defaultValue={settings?.currency ?? 'GHS'}
-            className="w-full rounded border px-3 py-2"
-          />
-        </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Minimum Order</label>
+            <input
+              name="minimumOrder"
+              type="number"
+              step="0.01"
+              defaultValue={settings?.minimumOrder ?? '0'}
+              className="w-full rounded border px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Currency</label>
+            <input
+              name="currency"
+              type="text"
+              defaultValue={settings?.currency ?? 'GHS'}
+              className="w-full rounded border px-3 py-2"
+            />
+          </div>
+        </section>
+
+        <section className="space-y-4 rounded-xl border bg-white p-6">
+          <div>
+            <h2 className="text-lg font-semibold">Town Contact Details</h2>
+            <p className="text-sm text-gray-500">
+              These details will appear on the customer Contact Us page.
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Support Name</label>
+            <input
+              name="supportName"
+              type="text"
+              defaultValue={town.supportName ?? ''}
+              placeholder={`${town.name} Support Team`}
+              className="w-full rounded border px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Contact Email</label>
+            <input
+              name="contactEmail"
+              type="email"
+              defaultValue={town.contactEmail ?? ''}
+              placeholder="support@kostoma.com"
+              className="w-full rounded border px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Phone / SMS Number</label>
+            <input
+              name="contactPhone"
+              type="text"
+              defaultValue={town.contactPhone ?? ''}
+              placeholder="+233..."
+              className="w-full rounded border px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">WhatsApp Number</label>
+            <input
+              name="whatsappNumber"
+              type="text"
+              defaultValue={town.whatsappNumber ?? ''}
+              placeholder="+233..."
+              className="w-full rounded border px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Contact Address</label>
+            <input
+              name="contactAddress"
+              type="text"
+              defaultValue={town.contactAddress ?? ''}
+              placeholder="Market office address"
+              className="w-full rounded border px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Opening Hours</label>
+            <input
+              name="openingHours"
+              type="text"
+              defaultValue={town.openingHours ?? ''}
+              placeholder="Mon-Sat, 8am-6pm"
+              className="w-full rounded border px-3 py-2"
+            />
+          </div>
+        </section>
 
         <button type="submit" className="rounded bg-black px-4 py-2 text-white">
           Save Settings

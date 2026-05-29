@@ -45,6 +45,13 @@ export default function NewTownClient() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
 
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [supportName, setSupportName] = useState("");
+  const [contactAddress, setContactAddress] = useState("");
+  const [openingHours, setOpeningHours] = useState("");
+
   const [cloneEnabled, setCloneEnabled] = useState(false);
   const [cloneFromTownId, setCloneFromTownId] = useState("");
   const [copyVariants, setCopyVariants] = useState(true);
@@ -64,16 +71,18 @@ export default function NewTownClient() {
       setLoadingTowns(true);
       try {
         const data = await apiFetch<TownsResponse>("/admin/towns", {
-  method: "GET",
-  auth: true,
-});
+          method: "GET",
+          auth: true,
+        });
+
         const rows = data?.rows ?? [];
         setTowns(rows);
+
         if (!cloneFromTownId && rows.length) {
           setCloneFromTownId(rows[0].id);
         }
       } catch {
-        // do not block the page if towns fail to load
+        // Do not block the page if towns fail to load.
       } finally {
         setLoadingTowns(false);
       }
@@ -92,6 +101,14 @@ export default function NewTownClient() {
       const payload = {
         name: name.trim(),
         slug: (slug.trim() || suggestedSlug).toLowerCase(),
+
+        contactEmail,
+        contactPhone,
+        whatsappNumber,
+        supportName,
+        contactAddress,
+        openingHours,
+
         cloneFromTownId: cloneEnabled ? cloneFromTownId : null,
         copyVariants,
         copyImages,
@@ -99,10 +116,10 @@ export default function NewTownClient() {
       };
 
       await apiFetch<CreateTownResponse>("/admin/towns", {
-  method: "POST",
-  body: payload,
-  auth: true,
-});
+        method: "POST",
+        body: payload,
+        auth: true,
+      });
 
       router.push("/ops/towns");
       router.refresh();
@@ -119,7 +136,8 @@ export default function NewTownClient() {
         <div>
           <h1 className="text-2xl font-semibold">New Town</h1>
           <p className="text-sm text-gray-500">
-            Create a new town for product listings and customer storefronts.
+            Create a new town for product listings, customer storefronts, and
+            town-specific support contacts.
           </p>
         </div>
 
@@ -134,7 +152,10 @@ export default function NewTownClient() {
         </div>
       ) : null}
 
-      <form onSubmit={onSubmit} className="max-w-2xl space-y-5 rounded-lg border bg-white p-5 shadow-sm">
+      <form
+        onSubmit={onSubmit}
+        className="max-w-2xl space-y-5 rounded-lg border bg-white p-5 shadow-sm"
+      >
         <div>
           <label className="block text-sm text-gray-600">Town name</label>
           <input
@@ -159,6 +180,85 @@ export default function NewTownClient() {
             Leave blank to auto-generate from the name. Suggested:{" "}
             <span className="font-medium">{suggestedSlug || "—"}</span>
           </p>
+        </div>
+
+        <div className="rounded-md border bg-gray-50 p-4 space-y-4">
+          <div>
+            <h2 className="font-medium">Town Contact Details</h2>
+            <p className="mt-1 text-xs text-gray-500">
+              These details will appear on the customer Contact Us page for this
+              town.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-600">Support name</label>
+            <input
+              value={supportName}
+              onChange={(e) => setSupportName(e.target.value)}
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              placeholder="e.g. Kumasi Support Team"
+              disabled={saving}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-600">Contact email</label>
+            <input
+              type="email"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              placeholder="e.g. kumasi@kostoma.com"
+              disabled={saving}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-600">
+              Phone / SMS number
+            </label>
+            <input
+              value={contactPhone}
+              onChange={(e) => setContactPhone(e.target.value)}
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              placeholder="e.g. +233..."
+              disabled={saving}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-600">WhatsApp number</label>
+            <input
+              value={whatsappNumber}
+              onChange={(e) => setWhatsappNumber(e.target.value)}
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              placeholder="e.g. +233..."
+              disabled={saving}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-600">Contact address</label>
+            <input
+              value={contactAddress}
+              onChange={(e) => setContactAddress(e.target.value)}
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              placeholder="e.g. Market office address"
+              disabled={saving}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-600">Opening hours</label>
+            <input
+              value={openingHours}
+              onChange={(e) => setOpeningHours(e.target.value)}
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              placeholder="e.g. Mon-Sat, 8am-6pm"
+              disabled={saving}
+            />
+          </div>
         </div>
 
         <div className="rounded-md border bg-gray-50 p-4 space-y-4">

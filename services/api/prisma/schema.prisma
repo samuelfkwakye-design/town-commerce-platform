@@ -61,15 +61,24 @@ model CustomerPasswordReset {
 }
 
 model Town {
-  id                 String              @id @default(cuid())
-  name               String              @unique
-  slug               String              @unique
-  isActive           Boolean             @default(true)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id              String   @id @default(cuid())
+  name            String   @unique
+  slug            String   @unique
+  isActive        Boolean  @default(true)
+
+  contactEmail    String?
+  contactPhone    String?
+  whatsappNumber  String?
+  supportName     String?
+  contactAddress  String?
+  openingHours    String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
   adminNotifications AdminNotification[]
   adminUsers         AdminUser[]
-  defaultCustomers   Customer[]          @relation("CustomerDefaultTown")
+  defaultCustomers   Customer[] @relation("CustomerDefaultTown")
   drivers            Driver[]
   orders             Order[]
   promoCodes         PromoCode[]
