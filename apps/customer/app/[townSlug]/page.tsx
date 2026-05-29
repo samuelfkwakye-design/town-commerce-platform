@@ -206,6 +206,7 @@ function getCategoryDescription(name: string, town: string) {
 
   return `Trusted local products and essentials available in ${town}.`;
 }
+
 function CategoryIcon({
   name,
   size = "md",
@@ -530,6 +531,13 @@ export default async function TownCatalogPage({
                     </Link>
 
                     <Link
+                      href={`/${townSlug}/contact`}
+                      className="inline-flex w-full items-center justify-center rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white hover:bg-white/15 sm:w-auto"
+                    >
+                      Contact Us
+                    </Link>
+
+                    <Link
                       href={`/auth/login?redirect=${encodeURIComponent("/account/addresses")}`}
                       className="inline-flex w-full items-center justify-center rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white hover:bg-white/15 sm:w-auto"
                     >
@@ -681,6 +689,29 @@ export default async function TownCatalogPage({
           )}
         </section>
       )}
+
+      <section className="rounded-[2rem] bg-slate-950 p-6 text-white shadow-xl">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-bold text-orange-300">Need help?</p>
+
+            <h2 className="mt-1 text-2xl font-black">
+              Contact {townLabel} support
+            </h2>
+
+            <p className="mt-2 text-sm text-slate-300">
+              Questions about orders, delivery, products or local sellers?
+            </p>
+          </div>
+
+          <Link
+            href={`/${townSlug}/contact`}
+            className="inline-flex items-center justify-center rounded-full bg-orange-500 px-6 py-3 text-sm font-black text-white hover:bg-orange-600"
+          >
+            Contact Us
+          </Link>
+        </div>
+      </section>
 
       <TrustSignals town={townSlug} />
     </div>
